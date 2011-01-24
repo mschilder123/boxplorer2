@@ -1,10 +1,40 @@
 all: boxplorer shadershrink
 
-CFLAGS=-O2 -Wall
-LDFLAGS=-lm -lGL -lSDL
+CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX
 
-boxplorer: boxplorer.cc default_shaders.h shader_procs.h Makefile
-	g++ $(CFLAGS) boxplorer.cc -o boxplorer $(LDFLAGS)
+LDFLAGS=-lm -lGL -lSDL -lX11
 
-shadershrink: shadershrink.c shadershrink.h Makefile
-	g++ $(CFLAGS) shadershrink.c -o shadershrink
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o
+
+boxplorer: boxplorer.o Makefile.linux $(TW_OBJS)
+	g++ boxplorer.o $(TW_OBJS) -o boxplorer $(LDFLAGS)
+
+boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.linux
+	g++ -c $(CFLAGS) boxplorer.cc
+
+shadershrink: shadershrink.cc shadershrink.h Makefile.linux
+	g++ $(CFLAGS) shadershrink.cc -o shadershrink
+
+TwBar.o: AntTweakBar/src/TwBar.cpp
+	g++ -c $(CFLAGS) $<
+
+TwFonts.o: AntTweakBar/src/TwFonts.cpp
+	g++ -c $(CFLAGS) $<
+
+TwMgr.o: AntTweakBar/src/TwMgr.cpp
+	g++ -c $(CFLAGS) $<
+
+TwPrecomp.o: AntTweakBar/src/TwPrecomp.cpp
+	g++ -c $(CFLAGS) $<
+
+TwColors.o: AntTweakBar/src/TwColors.cpp
+	g++ -c $(CFLAGS) $<
+
+TwOpenGL.o: AntTweakBar/src/TwOpenGL.cpp
+	g++ -c $(CFLAGS) $<
+
+LoadOGL.o: AntTweakBar/src/LoadOGL.cpp
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
+	g++ -c $(CFLAGS) $<
