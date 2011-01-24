@@ -1,0 +1,29 @@
+Menger box for Boxplorer 1.02 
+=============================
+unzip inside Boxplorer 1.02 folder
+
+Usage
+-----
+ click blend-menger-sphere shortcut
+ or from the command line:
+ mandelbox blend-menger-sphere.cfg
+
+ The shader files are in "blend-menger-sphere" folder
+
+Controls
+--------
+ * up/down arrow      - modify active parameter .y
+ * left/right arrow   - modify active parameter .x
+ 
+ACTIVE PARAMETERS (for this shader)
+-----------------------------------
+[1] key: up/down arrows change the size of the holes (1==> Menger)
+[2] key: up/down arrows change x position of the holes (0==> Menger)
+[2] key: left/right arrows change y position of the holes (0==> Menger)
+[3] key: up/down arrows change z position of the holes (0==> Menger)
+[4] key: up/down arrows change blend factor (0==>Menger, 1==> sphere, values >1 and <0 are allowed :)
+[4] key: left/right arrows change radius of sphere.
+
+You can also navigate inside this thing :)
+Enjoy!
+Knighty

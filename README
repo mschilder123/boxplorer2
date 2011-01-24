@@ -1,0 +1,65 @@
+Added simple makefiles for linux, win32 and osx. Mild testing on all got done.
+Copy Makefile.? to Makefile and run make/nmake.
+
+You'll need SDL ( http://www.libsdl.org/download-1.2.php )
+
+Compared to starting point boxplorer-1.02:
+- added z-buffering splining, rough keyframe editing and visualization.
+- changed some controls around.
+
+Keyboard control:
+
+W,A,S,D + mouse : move, look around
+Q,E             : roll
+Z,C             : adjust movement speed
+
+Keyframe control:
+
+HOME      : splines keyframes and starts going along path
+            (needs at least two keyframes be defined..)
+END       : jump to last keyframe
+TAB       : jumps to next keyframe
+BACKSPACE : jumps to previous keyframe
+SPACE     : add current camera as new next keyframe
+DEL       : delete last keyframe
+
+CTRL-SPACE: rewrite currently selected keyframe with camera
+CTRL-TAB  : start playing from current keyframe
+CTRL-DEL  : delete currently selected keyframe
+
+When clicking the mouse once or hitting ESC,
+a mouse cursor appears. Hoover over a blue keyframe bar and
+the console should say which keyframe is under the cursor.
+You can try drag the keyframe bar with the mouse.
+
+Controls that affect the currently selected keyframe:
+
+NUMPAD 7, 9  or
+mousewheel     : adjust camera speed
+NUMPAD 2,4,6,8 : move keyframe up/down/left/right
+
+Once you have a sequence you want to render to a movie,
+restart with argument --render.
+Thus like 'boxplorer your.cfg --render'.
+Rendered frames will be written to the .data directory that
+is associated with the .cfg file (your.cfg.data/).
+Change resolution in your.cfg to desired movie resolution.
+--render --speed takes the speed parameter from your.cfg and only
+renders a frame every a fixed distance along the spline. Constant speed.
+--render --time takes the fps parameter into account and outputs a
+frame based on the time difference between keyframes.
+
+Options for stereoscopic rendering:
+
+--xeyed     : cross eyed side-by-side (half horizontal resolution).
+--overunder : over-under mode (half vertical resolution).
+--interlaced : Zalman display interlaced mode (left odd, right even).
+
+To make a flight path form a loop, edit the .cfg file to have it
+contain a line 'loop 1'. Or add --loop on the commandline.
+
+I added a couple sample configs, that include alternate fragment.glsl code to
+either change the box appearance or switch fractal entirely (bulb,
+menger,blend-menger).
+
+-marius

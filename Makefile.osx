@@ -1,0 +1,10 @@
+all: boxplorer shadershrink
+
+CFLAGS=-O2
+LDFLAGS=-framework SDL -framework OpenGL -framework Cocoa
+
+boxplorer: boxplorer.cc default_shaders.h shader_procs.h Makefile
+	g++ $(CFLAGS) boxplorer.cc SDLmain.m -o boxplorer $(LDFLAGS)
+
+shadershrink: shadershrink.c shadershrink.h Makefile
+	g++ $(CFLAGS) shadershrink.c -o shadershrink

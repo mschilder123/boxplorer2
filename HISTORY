@@ -1,0 +1,48 @@
+2011-01-23 v2.00
+----------------
+- Stereoscopic rendering
+- zBuffer
+- Splining
+- Path visualization
+- AntTweakBar
+- sequence rendering
+- added various fractal configs
+
+2010-07-20 v1.02
+----------------
+Program changes:
+- Config file.
+- Screenshots and parameter snapshots.
+- Fullscreen switching on the fly.
+- Allowed to release the mouse.
+- Full screen anti-aliasing.
+- Better controls.
+- 10x2 parameters to play with in custom shaders.
+- Shader-shrinking script is much smarter, pretty output formatting.
+- Works in Linux (copile with gcc).
+
+Mandelbox shader changes:
+- Ambient occlusion (similar to iq's method in Slisesix).
+- Allowed to change minRadius.
+- Overstepping in raymarching (speedup in complex scenes, but may... overstep :-)).
+- More gradient estimation methods.
+- Surface fades into background after reaching max_steps (fewer steps needed).
+- Speedup in the inner Mandelbox iteration. Saved a register on NVIDIA.
+- More interesting coloring method (orbit trap + fractional iterations).
+- Colors that don't hurt your eyes. ;-)
+
+2010-06-23 v1.01
+----------------
+- Default internal shaders (obfuscated by a script).
+  Optionally overriden by external files "vertex.glsl" or "fragment.glsl".
+- Added "glGetShaderInfoLog" to catch errors.
+- FPS averaging over the last 6 frames.
+- Ambient light (0.2).
+- Shader speedup, ATI compatibility (in function "shade": "half"->"halfLV")
+- test (ATI Radeon HD 4850): 44.5 fps
+- test (NVIDIA Geforce 9300M GS): 2.61 fps
+
+2010-06-20 Initial release
+--------------------------
+- test (NVIDIA Geforce 9300M GS): 2.31 fps
+- test (Intel i945GMS): N/A (no GLSL)
