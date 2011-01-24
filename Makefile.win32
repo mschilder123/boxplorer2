@@ -4,7 +4,7 @@ CFLAGS=/I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /
 LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwEventSDL.obj TwColors.obj TwOpenGL.obj \
-        TwPreComp.obj LoadOGL.obj TwEventWin.obj TwDirect3D10.obj TwDirect3D9.obj
+        TwPrecomp.obj LoadOGL.obj TwEventWin.obj TwDirect3D10.obj TwDirect3D9.obj
 
 boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h Makefile.win32 $(TW_OBJS)
 	cl -c $(CFLAGS) boxplorer.cc
@@ -31,7 +31,7 @@ TwEventSDL.obj: AntTweakBar\src\TwEventSDL.c
 TwOpenGL.obj: AntTweakBar\src\TwOpenGL.cpp
 	cl -c $(CFLAGS) $**
 
-TwPreComp.obj: AntTweakBar\src\TwPreComp.cpp
+TwPrecomp.obj: AntTweakBar\src\TwPrecomp.cpp
 	cl -c $(CFLAGS) $**
 
 LoadOGL.obj: AntTweakBar\src\LoadOGL.cpp
