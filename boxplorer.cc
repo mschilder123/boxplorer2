@@ -1097,6 +1097,8 @@ int main(int argc, char **argv) {
   // Load configuration.
   if (config.loadConfig(configFile)) {
     changeWorkingDirectory(configFile);
+  } else {
+    die("Usage: boxplorer <configuration-file.cfg>");
   }
 
   // Sanitize config only parameters.
