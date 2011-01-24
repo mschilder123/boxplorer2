@@ -1,0 +1,10 @@
+all: boxplorer shadershrink
+
+CFLAGS=-O2 -Wall
+LDFLAGS=-lm -lGL -lSDL
+
+boxplorer: boxplorer.cc default_shaders.h shader_procs.h Makefile
+	g++ $(CFLAGS) boxplorer.cc -o boxplorer $(LDFLAGS)
+
+shadershrink: shadershrink.c shadershrink.h Makefile
+	g++ $(CFLAGS) shadershrink.c -o shadershrink

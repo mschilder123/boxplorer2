@@ -1,0 +1,47 @@
+all: boxplorer.exe shadershrink.exe
+
+CFLAGS=/I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
+LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console
+
+TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwEventSDL.obj TwColors.obj TwOpenGL.obj \
+        TwPreComp.obj LoadOGL.obj TwEventWin.obj TwDirect3D10.obj TwDirect3D9.obj
+
+boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h Makefile.win32 $(TW_OBJS)
+	cl -c $(CFLAGS) boxplorer.cc
+	link $(LDFLAGS) boxplorer.obj  $(TW_OBJS)
+
+shadershrink.exe: shadershrink.cc Makefile.win32
+	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
+
+TwBar.obj: AntTweakBar\src\TwBar.cpp
+	cl -c $(CFLAGS) $**
+
+TwMgr.obj: AntTweakBar\src\TwMgr.cpp
+	cl -c $(CFLAGS) $**
+
+TwColors.obj: AntTweakBar\src\TwColors.cpp
+	cl -c $(CFLAGS) $**
+
+TwFonts.obj: AntTweakBar\src\TwFonts.cpp
+	cl -c $(CFLAGS) $**
+
+TwEventSDL.obj: AntTweakBar\src\TwEventSDL.c
+	cl -c $(CFLAGS) $**
+
+TwOpenGL.obj: AntTweakBar\src\TwOpenGL.cpp
+	cl -c $(CFLAGS) $**
+
+TwPreComp.obj: AntTweakBar\src\TwPreComp.cpp
+	cl -c $(CFLAGS) $**
+
+LoadOGL.obj: AntTweakBar\src\LoadOGL.cpp
+	cl -c $(CFLAGS) $**
+
+TwEventWin.obj: AntTweakBar\src\TwEventWin.c
+	cl -c $(CFLAGS) $**
+
+TwDirect3D10.obj: AntTweakBar\src\TwDirect3D10.cpp
+	cl -c $(CFLAGS) $**
+
+TwDirect3D9.obj: AntTweakBar\src\TwDirect3D9.cpp
+	cl -c $(CFLAGS) $**

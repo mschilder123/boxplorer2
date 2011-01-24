@@ -1,0 +1,116 @@
+Boxplorer 1.02
+==============
+
+Requirements
+------------
+- Video card with GLSL support (OpenGL 2.0)
+- SDL runtime library installed (http://www.libsdl.org/download-1.2.php)
+
+Usage
+-----
+
+  boxplorer [configuration file]
+
+The default configuration file is "boxplorer.cfg".
+
+Put "vertex.glsl" or "fragment.glsl" in the same folder as the executable
+to override default shaders.
+
+Controls
+--------
+ESC                - exit the program in fullscreen mode, release the mouse in window mode (click to regrab)
+ESC ESC            - exit the program
+Enter              - toggle fullscreen and reload shaders
+Space              - take a screenshot (.tga) and save parameters (.cfg)
+
+mouse movement     - look around
+mouse buttons      - move forward/back, remember movement direction
+Alt                - move forward
+press Shift, Ctrl  - double/halve movement speed
+W, A, S, D         - strafe (move sideways)
+Q, E               - roll
+
+W+S, A+D           - move forward/back
+forward+back       - move forward at 25% speed
+
+up/down arrow      - modify active parameter .y
+left/right arrow   - modify active parameter .x
+
+Modes
+-----
+One of these modes can be active:
+
+L      - "look around" mode: rotate camera
+F      - field of vision mode: zoom / aspect ratio
+R      - raymarching mode: required distance from fractal / max step count
+I      - iteration mode: iteration count / iteration count for coloring
+O      - ambient occlusion mode: strength of AO / scale for AO
+G      - glow mode: glow strength / object distance to color curve
+0...9  - user mode: modify parameters par0...par9
+
+Par0 is used for |minRadius2| and |scale| in the default Mandelbox shader.
+
+
+Configuration file parameters
+-----------------------------
+width, height           Window/viewport dimensions. Config only.
+                        If you set only one, the window aspect ratio will be 4:3.
+
+multisamples            Number of FSAA samples per pixel (full screen anti-aliasing). Config only.
+                        If you specify 1, no multisampling is used.
+                        Commonly supported values are 1,2,4,6,8 and 16.
+
+fullscreen              0 for window mode, 1 for fullscreen mode. Switched with Enter.
+                        If the desired resolution isn't supported, the next larger available mode
+                        will be set with a smaller viewport in its center.
+                        Parameters are visible only in window mode (in the window caption).
+
+speed                   Movement speed (units per frame). Can be adjusted by Shift and Ctrl.
+
+keyb_rot_speed          Degrees to turn per frame in mode L. Config only.
+
+mouse_rot_speed         Degrees to turn per pixel of mouse movement. Config only.
+
+fov_x, fov_y            Field of vision in degrees.
+                        If you set only one, the other is calculated to make pixels square.
+                        Modified in mode F.
+
+min_dist                Distance from the fractal that must be reached for the raymarching to stop.
+                        Higher values have banding artifacts, but are faster.
+                        Values around 1e-7 start having floating-point accuracy issues.
+                        Modified in mode R.
+
+max_steps               Maximum steps that raymarching can make. Glow density is based on it.
+                        Modified in mode R.
+
+iters                   Number of iterations. Modified in mode I.
+
+color_iters             Number of iterations for coloring. Modified in mode I.
+
+ao_eps                  Samples for ambient occlusion are taken at distances ao_eps*{2,3,5,9,17} along the normal.
+                        Lower values should have min_dist lowered appropriately.
+                        Modified in mode O.
+
+ao_strength             How much is the resultant color weighted by ambient occlusion.
+                        Modified in mode O.
+
+glow_strength           Glow progression is linear between zero steps and max_steps. This parameter
+                        controls how much glow is applied after max_steps is reached.
+                        Modified in mode G.
+
+dist_to_color           Controls how object distance is mapped to color (applies only when
+                        max_steps is reached).
+                        Modified in mode G.
+
+position x y z          Camera position in world units. Modified by moving the camera.
+
+direction x y z         Camera direction in world units (will be normalized).
+                        Modified by rotating the camera.
+
+upDirection x y z       Camera "up" direction in world units (will be made orthogonal to
+                        "direction" and normalized).
+                        Modified by rotating the camera.
+
+par0..par9 x y          User parameter values that are passed into the shader. Modified in modes 0...9.
+
+par0x_name..par9y_name  Name of the parameter displayed in the caption when modified.
