@@ -1,10 +1,38 @@
 all: boxplorer shadershrink
 
-CFLAGS=-O2
-LDFLAGS=-framework SDL -framework OpenGL -framework Cocoa
+CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/
 
-boxplorer: boxplorer.cc default_shaders.h shader_procs.h Makefile
-	g++ $(CFLAGS) boxplorer.cc SDLmain.m -o boxplorer $(LDFLAGS)
+LDFLAGS=-framework OpenGL -framework SDL -framework Cocoa -framework AppKit
 
-shadershrink: shadershrink.c shadershrink.h Makefile
-	g++ $(CFLAGS) shadershrink.c -o shadershrink
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPreComp.o TwColors.o TwOpenGL.o
+
+boxplorer: boxplorer.cc default_shaders.h shader_procs.h Makefile.osx $(TW_OBJS)
+	g++ $(CFLAGS) boxplorer.cc SDLmain.m -o boxplorer $(TW_OBJS) $(LDFLAGS)
+
+shadershrink: shadershrink.cc shadershrink.h Makefile.osx
+	g++ $(CFLAGS) shadershrink.cc -o shadershrink
+
+TwBar.o: AntTweakBar/src/TwBar.cpp
+	g++ -c $(CFLAGS) $<
+
+TwFonts.o: AntTweakBar/src/TwFonts.cpp
+	g++ -c $(CFLAGS) $<
+
+TwMgr.o: AntTweakBar/src/TwMgr.cpp
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
+	g++ -c $(CFLAGS) $<
+
+TwPreComp.o: AntTweakBar/src/TwPreComp.cpp
+	g++ -c $(CFLAGS) $<
+
+TwColors.o: AntTweakBar/src/TwColors.cpp
+	g++ -c $(CFLAGS) $<
+
+TwOpenGL.o: AntTweakBar/src/TwOpenGL.cpp
+	g++ -c $(CFLAGS) $<
+
+LoadOGL.o: AntTweakBar/src/LoadOGL.cpp
+	g++ -c $(CFLAGS) $<
+
