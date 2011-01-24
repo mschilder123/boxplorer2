@@ -2,12 +2,14 @@ all: boxplorer shadershrink
 
 CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/
 
-LDFLAGS=-framework OpenGL -framework SDL -framework Cocoa -framework AppKit
+LDFLAGS=-framework SDL -framework OpenGL -framework Cocoa
+# -framework AppKit
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPreComp.o TwColors.o TwOpenGL.o
 
 boxplorer: boxplorer.cc default_shaders.h shader_procs.h Makefile.osx $(TW_OBJS)
-	g++ $(CFLAGS) boxplorer.cc SDLmain.m -o boxplorer $(TW_OBJS) $(LDFLAGS)
+	g++ -c $(CFLAGS) boxplorer.cc
+	g++ boxplorer.o SDLmain.m $(TW_OBJS) -o boxplorer $(LDFLAGS)
 
 shadershrink: shadershrink.cc shadershrink.h Makefile.osx
 	g++ $(CFLAGS) shadershrink.cc -o shadershrink
