@@ -354,14 +354,22 @@ class KeyFrame {
       glLoadMatrixf(v);
    }
 
-   // Set the OpenGL modelview for gl*() functions.
+   // Set the OpenGL modelview and projection for gl*() functions.
    void activateGl() {
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      const float zNear = .0001f;  // TODO: make configurable and uniform
+      const float zFar = 5.0f;
+      float fH = tan( fov_y * PI / 360.0f ) * zNear;
+      float fW = tan( fov_x * PI / 360.0f ) * zNear;
+      glFrustum(-fW, fW, -fH, fH, zNear, zFar);
+
       orthogonalize();
       float matrix[16] = {
          right()[0], up()[0], -ahead()[0], 0,
          right()[1], up()[1], -ahead()[1], 0,
          right()[2], up()[2], -ahead()[2], 0,
-         0,                0,              0,             1
+                  0,       0,           0, 1
       };
       glMatrixMode(GL_MODELVIEW);
       glLoadMatrixf(matrix);
@@ -953,18 +961,8 @@ void initGraphics() {
   enableShaderProcs() ||
       die("This program needs support for GLSL shaders.\n");
   cleanupShaders(program);
-   (program = setupShaders()) ||
-	  die("Error in GLSL shader compilation (see stderr.txt for details).\n");
-
-  // Setup projection for gl*() functions.
-  // Perspective not active when running vertex shader.
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  const float zNear = .0001f;  // TODO: make configurable and uniform
-  const float zFar = 5.0f;
-  float fH = tan( config.fov_y * PI / 360.0f ) * zNear;
-  float fW = tan( config.fov_x * PI / 360.0f ) * zNear;
-  glFrustum(-fW, fW, -fH, fH, zNear, zFar);
+  (program = setupShaders()) ||
+      die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 }
 
 TwBar* bar = NULL;

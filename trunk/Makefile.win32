@@ -1,7 +1,7 @@
 all: boxplorer.exe shadershrink.exe
 
-CFLAGS=/I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
-LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console
+CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
+LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwEventSDL.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj TwEventWin.obj TwDirect3D10.obj TwDirect3D9.obj
