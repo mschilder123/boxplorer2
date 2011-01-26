@@ -35,7 +35,7 @@ uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
 vec3 aoColor = vec3(0, 0, 0);
 
 //Fuctions to call.
-#define d d_MandalaBeth1522
+#define d d_MandalaBeth1522  //d_MandalaBeth1032
 #define color color_MandalaBeth
 
 float d_MandalaBeth1522(vec3 pos) {
@@ -66,6 +66,44 @@ float d_MandalaBeth1522(vec3 pos) {
    float r = sqrt(r2);
    return .5*log(r)*r/(2.*dr);
 }
+
+float d_MandalaBeth1032(vec3 pos) {
+  float u = pos.x, v = pos.y, w = pos.z;
+  float sign = clamp(SIGN, -1., 1.);
+  float t = sqrt(5.),
+  x = u, x2 = x*x,
+  y = v, y2 = y*y,
+  z = w, z2 = z*z,
+  r2 = x2+y2+z2,dr = 1.;
+
+  for(int i = 0; (i < iters) && (r2 <= 4.); i++)
+  {
+     dr = 1.0+3.5*r2*r2*r2*dr;
+     float
+     x4 = x2*x2, x6 = x4*x2,
+     y4 = y2*y2, y6 = y4*y2,
+     z4 = z2*z2, z6 = z4*z2,
+     uu = u+sign*56./81.*x*(2.*(4.+3.*t)*y6+2.*(4.-3.*t)*z6-15.*(5.-3.*t)*y4*z2-15.*(5.+3.*t)*y2*z4
+                      -15.*x2*((1.+3.*t)*y4+(1.-3.*t)*z4-20.*y2*z2)
+                      -3.*x4*((7.-9.*t)*y2+(7.+9.*t)*z2)
+                      +2.*x6),
+     vv = v+sign*56./81.*y*(2.*(4.+3.*t)*z6+2.*(4.-3.*t)*x6-15.*(5.-3.*t)*z4*x2-15.*(5.+3.*t)*z2*x4
+                      -15.*y2*((1.+3.*t)*z4+(1.-3.*t)*x4-20.*z2*x2)
+                      -3.*y4*((7.-9.*t)*z2+(7.+9.*t)*x2)
+                      +2.*y6),
+     ww = w+sign*56./81.*z*(2.*(4.+3.*t)*x6+2.*(4.-3.*t)*y6-15.*(5.-3.*t)*x4*y2-15.*(5.+3.*t)*x2*y4
+                      -15.*z2*((1.+3.*t)*x4+(1.-3.*t)*y4-20.*x2*y2)
+                      -3.*z4*((7.-9.*t)*x2+(7.+9.*t)*y2)
+                      +2.*z6);
+     x = uu; x2 = x*x;
+     y = vv; y2 = y*y;
+     z = ww; z2 = z*z;
+     r2 = x2+y2+z2;
+  }
+  float r = sqrt(r2);
+  return log(r)*r/(50.*dr);
+}
+
 
 // Compute the color at `pos`.
 vec3 color_MandalaBeth(vec3 pos) {
