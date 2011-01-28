@@ -63,6 +63,9 @@ using namespace std;
 #define lengthof(x) ( sizeof(x)/sizeof((x)[0]) )
 #define sign(x)     ( (x)<0 ? -1 : 1 )
 
+#define zNear 0.0001f
+#define zFar  5.0f
+
 #define FPS_FRAMES_TO_AVERAGE 20
 
 static const char *kHand[] = {
@@ -358,8 +361,6 @@ class KeyFrame {
    void activateGl() {
       glMatrixMode(GL_PROJECTION);
       glLoadIdentity();
-      const float zNear = .0001f;  // TODO: make configurable and uniform
-      const float zFar = 5.0f;
       float fH = tan( fov_y * PI / 360.0f ) * zNear;
       float fW = tan( fov_x * PI / 360.0f ) * zNear;
       glFrustum(-fW, fW, -fH, fH, zNear, zFar);
@@ -384,7 +385,7 @@ class KeyFrame {
       size_t i;
       char s[32768];  // max line length
       while (fscanf(f, " %s", s) == 1) {  // read word
-		if (s[0] == 0 || s[0] == '#') continue;
+        if (s[0] == 0 || s[0] == '#') continue;
 
         double val;
         int v;
@@ -400,11 +401,12 @@ class KeyFrame {
 
         for (i=0; i<lengthof(par); i++) {
          char p[256];
-         sprintf(p, "par%lu", (unsigned long)i); if (!strcmp(s, p)) {
-			 v=fscanf(f, " %f %f %f", &par[i][0], &par[i][1], &par[i][2]);
-			 break;
-		 }
-		}
+         sprintf(p, "par%lu", (unsigned long)i);
+         if (!strcmp(s, p)) {
+           v=fscanf(f, " %f %f %f", &par[i][0], &par[i][1], &par[i][2]);
+           break;
+         }
+        }
       }
       fclose(f);
       printf(__FUNCTION__ " : read '%s'\n", configFile);
@@ -460,19 +462,19 @@ class KeyFrame {
    void saveConfig(char const* configFile) {
      FILE* f;
      if ((f = fopen(configFile, "w")) != 0) {
-		 #define PROCESS(type, name, nameString, doSpline) \
-		   fprintf(f, nameString " %g\n", (double)name);
-		 PROCESS_CONFIG_PARAMS
-		 #undef PROCESS
+        #define PROCESS(type, name, nameString, doSpline) \
+          fprintf(f, nameString " %g\n", (double)name);
+        PROCESS_CONFIG_PARAMS
+        #undef PROCESS
 
-		 fprintf(f, "position %g %g %g\n", pos()[0], pos()[1], pos()[2]);
-		 fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
-		 fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
-		 for (size_t i=0; i<lengthof(par); i++) {
-		   fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
-		 }
-		 fclose(f);
-		 printf(__FUNCTION__ " : wrote '%s'\n", configFile);
+        fprintf(f, "position %g %g %g\n", pos()[0], pos()[1], pos()[2]);
+        fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
+        fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
+        for (size_t i=0; i<lengthof(par); i++) {
+          fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
+        }
+        fclose(f);
+        printf(__FUNCTION__ " : wrote '%s'\n", configFile);
      }
    }
 
@@ -570,9 +572,9 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
   if (loop) {
     // Replicate first two at end.
     controlpoints.push_back(keyframes[0]);
-	if (controlpoints[controlpoints.size()-1].delta_time == 0) {
-		suggestDeltaTime(controlpoints[controlpoints.size() - 1], keyframes);
-	}
+    if (controlpoints[controlpoints.size()-1].delta_time == 0) {
+      suggestDeltaTime(controlpoints[controlpoints.size() - 1], keyframes);
+    }
     controlpoints.push_back(keyframes[1]);
     // Last one is p0 for spline of first keyframe.
     controlpoints.push_back(keyframes[keyframes.size()-1]);
@@ -783,37 +785,43 @@ void saveScreenshot(char const* tgaFile) {
 
     free(img);
     fclose(f);
-	printf(__FUNCTION__ " : wrote %s\n", tgaFile);
+    printf(__FUNCTION__ " : wrote %s\n", tgaFile);
   }
 }
 
 // Return BGR value of pixel x,y.
 unsigned int getBGRpixel(int x, int y) {
-    unsigned char img[3];
-    int height = config.height;
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadBuffer(GL_FRONT);
-    glReadPixels(viewportOffset[0] + x, viewportOffset[1] + height - 1 - y, 1, 1, GL_BGR, GL_UNSIGNED_BYTE, img);
-	unsigned int val =
+  unsigned char img[3];
+  int height = config.height;
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadBuffer(GL_FRONT);
+  glReadPixels(viewportOffset[0] + x, viewportOffset[1] + height - 1 - y, 1, 1, GL_BGR, GL_UNSIGNED_BYTE, img);
+  unsigned int val =
       img[0] * 256 * 256 +
       img[1] * 256 +
       img[2];
-	return val;
+  return val;
 }
 
 // Read out Z-buffer around the center of the view.
 float distanceToSurface() {
-   const int SIZE = 10;
-   float z[SIZE*SIZE];
-   int x = config.width / 2 - SIZE / 2;
-   int y = config.height / 2 - SIZE / 2;
-   glReadPixels(viewportOffset[0] + x, viewportOffset[1] + config.height - 1 - y, SIZE, SIZE,
-             GL_DEPTH_COMPONENT, GL_FLOAT, z);
-   float avg = 0;
-   for (size_t i = 0; i < lengthof(z); ++i) {
-      avg += z[i];
-   }
-   return avg / lengthof(z);
+  const int SIZE = 1;
+  float z[SIZE*SIZE];
+  int x = config.width / 2 - SIZE / 2;
+  int y = config.height / 2 - SIZE / 2;
+  glReadPixels(viewportOffset[0] + x, viewportOffset[1] + config.height - 1 - y, SIZE, SIZE,
+               GL_DEPTH_COMPONENT, GL_FLOAT, z);
+  float avg = 0;
+  for (size_t i = 0; i < lengthof(z); ++i) {
+    avg += z[i];
+  }
+  float v = avg / lengthof(z);
+
+  // Convert zbuffer [0,1] value v back into actual dist.
+  const float a = zFar / (zFar - zNear);
+  const float b = zFar * zNear / (zNear - zFar);
+
+  return b / (v - a);
 }
 
 string glsl_source;
@@ -867,31 +875,31 @@ int setupShaders(void) {
 
 // Detach & delete any shaders, delete program.
 void cleanupShaders(int p) {
-	GLuint shaders[2];
-	GLsizei count = 2;
-	if (!glIsProgram(p)) return;
-	glGetAttachedShaders(p, count, &count, shaders);
-	for (GLsizei i = 0; i < count; ++i) {
-		glDetachShader(p, shaders[i]);
-		glDeleteShader(shaders[i]);
-	}
-	glDeleteProgram(p);
+  GLuint shaders[2];
+  GLsizei count = 2;
+  if (!glIsProgram(p)) return;
+  glGetAttachedShaders(p, count, &count, shaders);
+  for (GLsizei i = 0; i < count; ++i) {
+    glDetachShader(p, shaders[i]);
+    glDeleteShader(shaders[i]);
+  }
+  glDeleteProgram(p);
 }
 
 void changeWorkingDirectory(const char* configFile) {
-   char dirName[MAX_PATH];
-   strncpy(dirName, configFile, sizeof dirName);
-   dirName[sizeof dirName - 1] = 0;
-   if (strstr(configFile, ".cfg.data") == NULL) {
-      strncat(dirName, ".data", sizeof dirName);
-      MKDIR(dirName);
-   } else {
-      // Already have a .cfg.data in path, chdir to it.
-      int i = strlen(dirName);
-      while (i > 0 && strchr("/\\", dirName[--i]) == NULL);
-      dirName[i] = 0;
-   }
-   if (!chdir(dirName)) printf(__FUNCTION__ " : chdir '%s'\n", dirName);
+  char dirName[MAX_PATH];
+  strncpy(dirName, configFile, sizeof dirName);
+  dirName[sizeof dirName - 1] = 0;
+  if (strstr(configFile, ".cfg.data") == NULL) {
+    strncat(dirName, ".data", sizeof dirName);
+    MKDIR(dirName);
+  } else {
+    // Already have a .cfg.data in path, chdir to it.
+    int i = strlen(dirName);
+    while (i > 0 && strchr("/\\", dirName[--i]) == NULL);
+    dirName[i] = 0;
+  }
+  if (!chdir(dirName)) printf(__FUNCTION__ " : chdir '%s'\n", dirName);
 }
 
 // Initializes the video mode, OpenGL state, shaders, camera and shader parameters.
@@ -935,6 +943,9 @@ void initGraphics() {
             i, config.multisamples);
   }
 
+  SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &config.depth_size);
+  printf(__FUNCTION__ " : depth size %u\n", config.depth_size);
+
   if (grabbedInput) {
     // order is important
     SDL_ShowCursor(SDL_DISABLE);
@@ -967,79 +978,80 @@ void initGraphics() {
 
 TwBar* bar = NULL;
 
-// Find '#define foo par[x].z  // {twbar params}' in glsl_source.
+// Find '\n#define foo par[x].z  // {twbar params}' in glsl_source.
 void initTwParVars() {
-	size_t start = 0;
-	while ((start = glsl_source.find("\n#define ", start + 1)) != string::npos) {
-		size_t eol = glsl_source.find("\n", start + 1);
-		if (eol == string::npos) continue;
-		string line(glsl_source, start + 1, eol - (start + 1));
+  size_t start = 0;
+  while ((start = glsl_source.find("\n#define ", start + 1)) != string::npos) {
+    size_t eol = glsl_source.find("\n", start + 1);
+    if (eol == string::npos) continue;
+    string line(glsl_source, start + 1, eol - (start + 1));
 
-		size_t parStart = line.find(" par[");
-		if (parStart == string::npos || parStart < 8) continue;
-		string varName(line, 8, parStart - 8);
+    size_t parStart = line.find(" par[");
+    if (parStart == string::npos || parStart < 8) continue;
+    string varName(line, 8, parStart - 8);
 
-		size_t attr_start = line.find("{");
-		size_t attr_end = line.find("}");
-		string attr;
-		if (attr_start != string::npos && attr_end != string::npos && attr_end > attr_start)
-			attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
+    size_t attr_start = line.find("{");
+    size_t attr_end = line.find("}");
+    string attr;
+    if (attr_start != string::npos && attr_end != string::npos && attr_end > attr_start)
+      attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
 
-		int index;
-		char xyz = 'x';
-		if (sscanf(line.c_str() + parStart + 5, "%d].%c", &index, &xyz) < 1) continue;
-		if (index < 0 || index > lengthof(camera.par)) continue;
-		if (xyz < 'x' || xyz > 'z') continue;
+    int index;
+    char xyz = 'x';
+    if (sscanf(line.c_str() + parStart + 5, "%d].%c", &index, &xyz) < 1) continue;
+    if (index < 0 || index > lengthof(camera.par)) continue;
+    if (xyz < 'x' || xyz > 'z') continue;
 
-		printf("parameter %s par[%d].%c {%s}\n", varName.c_str(), index, xyz, attr.c_str());
+    printf("parameter %s par[%d].%c {%s}\n", varName.c_str(), index, xyz, attr.c_str());
 
-		float* address = &camera.par[index][xyz-'x'];
+    float* address = &camera.par[index][xyz-'x'];
 
-		if (varName.find("Color") != string::npos) {
-			TwAddVarRW(bar, varName.c_str(), TW_TYPE_COLOR3F, address, "");
-		} else if (varName.find("Vector") != string::npos) {
-			TwAddVarRW(bar, varName.c_str(), TW_TYPE_DIR3F, address, "");
-		} else {
-			TwAddVarRW(bar, varName.c_str(), TW_TYPE_FLOAT, address, attr.c_str());
-		}
-	}
+    if (varName.find("Color") != string::npos) {
+      TwAddVarRW(bar, varName.c_str(), TW_TYPE_COLOR3F, address, "");
+    } else if (varName.find("Vector") != string::npos) {
+      TwAddVarRW(bar, varName.c_str(), TW_TYPE_DIR3F, address, "");
+    } else {
+      TwAddVarRW(bar, varName.c_str(), TW_TYPE_FLOAT, address, attr.c_str());
+    }
+  }
 }
 
-// Find '\nuniform <type> name;' in glsl_source. Pick up type and twbar params, if found.
+// Find '\nuniform <type> name;' in glsl_source.
+// Pick up type and twbar params, if found.
 void initTwUniform(const string& name, void* addr) {
-	size_t start = 0;
-	while ((start = glsl_source.find("\nuniform ", start + 1)) != string::npos) {
-		size_t eol = glsl_source.find("\n", start + 1);
-		string line(glsl_source, start + 1, eol - (start + 1));
+  size_t start = 0;
+  while ((start = glsl_source.find("\nuniform ", start + 1)) != string::npos) {
+    size_t eol = glsl_source.find("\n", start + 1);
+    string line(glsl_source, start + 1, eol - (start + 1));
 
-		size_t attr_start = line.find("{");
-		size_t attr_end = line.find("}");
-		string attr;
-		if (attr_start != string::npos && attr_end != string::npos && attr_end > attr_start)
-			attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
+    size_t attr_start = line.find("{");
+    size_t attr_end = line.find("}");
+    string attr;
+    if (attr_start != string::npos && attr_end != string::npos && attr_end > attr_start)
+      attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
 
-		if (line.find("uniform float " + name + ";") == 0) {
-			TwAddVarRW(bar, name.c_str(), TW_TYPE_FLOAT, (float*)addr, attr.c_str());
-		} else if (line.find("uniform int " + name + ";") == 0) {
-			TwAddVarRW(bar, name.c_str(), TW_TYPE_INT32, (int*)addr, attr.c_str());
-		}
-	}
+    if (line.find("uniform float " + name + ";") == 0) {
+      TwAddVarRW(bar, name.c_str(), TW_TYPE_FLOAT, (float*)addr, attr.c_str());
+    } else if (line.find("uniform int " + name + ";") == 0) {
+      TwAddVarRW(bar, name.c_str(), TW_TYPE_INT32, (int*)addr, attr.c_str());
+    }
+  }
 }
 
 void initTwBar() {
-	if (bar == NULL) TwInit(TW_OPENGL, NULL);
+  if (bar == NULL) TwInit(TW_OPENGL, NULL);
 
-	TwWindowSize(config.width, config.height);
+  TwWindowSize(config.width, config.height);
 
-	if (bar != NULL) return;
+  if (bar != NULL) return;
 
-	bar = TwNewBar("boxplorer");
+  bar = TwNewBar("boxplorer");
 
-	#define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
-	PROCESS_CONFIG_PARAMS
-	#undef PROCESS
+  #define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
+  PROCESS_CONFIG_PARAMS
+  #undef PROCESS
 
-	initTwParVars();
+  initTwParVars();
 }
 
 void LoadKeyFrames() {
@@ -1183,120 +1195,119 @@ int main(int argc, char **argv) {
            continue;
         }
         dist_along_spline -= (configSpeed?config.speed:camera.speed);
-     } else {
+      } else {
         splines.clear();
-     }
-   }
+      }
+    }
 
-   if (!rendering) {
-     // If we're rendering a sequence to disk, we don't care about z-buffer.
-     // Otherwise, just overwrite since we write every pixel.
-     glEnable(GL_DEPTH_TEST);
-     glDepthFunc(GL_ALWAYS);
-   }
+    if (!rendering) {
+      // If we're rendering a sequence to disk, we don't care about z-buffer.
+      // Otherwise, just overwrite since we write every pixel.
+      glEnable(GL_DEPTH_TEST);
+      glDepthFunc(GL_ALWAYS);
+    }
 
-   glUseProgram(program);
+    glUseProgram(program);
 
-   camera.render(stereoMode);
+    camera.render(stereoMode);
 
-   glUseProgram(0);
+    glUseProgram(0);
 
-   // Draw keyframe splined path, if we have 2+ keyframes and are not rendering.
-   if (stereoMode == ST_NONE && keyframes.size() > 1 && splines.empty()) {
-     glDepthFunc(GL_LESS);
+    // Draw keyframe splined path, if we have 2+ keyframes and are not rendering
+    if (stereoMode == ST_NONE && keyframes.size() > 1 && splines.empty()) {
+      glDepthFunc(GL_LESS);
 
-     camera.activateGl();
+      camera.activateGl();
 
-     vector<KeyFrame> splines;
-     CatmullRom(keyframes, &splines, config.loop);
+      vector<KeyFrame> splines;
+      CatmullRom(keyframes, &splines, config.loop);
 
-     glColor4f(.8,.8,.8,1);
-     glLineWidth(1);
-     glEnable(GL_LINE_SMOOTH);
+      glColor4f(.8,.8,.8,1);
+      glLineWidth(1);
+      glEnable(GL_LINE_SMOOTH);
 
-     glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // right eye
-     for (size_t i = 0; i < splines.size(); ++i) {
-       splines[i].move(splines[i].speed, 0, 0);
-       glVertex3fv(splines[i].pos());
-       splines[i].move(-2*splines[i].speed, 0, 0);
-     }
-     glEnd();
-     glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // left eye
-     for (size_t i = 0; i < splines.size(); ++i) {
-       glVertex3fv(splines[i].pos());
-     }
-     glEnd();
+      glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // right eye
+      for (size_t i = 0; i < splines.size(); ++i) {
+        splines[i].move(splines[i].speed, 0, 0);
+        glVertex3fv(splines[i].pos());
+        splines[i].move(-2*splines[i].speed, 0, 0);
+      }
+      glEnd();
+      glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // left eye
+      for (size_t i = 0; i < splines.size(); ++i) {
+        glVertex3fv(splines[i].pos());
+      }
+      glEnd();
 
-     glLineWidth(13);
-     for (size_t i = 0; i < keyframes.size(); ++i) {
-       glColor4f(0,0,1 - (i/256.0),1);  // Encode keyframe # in color.
-       glBegin(GL_LINES);
-       KeyFrame tmp = keyframes[i];
-       tmp.move(tmp.speed, 0, 0);
-       glVertex3fv(tmp.pos());
-       tmp = keyframes[i];
-       tmp.move(-tmp.speed, 0, 0);
-       glVertex3fv(tmp.pos());
-       glEnd();
-     }
-   }
+      glLineWidth(13);
+      for (size_t i = 0; i < keyframes.size(); ++i) {
+        glColor4f(0,0,1 - (i/256.0),1);  // Encode keyframe # in color.
+        glBegin(GL_LINES);
+        KeyFrame tmp = keyframes[i];
+        tmp.move(tmp.speed, 0, 0);
+        glVertex3fv(tmp.pos());
+        tmp = keyframes[i];
+        tmp.move(-tmp.speed, 0, 0);
+        glVertex3fv(tmp.pos());
+        glEnd();
+      }
+    }
 
-   float dist = 1.;  //distanceToSurface();
+    if (!grabbedInput && !rendering) TwDraw();
 
-   if (!grabbedInput && !rendering) TwDraw();
+    SDL_GL_SwapBuffers();
 
-   SDL_GL_SwapBuffers();
+    float dist = distanceToSurface();
 
-   if (rendering && !splines.empty()) {
+    if (rendering && !splines.empty()) {
       // If we're playing a sequence back, save every frame to disk.
       char filename[256];
       sprintf(filename, "frame-%05d.tga", frameno);
       ++frameno;
       saveScreenshot(filename);
-   }
+    }
 
     updateFPS();
 
     // Show position and fps in the caption.
     char caption[2048], controllerStr[256];
-
     sprintf(caption, "%s %.2ffps %5lu [%.3f %.3f %.3f] %dms",
-      printController(controllerStr, ctl),
-      getFPS(), (unsigned long)splines_index, camera.pos()[0], camera.pos()[1], camera.pos()[2], getLastFrameDuration()
+        printController(controllerStr, ctl),
+        getFPS(), (unsigned long)splines_index,
+        camera.pos()[0], camera.pos()[1], camera.pos()[2],
+        getLastFrameDuration()
     );
     SDL_WM_SetCaption(caption, 0);
 
     // Process events.
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-	  if (grabbedInput || !TwEventSDL(&event))
-      switch (event.type) {
-		case SDL_VIDEORESIZE: {
-			config.width = event.resize.w;
-			config.height = event.resize.h;
-			config.fov_x = 0;  // go for square pixels..
-			config.sanitizeParameters();
-			grabbedInput = 1; initGraphics(); initTwBar();
-			printf("resize(%d, %d)\n", config.width, config.height);
-		} break;
+      if (grabbedInput || !TwEventSDL(&event)) switch (event.type) {
+      case SDL_VIDEORESIZE: {
+            config.width = event.resize.w;
+            config.height = event.resize.h;
+            config.fov_x = 0;  // go for square pixels..
+            config.sanitizeParameters();
+            grabbedInput = 1; initGraphics(); initTwBar();
+            printf("resize(%d, %d)\n", config.width, config.height);
+      } break;
 
-        case SDL_QUIT: done |= 1; break;
+      case SDL_QUIT: done |= 1; break;
 
-        case SDL_MOUSEBUTTONDOWN: {
+      case SDL_MOUSEBUTTONDOWN: {
         //printf("SDL_MOUSEBUTTONDOWN %x @ %d, %d", event.button.button, event.button.x, event.button.y);
-          if (grabbedInput == 0) {
-           unsigned int bgr = getBGRpixel(event.button.x, event.button.y);
-           //printf(" : %06x\n", bgr);
-           if ((bgr & 0xffff) == 0) {  // No red or green at all : probably a keyframe marker (fragile).
-              size_t kf = 255 - (bgr >> 16);
-              if (kf < keyframes.size()) {
-                 printf("selected keyframe %lu\n", (unsigned long)kf);
-                 keyframe = kf;
-                 dragging = true;
-              }
-           }
-         } else {
-          switch(event.button.button) {
+        if (grabbedInput == 0) {
+          unsigned int bgr = getBGRpixel(event.button.x, event.button.y);
+          //printf(" : %06x\n", bgr);
+          if ((bgr & 0xffff) == 0) {  // No red or green at all : probably a keyframe marker (fragile).
+            size_t kf = 255 - (bgr >> 16);
+            if (kf < keyframes.size()) {
+               printf("selected keyframe %lu\n", (unsigned long)kf);
+               keyframe = kf;
+               dragging = true;
+            }
+          }
+        } else switch(event.button.button) {
           case 1:  // left mouse
             grabbedInput = 0; SDL_ShowCursor(SDL_ENABLE); SDL_WM_GrabInput(SDL_GRAB_OFF);
             ignoreNextMouseUp = true;
@@ -1311,8 +1322,7 @@ int main(int argc, char **argv) {
               keyframes[keyframe].speed *= .9;
              }
             break;
-          }
-         }
+        }
         //printf("\n");
       } break;
 
@@ -1364,172 +1374,172 @@ int main(int argc, char **argv) {
            SDL_ShowCursor(SDL_ENABLE);
            SDL_WM_GrabInput(SDL_GRAB_OFF);
          } else done |= 1;
-       } break;
+      } break;
 
-       // Switch fullscreen mode (loses the whole OpenGL context in Windows).
-       case SDLK_RETURN: case SDLK_KP_ENTER: {
-         config.fullscreen ^= 1; grabbedInput = 1; initGraphics(); initTwBar();
-       } break;
+      // Switch fullscreen mode (loses the whole OpenGL context in Windows).
+      case SDLK_RETURN: case SDLK_KP_ENTER: {
+        config.fullscreen ^= 1; grabbedInput = 1; initGraphics(); initTwBar();
+      } break;
 
-       // Save config and screenshot (filename = current time).
-       case SDLK_SYSREQ:
-       case SDLK_PRINT: {
-         time_t t = time(0);
-         struct tm* ptm = localtime(&t);
-         char filename[256];
-         strftime(filename, 256, "%Y%m%d_%H%M%S.cfg", ptm);
-         camera.saveConfig(filename);
-         strftime(filename, 256, "%Y%m%d_%H%M%S.tga", ptm);
-         saveScreenshot(filename);
-       } break;
+      // Save config and screenshot (filename = current time).
+      case SDLK_SYSREQ:
+      case SDLK_PRINT: {
+        time_t t = time(0);
+        struct tm* ptm = localtime(&t);
+        char filename[256];
+        strftime(filename, 256, "%Y%m%d_%H%M%S.cfg", ptm);
+        camera.saveConfig(filename);
+        strftime(filename, 256, "%Y%m%d_%H%M%S.tga", ptm);
+        saveScreenshot(filename);
+      } break;
 
-       // Splined path control.
-       case SDLK_HOME: {  // Start spline playback from start.
-		 if (!keyframes.empty()) {
-			 CatmullRom(keyframes, &splines, config.loop);
-			 splines_index = 0;
-			 render_time = 0;
-			 render_start = now();
-			 keyframe = 0;
-		 } else camera = config;
-       } break;
-
-       case SDLK_END: {  // Stop spline playback.
-         splines.clear();
-         if (!keyframes.empty()) {
-           keyframe = keyframes.size() - 1;
-           camera = keyframes[keyframe];
-         } else camera = config;
-       } break;
-
-       case SDLK_DELETE: {
-         // Drop last keyframe, reset camera to previous keyframe.
-         splines.clear();
-         if (!keyframes.empty()) {
-           if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
-             // delete current keyframe
-             if (keyframe < keyframes.size()) {
-               keyframes.erase(keyframes.begin() + keyframe);
-               if (keyframe >= keyframes.size())
-                 keyframe = keyframes.size() - 1;
-               }
-           } else {
-             // delete last keyframe
-             keyframes.pop_back();
-             keyframe = keyframes.size() - 1;
-
-             if (keyframe < keyframes.size())
-               camera = keyframes[keyframe];
-            }
-          }
-        } break;
-
-        case SDLK_SPACE:
-        case SDLK_INSERT: {  // Add keyframe.
-          splines.clear();
-          size_t index = keyframes.size();
-          if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
-            // Replace currently selected keyframe.
-            index = keyframe;
-          }
-          if (!(event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL))) {
-            // Need an estimate for delta_time for this new frame.
-			suggestDeltaTime(camera, keyframes);
-            keyframes.push_back(camera);  // Add keyframe at end.
-          } else {
-            keyframes[index] = camera;  // Overwrite current keyframe.
-          }
-          char filename[256];
-          sprintf(filename, "keyframe-%lu.cfg", (unsigned long)index);
-          camera.saveConfig(filename);
-        } break;
-
-        case SDLK_PAGEUP: {  // Jump keyframe back in spline playback.
-          if (splines.empty()) {
+      // Splined path control.
+      case SDLK_HOME: {  // Start spline playback from start.
+        if (!keyframes.empty()) {
             CatmullRom(keyframes, &splines, config.loop);
-            splines_index = splines.size();
-          }
-          if (splines_index < NSUBFRAMES)
             splines_index = 0;
-          else
-            splines_index -= NSUBFRAMES;
-        } break;
+            render_time = 0;
+            render_start = now();
+            keyframe = 0;
+        } else camera = config;
+      } break;
 
-        case SDLK_PAGEDOWN: { // Jump splined playback keyframe ahead.
-          splines_index += NSUBFRAMES;
-          if (splines_index >= splines.size()) {
-            splines_index = splines.size()-1;
-          }
-        } break;
+      case SDLK_END: {  // Stop spline playback.
+        splines.clear();
+        if (!keyframes.empty()) {
+          keyframe = keyframes.size() - 1;
+          camera = keyframes[keyframe];
+        } else camera = config;
+      } break;
 
-        case SDLK_TAB: {  // Step thru keyframes.
-          if (!splines.empty()) {
-             // find most recently played keyframe
-             int nkeys = 0;
-             for (size_t i = 0; i < splines_index; ++i)
-                if (splines[i].isKey()) ++nkeys;
-             keyframe = nkeys;
-          }
-          if (!(event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL))) ++keyframe;
-          if (keyframe >= keyframes.size()) keyframe = 0;
-
-          if (keyframe < keyframes.size() && splines.empty()) {
-             // Don't jump camera ahead if we were playing, just stop in place.
-             camera = keyframes[keyframe];
-          }
-
-          if (keyframe < keyframes.size()) {
-            printf("at keyframe %lu, speed %f, delta_time %f\n",
-                (unsigned long)keyframe, keyframes[keyframe].speed,
-                keyframes[keyframe].delta_time);
-		  }
-
-		  if (keyframes.empty()) camera = config;  // back to start
-
+      case SDLK_DELETE: {
+        // Drop last keyframe, reset camera to previous keyframe.
+        splines.clear();
+        if (!keyframes.empty()) {
           if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
-            // Start playing: spline and start at keyframe.
-            if (!keyframes.empty()) {
-              CatmullRom(keyframes, &splines, config.loop);
-              int nkeys = keyframe;
-              for (splines_index = 0; splines_index < splines.size();
-                   ++splines_index) {
-                if (splines[splines_index].isKey())
-                if (nkeys-- == 0) break;
+            // delete current keyframe
+            if (keyframe < keyframes.size()) {
+              keyframes.erase(keyframes.begin() + keyframe);
+              if (keyframe >= keyframes.size())
+                keyframe = keyframes.size() - 1;
               }
-              render_time = splines[splines_index].time;
-              render_start = now() - render_time;
-            }
           } else {
-            splines.clear();
+            // delete last keyframe
+            keyframes.pop_back();
+            keyframe = keyframes.size() - 1;
+
+            if (keyframe < keyframes.size())
+              camera = keyframes[keyframe];
           }
-        } break;
+        }
+      } break;
 
-        case SDLK_BACKSPACE: {
-          --keyframe;
-          if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
-          if (keyframe < keyframes.size()) {
-            camera = keyframes[keyframe];
-            printf("at keyframe %lu, speed %f, delta_time %f\n",
-                (unsigned long)keyframe, keyframes[keyframe].speed,
-                keyframes[keyframe].delta_time);
-          } else camera = config;
+      case SDLK_SPACE:
+      case SDLK_INSERT: {  // Add keyframe.
+        splines.clear();
+        size_t index = keyframes.size();
+        if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
+          // Replace currently selected keyframe.
+          index = keyframe;
+        }
+        if (!(event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL))) {
+          // Need an estimate for delta_time for this new frame.
+          suggestDeltaTime(camera, keyframes);
+          keyframes.push_back(camera);  // Add keyframe at end.
+        } else {
+          keyframes[index] = camera;  // Overwrite current keyframe.
+        }
+        char filename[256];
+        sprintf(filename, "keyframe-%lu.cfg", (unsigned long)index);
+        camera.saveConfig(filename);
+      } break;
+
+      case SDLK_PAGEUP: {  // Jump keyframe back in spline playback.
+        if (splines.empty()) {
+          CatmullRom(keyframes, &splines, config.loop);
+          splines_index = splines.size();
+        }
+        if (splines_index < NSUBFRAMES)
+          splines_index = 0;
+        else
+          splines_index -= NSUBFRAMES;
+      } break;
+
+      case SDLK_PAGEDOWN: { // Jump splined playback keyframe ahead.
+        splines_index += NSUBFRAMES;
+        if (splines_index >= splines.size()) {
+          splines_index = splines.size()-1;
+        }
+      } break;
+
+      case SDLK_TAB: {  // Step thru keyframes.
+        if (!splines.empty()) {
+           // find most recently played keyframe
+           int nkeys = 0;
+           for (size_t i = 0; i < splines_index; ++i)
+              if (splines[i].isKey()) ++nkeys;
+           keyframe = nkeys;
+        }
+        if (!(event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL))) ++keyframe;
+        if (keyframe >= keyframes.size()) keyframe = 0;
+
+        if (keyframe < keyframes.size() && splines.empty()) {
+           // Don't jump camera ahead if we were playing, just stop in place.
+           camera = keyframes[keyframe];
+        }
+
+        if (keyframe < keyframes.size()) {
+          printf("at keyframe %lu, speed %f, delta_time %f\n",
+              (unsigned long)keyframe, keyframes[keyframe].speed,
+              keyframes[keyframe].delta_time);
+        }
+
+        if (keyframes.empty()) camera = config;  // back to start
+
+        if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
+          // Start playing: spline and start at keyframe.
+          if (!keyframes.empty()) {
+            CatmullRom(keyframes, &splines, config.loop);
+            int nkeys = keyframe;
+            for (splines_index = 0; splines_index < splines.size();
+                 ++splines_index) {
+              if (splines[splines_index].isKey())
+              if (nkeys-- == 0) break;
+            }
+            render_time = splines[splines_index].time;
+            render_start = now() - render_time;
+          }
+        } else {
           splines.clear();
-        } break;
+        }
+      } break;
 
-        case SDLK_LSHIFT: {
-          // Change movement speed.
-          if (camera.speed < 1) camera.speed *= 1.1;
-        } break;
+      case SDLK_BACKSPACE: {
+        --keyframe;
+        if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
+        if (keyframe < keyframes.size()) {
+          camera = keyframes[keyframe];
+          printf("at keyframe %lu, speed %f, delta_time %f\n",
+              (unsigned long)keyframe, keyframes[keyframe].speed,
+              keyframes[keyframe].delta_time);
+        } else camera = config;
+        splines.clear();
+      } break;
 
-        case SDLK_LALT: {
-          if (camera.speed > camera.min_dist) camera.speed *= .9;
-        } break;
+      case SDLK_LSHIFT: {
+        // Change movement speed.
+        if (camera.speed < 1) camera.speed *= 1.1;
+      } break;
 
-        // Resolve controller value changes that happened during rendering.
-        case SDLK_LEFT:  ctlXChanged = 1; updateControllerX(ctl, -(consecutiveChanges=1)); break;
-        case SDLK_RIGHT: ctlXChanged = 1; updateControllerX(ctl,  (consecutiveChanges=1)); break;
-        case SDLK_DOWN:  ctlYChanged = 1; updateControllerY(ctl, -(consecutiveChanges=1)); break;
-        case SDLK_UP:    ctlYChanged = 1; updateControllerY(ctl,  (consecutiveChanges=1)); break;
+      case SDLK_LALT: {
+        if (camera.speed > camera.min_dist) camera.speed *= .9;
+      } break;
+
+      // Resolve controller value changes that happened during rendering.
+      case SDLK_LEFT:  ctlXChanged = 1; updateControllerX(ctl, -(consecutiveChanges=1)); break;
+      case SDLK_RIGHT: ctlXChanged = 1; updateControllerX(ctl,  (consecutiveChanges=1)); break;
+      case SDLK_DOWN:  ctlYChanged = 1; updateControllerY(ctl, -(consecutiveChanges=1)); break;
+      case SDLK_UP:    ctlYChanged = 1; updateControllerY(ctl,  (consecutiveChanges=1)); break;
 
         // Current keyframe manouvering in screenspace.
         case SDLK_KP4: {
@@ -1579,7 +1589,7 @@ int main(int argc, char **argv) {
     }
 
     if (done) break;
-	if (!grabbedInput) continue;
+    if (!grabbedInput) continue;
 
     // Get keyboard and mouse state.
     Uint8* keystate = SDL_GetKeyState(0);
@@ -1592,7 +1602,7 @@ int main(int argc, char **argv) {
     (void)mouse_button_left;
     (void)mouse_button_right;
 
-    if (keystate[SDLK_w]) camera.move(0, 0, camera.speed * dist);  //forward
+    if (keystate[SDLK_w]) camera.move(0, 0, min(camera.speed , 0.9f * dist));  //forward
     if (keystate[SDLK_s]) camera.move(0, 0, -camera.speed);  //back
 
     if (keystate[SDLK_a]) camera.move(-camera.speed, 0, 0);  //left
