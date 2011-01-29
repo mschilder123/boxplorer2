@@ -805,6 +805,7 @@ unsigned int getBGRpixel(int x, int y) {
 
 // Read out Z-buffer around the center of the view.
 float distanceToSurface() {
+#if TRY_DISTANCE_TO_SURFACE
   const int SIZE = 1;
   float z[SIZE*SIZE];
   int x = config.width / 2 - SIZE / 2;
@@ -822,6 +823,9 @@ float distanceToSurface() {
   const float b = zFar * zNear / (zNear - zFar);
 
   return b / (v - a);
+#else
+  return 100.0f;
+#endif
 }
 
 string glsl_source;
@@ -1054,12 +1058,18 @@ void initTwBar() {
   initTwParVars();
 }
 
-void LoadKeyFrames() {
+void LoadKeyFrames(bool fixedFov) {
   char filename[256];
   for (int i = 0; ; ++i) {
     sprintf(filename, "keyframe-%u.cfg", i);
     KeyFrame tmp;
     if (!tmp.loadConfig(filename)) break;
+    if (fixedFov) {
+      tmp.width = config.width;
+      tmp.height = config.height;
+      tmp.fov_x = config.fov_x;
+      tmp.fov_y = config.fov_y;
+    }
     keyframes.push_back(tmp);
   }
   printf(__FUNCTION__ " : loaded %lu keyframes\n",
@@ -1082,6 +1092,7 @@ int main(int argc, char **argv) {
   bool loop = false;
   bool useTime = false;
   bool configSpeed = false;
+  bool fixedFov = false;
   // Peel known options off the back..
   while (argc>1) {
     if (!strcmp(argv[argc-1], "--overunder")) {
@@ -1096,6 +1107,8 @@ int main(int argc, char **argv) {
       useTime = true;
     } else if (!strcmp(argv[argc-1], "--speed")) {
       configSpeed = true;
+    } else if (!strcmp(argv[argc-1], "--fixedfov")) {
+      fixedFov = true;
     } else if (!strcmp(argv[argc-1], "--loop")) {
       loop = true;
     } else break;
@@ -1119,7 +1132,7 @@ int main(int argc, char **argv) {
   camera = config;
 
   bool keyframesChanged = false;
-  LoadKeyFrames();
+  LoadKeyFrames(fixedFov);
 
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
