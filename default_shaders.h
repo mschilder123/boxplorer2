@@ -125,7 +125,8 @@ const char default_fs[] =
     "float zNear=0.0001;"
     "float a=zFar/(zFar-zNear);"
     "float b=zFar*zNear/(zNear-zFar);"
-    "gl_FragDepth=(a+b/clamp(totalD/length(dir), 0., zFar));"
-    "gl_FragColor=vec4(col,1);"
+    "float depth=(a+b/clamp(totalD/length(dir), zNear, zFar));"
+    "gl_FragDepth=depth;"
+    "gl_FragColor=vec4(col,depth);"
   "}";
 

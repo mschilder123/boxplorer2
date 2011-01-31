@@ -45,7 +45,7 @@ float d_MandalaBeth1522(vec3 pos) {
    x = u, x2 = x*x,
    y = v, y2 = y*y,
    z = w, z2 = z*z,
-   r2 = x2+y2+z2,dr = 1.;   
+   r2 = x2+y2+z2,dr = 1.;
    for(int i = 0; (i < iters) && (r2 <= 4.); i++)
    {
       dr = 1.+2.5*r2*r2*dr;
@@ -194,7 +194,8 @@ float ambient_occlusion(vec3 p, vec3 n, float side) {
 
 void main() {
   vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed * vec3(gl_ModelViewMatrix[0]);
+  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
+      vec3(gl_ModelViewMatrix[0]);
 
   vec3 p = eye_in, dp = normalize(dir);
 
@@ -204,7 +205,7 @@ void main() {
   int steps;
   for (steps=0; steps<max_steps; steps++) {
     lastD = D;
-    D = d(p + totalD * dp);  
+    D = d(p + totalD * dp);
     if (extraD > 0.0 && D < extraD) {
         totalD -= extraD;
         extraD = 0.0;
@@ -212,7 +213,7 @@ void main() {
         steps--;
         continue;
     }
-    if (D < min_dist) break;	
+    if (D < min_dist) break;
     if (D > MAX_DIST) break;
 
     totalD += D;
@@ -220,7 +221,7 @@ void main() {
   }
 
   p += totalD * dp;
- 
+
   // Color the surface with Blinn-Phong shading, ambient occlusion and glow.
   vec3 col = backgroundColor;
 
@@ -246,7 +247,7 @@ void main() {
   float zNear = 0.0001;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
-  gl_FragDepth = (a + b / clamp(totalD/length(dir), 0., zFar));
-
-  gl_FragColor = vec4(col, 1);
+  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
+  gl_FragDepth = depth;
+  gl_FragColor = vec4(col, depth);
 }
