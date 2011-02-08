@@ -54,6 +54,8 @@ using namespace std;
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
+#define FRAME_VERTEX_SHADER_FILE   "frame_vertex.glsl"
+#define FRAME_FRAGMENT_SHADER_FILE "frame_fragment.glsl"
 
 #ifdef PI
   #undef PI
@@ -69,62 +71,42 @@ using namespace std;
 #define FPS_FRAMES_TO_AVERAGE 20
 
 static const char *kHand[] = {
-  /* width height num_colors chars_per_pixel */
-  "    32    32        3            1",
-  /* colors */
-  ". c #000000",
-  "X c #ffffff",
-  "  c None",
-  /* pixels */
-  "     XX                         ",
-  "    X..X                        ",
-  "    X..X                        ",
-  "    X..X                        ",
-  "    X..XXXXXX                   ",
-  "    X..X..X..XXX                ",
-  "XXX X..X..X..X..X               ",
-  "X..XX..X..X..X..X               ",
-  "X...X..X..X..X..X               ",
-  " X..X..X..X..X..X               ",
-  " X..X........X..X               ",
-  " X..X...........X               ",
-  " X..............X               ",
-  " X.............X                ",
-  " X.............X                ",
-  "  X...........X                 ",
-  "   X.........X                  ",
-  "    X........X                  ",
-  "    X........X                  ",
-  "    XXXXXXXXXX                  ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "                                ",
-  "5,0"
+  "     XX                 ",
+  "    X..X                ",
+  "    X..X                ",
+  "    X..X                ",
+  "    X..XXXXXX           ",
+  "    X..X..X..XXX        ",
+  "XXX X..X..X..X..X       ",
+  "X..XX..X..X..X..X       ",
+  "X...X..X..X..X..X       ",
+  " X..X..X..X..X..X       ",
+  " X..X........X..X       ",
+  " X..X...........X       ",
+  " X..............X       ",
+  " X.............X        ",
+  " X.............X        ",
+  "  X...........X         ",
+  "   X.........X          ",
+  "    X........X          ",
+  "    X........X          ",
+  "    XXXXXXXXXX          ",
 };
 
 static SDL_Cursor *init_system_cursor(const char *image[]) {
-  int i = -1, row;
-  Uint8 data[4*32];
-  Uint8 mask[4*32];
+  int i = -1;
+  Uint8 data[3*20];
+  Uint8 mask[3*20];
 
-  for ( row=0; row<32; ++row ) {
-    for ( int col=0; col<32; ++col ) {
+  for ( int row=0; row<20; ++row ) {
+    for ( int col=0; col<24; ++col ) {
       if ( col % 8 ) {
         data[i] <<= 1; mask[i] <<= 1;
       } else {
         ++i;
         data[i] = mask[i] = 0;
       }
-      switch (image[4+row][col]) {
+      switch (image[row][col]) {
         case '.':
           data[i] |= 0x01; mask[i] |= 0x01;
           break;
@@ -136,10 +118,7 @@ static SDL_Cursor *init_system_cursor(const char *image[]) {
       }
     }
   }
-
-  int hot_x, hot_y;
-  sscanf(image[4+row], "%d,%d", &hot_x, &hot_y);
-  return SDL_CreateCursor(data, mask, 32, 32, hot_x, hot_y);
+  return SDL_CreateCursor(data, mask, 24, 20, 5, 0);
 }
 
 // SDL cursors.
@@ -153,6 +132,15 @@ SDL_Surface* screen;
 
 // Pinhole camera modes.
 enum StereoMode {ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED } stereoMode = ST_NONE;
+
+// ogl framebuffer object
+GLuint fbo;
+// texture that frame got rendered to
+GLuint texture;
+// depth buffer attached to fbo
+GLuint depthBuffer;
+// the mipmapper program
+int frame_program;
 
 ////////////////////////////////////////////////////////////////
 // Helper functions
@@ -263,7 +251,11 @@ float getFPS(void) {
   PROCESS(float, delta_time, "delta_time", false) \
   PROCESS(float, time, "time", true) \
   PROCESS(float, fps, "fps", false) \
-  PROCESS(int, depth_size, "depth_size", false)
+  PROCESS(int, depth_size, "depth_size", false) \
+  PROCESS(float, z_near, "z_near", true) \
+  PROCESS(float, z_far, "z_far", true) \
+  PROCESS(float, dof_scale, "dof_scale", true) \
+  PROCESS(float, dof_offset, "dof_offset", true)
 
 char* parName[10][3];
 
@@ -451,6 +443,8 @@ class KeyFrame {
      if (ao_strength <= 0) ao_strength = 0.1;
      if (glow_strength <= 0) glow_strength = 0.25;
      if (dist_to_color <= 0) dist_to_color = 0.2;
+     if (z_near <= 0) z_near = zNear;
+     if (z_far <= 0) z_far = zFar;
 
      orthogonalize();
 
@@ -877,6 +871,54 @@ int setupShaders(void) {
   return p;
 }
 
+// Compile and activate shader programs for frame buffer manipulation.
+// Return the program handle.
+int setupShaders2(void) {
+  char const* vs;
+  char const* fs;
+  GLuint v,f,p;
+  char log[2048]; int logLength;
+
+  (vs = readFile(FRAME_VERTEX_SHADER_FILE)) || ( vs = frame_default_vs );
+  (fs = readFile(FRAME_FRAGMENT_SHADER_FILE)) || ( fs = frame_default_fs );
+
+  if (fs != frame_default_fs) {
+     printf(__FUNCTION__ " : read shader from %s\n", FRAME_FRAGMENT_SHADER_FILE);
+  } else {
+     printf(__FUNCTION__ " : using default shader\n");
+  }
+
+  glsl_source.append(fs);
+
+  p = glCreateProgram();
+
+  v = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(v, 1, &vs, 0);
+  glCompileShader(v);
+  glGetShaderInfoLog(v, sizeof(log), &logLength, log);
+  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+
+  f = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(f, 1, &fs, 0);
+  glCompileShader(f);
+  glGetShaderInfoLog(f, sizeof(log), &logLength, log);
+  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+
+  glAttachShader(p, v);
+  glAttachShader(p, f);
+  glLinkProgram(p);
+
+  glGetProgramInfoLog(p, sizeof(log), &logLength, log);
+  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+
+  if (vs != frame_default_vs) free((char*)vs);
+  if (fs != frame_default_fs) free((char*)fs);
+
+  if (glGetError()) die("setupShaders() fails");
+
+  return p;
+}
+
 // Detach & delete any shaders, delete program.
 void cleanupShaders(int p) {
   GLuint shaders[2];
@@ -920,7 +962,7 @@ void initGraphics() {
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-  //SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+  SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, config.depth_size);
 
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
@@ -975,9 +1017,60 @@ void initGraphics() {
   // Needs to be done after setting the video mode.
   enableShaderProcs() ||
       die("This program needs support for GLSL shaders.\n");
+
   cleanupShaders(program);
+  cleanupShaders(frame_program);
+  
   (program = setupShaders()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
+  (frame_program = setupShaders2()) ||
+      die("Error in GLSL shader compilation (see stderr.txt for details).\n");
+
+  GLenum status = GL_NO_ERROR;
+
+  // Create depthbuffer
+  glDeleteRenderbuffers(1, &depthBuffer);
+  glGenRenderbuffers(1, &depthBuffer);
+  glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, config.width, config.height);
+  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+  // Create texture to render to
+  glDeleteTextures(1, &texture);
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+
+  // Allocate storage
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+
+  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+  // Allocate / generate mips
+  glGenerateMipmap(GL_TEXTURE_2D);
+
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // Create framebuffer
+  glDeleteFramebuffers(1, &fbo);
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+  // Attach texture to framebuffer as colorbuffer
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+  // Attach depthbuffer to framebuffer
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
+
+  status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  if (status != GL_FRAMEBUFFER_COMPLETE)
+    die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
+
+  // Back to normal framebuffer.
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  status = glGetError();
+  if (status != GL_NO_ERROR)
+    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 }
 
 TwBar* bar = NULL;
@@ -1213,6 +1306,11 @@ int main(int argc, char **argv) {
       }
     }
 
+    if (camera.dof_scale > .0001) {
+      // If we have some DoF to render, render to texture.
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    }
+
     if (!rendering) {
       // If we're rendering a sequence to disk, we don't care about z-buffer.
       // Otherwise, just overwrite since we write every pixel.
@@ -1221,13 +1319,11 @@ int main(int argc, char **argv) {
     }
 
     glUseProgram(program);
-
     camera.render(stereoMode);
-
     glUseProgram(0);
 
-    // Draw keyframe splined path, if we have 2+ keyframes and are not rendering
     if (stereoMode == ST_NONE && keyframes.size() > 1 && splines.empty()) {
+      // Draw keyframe splined path, if we have 2+ keyframes and are not rendering 
       glDepthFunc(GL_LESS);
 
       camera.activateGl();
@@ -1266,7 +1362,57 @@ int main(int argc, char **argv) {
       }
     }
 
+    glDisable(GL_DEPTH_TEST);
+
+    if (camera.dof_scale) {
+      // If we're rendering some DoF, draw texture on screen.
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+      glEnable(GL_TEXTURE_2D);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glGenerateMipmap(GL_TEXTURE_2D);
+
+      glUseProgram(frame_program);  // Activate our alpha channel shader.
+
+      glUniform1i(glGetUniformLocation(frame_program, "my_texture"), 0);
+      glUniform1f(glGetUniformLocation(frame_program, "z_near"), camera.z_near);
+      glUniform1f(glGetUniformLocation(frame_program, "z_far"), camera.z_far);
+      glUniform1f(glGetUniformLocation(frame_program, "dof_scale"), camera.dof_scale);
+      glUniform1f(glGetUniformLocation(frame_program, "dof_offset"), camera.dof_offset);
+
+      // Ortho projection, entire screen in regular pixel coordinates.
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      glOrtho(0, config.width, config.height, 0, -1, 1);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+
+      // Draw our texture covering entire screen, running the frame shader.
+      glColor4f(1,1,1,1);
+      glBegin(GL_QUADS);
+        glTexCoord2f(0,1);
+        glVertex2f(0,0);
+        glTexCoord2f(0,0);
+        glVertex2f(0,config.height);
+        glTexCoord2f(1,0);
+        glVertex2f(config.width,config.height);
+        glTexCoord2f(1,1);
+        glVertex2f(config.width,0);
+      glEnd();
+
+      glUseProgram(0);
+
+      glDisable(GL_TEXTURE_2D);
+    }
+
+    // Draw AntTweakBar
     if (!grabbedInput && !rendering) TwDraw();
+
+    {
+      GLenum err = glGetError();
+      if (err != GL_NO_ERROR) printf("glGetError():%04x\n", err);
+    }
 
     SDL_GL_SwapBuffers();
 
