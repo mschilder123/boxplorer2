@@ -1,0 +1,5 @@
+= Random screenshots =
+
+Depth of field rendering using texture mipmapping:
+
+[http://code.google.com/p/boxplorer2/files/dof.jpg]
