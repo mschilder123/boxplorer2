@@ -1,4 +1,4 @@
-= Random screenshots =
+#summary Random screenshots
 
 Depth of field rendering using texture mipmapping:
 
