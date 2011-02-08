@@ -1364,7 +1364,7 @@ int main(int argc, char **argv) {
 
     glDisable(GL_DEPTH_TEST);
 
-    if (camera.dof_scale) {
+    if (camera.dof_scale > .0001) {
       // If we're rendering some DoF, draw texture on screen.
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
