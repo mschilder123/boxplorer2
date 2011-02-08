@@ -131,7 +131,8 @@ int program;
 SDL_Surface* screen;
 
 // Pinhole camera modes.
-enum StereoMode {ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED } stereoMode = ST_NONE;
+enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED }
+    stereoMode = ST_NONE;
 
 // ogl framebuffer object
 GLuint fbo;
@@ -139,8 +140,8 @@ GLuint fbo;
 GLuint texture;
 // depth buffer attached to fbo
 GLuint depthBuffer;
-// the mipmapper program
-int frame_program;
+// the dof mipmapper program
+int dof_program;
 
 ////////////////////////////////////////////////////////////////
 // Helper functions
@@ -255,7 +256,8 @@ float getFPS(void) {
   PROCESS(float, z_near, "z_near", true) \
   PROCESS(float, z_far, "z_far", true) \
   PROCESS(float, dof_scale, "dof_scale", true) \
-  PROCESS(float, dof_offset, "dof_offset", true)
+  PROCESS(float, dof_offset, "dof_offset", true) \
+  PROCESS(int, enable_dof, "enable_dof", false)
 
 char* parName[10][3];
 
@@ -975,10 +977,9 @@ void initGraphics() {
 
   // Set the video mode, hide the mouse and grab keyboard and mouse input.
   if (screen == NULL) SDL_putenv((char*)"SDL_VIDEO_CENTERED=center");
-
   if (screen != NULL) SDL_FreeSurface(screen);
-  (screen = SDL_SetVideoMode(config.width, config.height, bpp, SDL_OPENGL |
-                             (config.fullscreen ? SDL_FULLSCREEN : SDL_RESIZABLE)))
+  (screen = SDL_SetVideoMode(config.width, config.height, bpp,
+      SDL_OPENGL | (config.fullscreen ? SDL_FULLSCREEN : SDL_RESIZABLE)))
     || die("Video mode initialization failed: %s\n", SDL_GetError());
 
   if (config.multisamples > 1) {
@@ -1019,11 +1020,14 @@ void initGraphics() {
       die("This program needs support for GLSL shaders.\n");
 
   cleanupShaders(program);
-  cleanupShaders(frame_program);
-  
+  cleanupShaders(dof_program);
+
   (program = setupShaders()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
-  (frame_program = setupShaders2()) ||
+
+  if (!config.enable_dof) return;
+
+  (dof_program = setupShaders2()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
   GLenum status = GL_NO_ERROR;
@@ -1032,7 +1036,8 @@ void initGraphics() {
   glDeleteRenderbuffers(1, &depthBuffer);
   glGenRenderbuffers(1, &depthBuffer);
   glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, config.width, config.height);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
+                        config.width, config.height);
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
   // Create texture to render to
@@ -1041,9 +1046,11 @@ void initGraphics() {
   glBindTexture(GL_TEXTURE_2D, texture);
 
   // Allocate storage
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height,
+               0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 
-  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                   GL_LINEAR_MIPMAP_LINEAR);
 
   // Allocate / generate mips
   glGenerateMipmap(GL_TEXTURE_2D);
@@ -1056,10 +1063,12 @@ void initGraphics() {
   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
   // Attach texture to framebuffer as colorbuffer
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                         GL_TEXTURE_2D, texture, 0);
 
   // Attach depthbuffer to framebuffer
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            GL_RENDERBUFFER, depthBuffer);
 
   status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   if (status != GL_FRAMEBUFFER_COMPLETE)
@@ -1076,7 +1085,7 @@ void initGraphics() {
 TwBar* bar = NULL;
 
 // Find '\n#define foo par[x].z  // {twbar params}' in glsl_source.
-void initTwParVars() {
+void initTwParDefines() {
   size_t start = 0;
   while ((start = glsl_source.find("\n#define ", start + 1)) != string::npos) {
     size_t eol = glsl_source.find("\n", start + 1);
@@ -1090,16 +1099,20 @@ void initTwParVars() {
     size_t attr_start = line.find("{");
     size_t attr_end = line.find("}");
     string attr;
-    if (attr_start != string::npos && attr_end != string::npos && attr_end > attr_start)
+    if (attr_start != string::npos &&
+        attr_end != string::npos &&
+        attr_end > attr_start)
       attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
 
     int index;
     char xyz = 'x';
-    if (sscanf(line.c_str() + parStart + 5, "%d].%c", &index, &xyz) < 1) continue;
-    if (index < 0 || index > lengthof(camera.par)) continue;
+    if (sscanf(line.c_str() + parStart + 5, "%d].%c",
+               &index, &xyz) < 1) continue;
+    if (index < 0 || index > (int)lengthof(camera.par)) continue;
     if (xyz < 'x' || xyz > 'z') continue;
 
-    printf("parameter %s par[%d].%c {%s}\n", varName.c_str(), index, xyz, attr.c_str());
+    printf("parameter %s par[%d].%c {%s}\n",
+           varName.c_str(), index, xyz, attr.c_str());
 
     float* address = &camera.par[index][xyz-'x'];
 
@@ -1124,7 +1137,9 @@ void initTwUniform(const string& name, void* addr) {
     size_t attr_start = line.find("{");
     size_t attr_end = line.find("}");
     string attr;
-    if (attr_start != string::npos && attr_end != string::npos && attr_end > attr_start)
+    if (attr_start != string::npos &&
+        attr_end != string::npos &&
+        attr_end > attr_start)
       attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
 
     if (line.find("uniform float " + name + ";") == 0) {
@@ -1148,7 +1163,7 @@ void initTwBar() {
   PROCESS_CONFIG_PARAMS
   #undef PROCESS
 
-  initTwParVars();
+  initTwParDefines();
 }
 
 void LoadKeyFrames(bool fixedFov) {
@@ -1186,6 +1201,7 @@ int main(int argc, char **argv) {
   bool useTime = false;
   bool configSpeed = false;
   bool fixedFov = false;
+  int enableDof = 0;
   // Peel known options off the back..
   while (argc>1) {
     if (!strcmp(argv[argc-1], "--overunder")) {
@@ -1200,6 +1216,10 @@ int main(int argc, char **argv) {
       useTime = true;
     } else if (!strcmp(argv[argc-1], "--speed")) {
       configSpeed = true;
+    } else if (!strcmp(argv[argc-1], "--disabledof")) {
+      enableDof = -1;
+    } else if (!strcmp(argv[argc-1], "--enabledof")) {
+      enableDof = 1;
     } else if (!strcmp(argv[argc-1], "--fixedfov")) {
       fixedFov = true;
     } else if (!strcmp(argv[argc-1], "--loop")) {
@@ -1217,8 +1237,9 @@ int main(int argc, char **argv) {
     die("Usage: boxplorer <configuration-file.cfg>");
   }
 
-  // Sanitize config only parameters.
+  // Sanitize / override config parameters.
   if (loop) config.loop = true;
+  if (enableDof) config.enable_dof = (enableDof == 1);  // override
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
 
@@ -1306,7 +1327,7 @@ int main(int argc, char **argv) {
       }
     }
 
-    if (camera.dof_scale > .0001) {
+    if (config.enable_dof && camera.dof_scale > .0001) {
       // If we have some DoF to render, render to texture.
       glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     }
@@ -1323,7 +1344,7 @@ int main(int argc, char **argv) {
     glUseProgram(0);
 
     if (stereoMode == ST_NONE && keyframes.size() > 1 && splines.empty()) {
-      // Draw keyframe splined path, if we have 2+ keyframes and are not rendering 
+      // Draw keyframe splined path, if we have 2+ keyframes and not rendering
       glDepthFunc(GL_LESS);
 
       camera.activateGl();
@@ -1364,7 +1385,7 @@ int main(int argc, char **argv) {
 
     glDisable(GL_DEPTH_TEST);
 
-    if (camera.dof_scale > .0001) {
+    if (config.enable_dof && camera.dof_scale > .0001) {
       // If we're rendering some DoF, draw texture on screen.
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -1373,13 +1394,15 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, texture);
       glGenerateMipmap(GL_TEXTURE_2D);
 
-      glUseProgram(frame_program);  // Activate our alpha channel shader.
+      glUseProgram(dof_program);  // Activate our alpha channel shader.
 
-      glUniform1i(glGetUniformLocation(frame_program, "my_texture"), 0);
-      glUniform1f(glGetUniformLocation(frame_program, "z_near"), camera.z_near);
-      glUniform1f(glGetUniformLocation(frame_program, "z_far"), camera.z_far);
-      glUniform1f(glGetUniformLocation(frame_program, "dof_scale"), camera.dof_scale);
-      glUniform1f(glGetUniformLocation(frame_program, "dof_offset"), camera.dof_offset);
+      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
+      glUniform1f(glGetUniformLocation(dof_program, "z_near"), camera.z_near);
+      glUniform1f(glGetUniformLocation(dof_program, "z_far"), camera.z_far);
+      glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
+                  camera.dof_scale);
+      glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
+                  camera.dof_offset);
 
       // Ortho projection, entire screen in regular pixel coordinates.
       glMatrixMode(GL_PROJECTION);
@@ -1454,11 +1477,10 @@ int main(int argc, char **argv) {
       case SDL_QUIT: done |= 1; break;
 
       case SDL_MOUSEBUTTONDOWN: {
-        //printf("SDL_MOUSEBUTTONDOWN %x @ %d, %d", event.button.button, event.button.x, event.button.y);
         if (grabbedInput == 0) {
           unsigned int bgr = getBGRpixel(event.button.x, event.button.y);
-          //printf(" : %06x\n", bgr);
-          if ((bgr & 0xffff) == 0) {  // No red or green at all : probably a keyframe marker (fragile).
+          if ((bgr & 0xffff) == 0) {
+            // No red or green at all : probably a keyframe marker (fragile).
             size_t kf = 255 - (bgr >> 16);
             if (kf < keyframes.size()) {
                printf("selected keyframe %lu\n", (unsigned long)kf);
@@ -1468,7 +1490,9 @@ int main(int argc, char **argv) {
           }
         } else switch(event.button.button) {
           case 1:  // left mouse
-            grabbedInput = 0; SDL_ShowCursor(SDL_ENABLE); SDL_WM_GrabInput(SDL_GRAB_OFF);
+            grabbedInput = 0;
+            SDL_ShowCursor(SDL_ENABLE);
+            SDL_WM_GrabInput(SDL_GRAB_OFF);
             ignoreNextMouseUp = true;
             break;
           case 4:  // mouse wheel up, increase speed at keyframe
@@ -1482,7 +1506,6 @@ int main(int argc, char **argv) {
              }
             break;
         }
-        //printf("\n");
       } break;
 
       case SDL_MOUSEMOTION: {
@@ -1517,7 +1540,7 @@ int main(int argc, char **argv) {
 
       case SDL_MOUSEBUTTONUP: {
          if (ignoreNextMouseUp == false && grabbedInput == 0) {
-           grabbedInput = 1; 
+           grabbedInput = 1;
            SDL_SetCursor(arrow_cursor);
            SDL_ShowCursor(SDL_DISABLE);
            SDL_WM_GrabInput(SDL_GRAB_ON);
@@ -1703,12 +1726,14 @@ int main(int argc, char **argv) {
         // Current keyframe manouvering in screenspace.
         case SDLK_KP4: {
           if (keyframe < keyframes.size()) {
-            keyframes[keyframe].moveAbsolute(camera.right(), -.5*keyframes[keyframe].speed);
+            keyframes[keyframe].moveAbsolute(camera.right(),
+                                             -.5*keyframes[keyframe].speed);
           }
         } break;
         case SDLK_KP6: {
           if (keyframe < keyframes.size()) {
-            keyframes[keyframe].moveAbsolute(camera.right(), .5*keyframes[keyframe].speed);
+            keyframes[keyframe].moveAbsolute(camera.right(),
+                                             .5*keyframes[keyframe].speed);
           }
         } break;
         case SDLK_KP8: {
