@@ -3,3 +3,7 @@
 Depth of field rendering using texture mipmapping:
 
 [https://lh4.googleusercontent.com/_uqT1DECwpD8/TVD9-BXvwVI/AAAAAAAASq4/LN9Qbct0jXs/dof.jpg]
+
+Showing keyframe flight path for left and right eye in the scene
+
+[https://lh4.googleusercontent.com/_uqT1DECwpD8/TVD-cMQDqbI/AAAAAAAASrA/0NOPb5CWA80/boxtweak.jpg]
