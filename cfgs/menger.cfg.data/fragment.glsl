@@ -1,7 +1,7 @@
 // Mandelbox shader by Rrrola
 // Original formula by Tglad
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
-
+//bermarte: formula from Knigthy
 #define d de_menger
 
 #define P0 p0                    // standard Mandelbox
