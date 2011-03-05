@@ -2,26 +2,37 @@
 // Original mandelbox formula by Tglad
 // Original kifs formulas by Knighty,parts by Marius
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
-//octakifs /bermarte/visual>see fractalforums.com 
+// octakifs /bermarte/visual>goto fractalforums.com 
 //#pragma OPENCL_EXTENSION cl_khr_fp64 : enable
 
 #define P0 p0
 #define Z0 z0
-#define CX par[6].x// {min=0 max=3 step=.001}
-#define CY par[7].x// {min=0 max=3 step=.001}
-#define CZ par[8].x// {min=0 max=3 step=.001}
-#define Angle par[3].x// {min=-3 max=3 step=.001}
-#define scale par[4].x// {min=0 max=9 step=.001}
+#define CX par[7].y// {min=-3.0 max=3 step=.001}
+#define CY par[7].x// {min=-3.0 max=3 step=.001}
+#define CZ par[8].x// {min=-3.0 max=3 step=.001}
+#define Angle par[3].x// {min=-6.0 max=6 step=.001}
+#define scale par[4].x// {min=-3 max=6 step=.001}
+#define surfaceColor1 par[1]
+#define surfaceColor2 par[2]
+#define surfaceColor3 par[6]
+#define glowColor par[5]
+//later?
+//#define fogStrength par[9].y  // {min=0 max=100 step=.25}
+//vec3 z0 = normalize(vec3(par[8].y, par[3].y, par[3].x));
+//#define LoDbase par[9].x  // {min=1 max=20 step=.25}
+//#define LoDpow par[9].y  // {min=0 max=50 step=.25}
 #define DE de_octa
-#define COLOR color_box
+#define COLOR color_octa
 #define DIST_MULTIPLIER 1.0
 #define MAX_DIST 4.0
+
+
 
 // Camera position and direction.
 varying vec3 eye, dir;
 
 // Interactive parameters.
-uniform vec3 par[10];//4 later
+uniform vec3 par[20];//4 later
 
 uniform float
   min_dist,           // Distance at which raymarching stops.
@@ -45,11 +56,11 @@ uniform int iters,    // Number of fractal iterations.
   //aoColor = vec3(.1, .1, .1);
 //////////////
 vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
-  surfaceColor1 = vec3(0.95, 0.12, 0.1),
-  surfaceColor2 = vec3(0.29, 0.4, 0.75),
-  surfaceColor3 = vec3(0.4, 0.06, 0.03),
+  //surfaceColor1 = vec3(0.95, 0.12, 0.1),
+  //surfaceColor2 = vec3(0.29, 0.4, 0.75),
+  //surfaceColor3 = vec3(0.4, 0.06, 0.03),
   specularColor = vec3(1.0, 0.8, 0.4),
-  glowColor = vec3(.1, 0.4, 0.4),
+  //glowColor = vec3(.1, 0.4, 0.4),
   aoColor = vec3(.1, .1, .1);
 
 // precomputed constants
@@ -58,11 +69,12 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 float absScalem1 = abs(1.1 - 1.0);//SCALE
 float AbsScaleRaisedTo1mIters = pow(abs(1.1), float(1-45));
 // Rotate around vector
-//float Angle = par[3].x;
+//WAS float Angle = par[3].x;
 float csat = cos(Angle);
 float ssat = sin(Angle);
 float usat = 1.0-cos(Angle);
-vec3 z0 = normalize(vec3(par[2].x, par[2].y, par[3].y));
+vec3 z0 = normalize(vec3(par[8].y, par[3].y, par[3].x));
+//WAS vec3 z0 = normalize(vec3(par[2].x, par[2].y, par[3].y));
 mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat + z0.z*ssat, z0.x*z0.z*usat - z0.y*ssat,
                             z0.y*z0.x*usat - z0.z*ssat, z0.y*z0.y*usat + csat,      z0.y*z0.z*usat + z0.x*ssat,
 			    z0.z*z0.x*usat + z0.y*ssat, z0.z*z0.y*usat - z0.x*ssat, z0.z*z0.z*usat + csat
@@ -70,7 +82,7 @@ mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat + z0.z*ss
 
 // Compute the distance from `pos` to the Mandelbox.
 float de_octa(vec3 z0) {
-float r=z0.x*z0.x+z0.y*z0.y+z0.z*z0.z;
+    float r=z0.x*z0.x+z0.y*z0.y+z0.z*z0.z;
     
     int i = 0;
     for (i=0;i< iters && r<20.0;i++){
@@ -91,7 +103,7 @@ float r=z0.x*z0.x+z0.y*z0.y+z0.z*z0.z;
   return max(k,-k);
 }
 // Compute the color at `pos`.
-vec3 color_box(vec3 pos) {
+vec3 color_octa(vec3 pos) {
   vec3 p = pos, p0 = p;
   float trap = 1.0;
   for (int i=0; i<color_iters; i++) {
@@ -221,5 +233,11 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  gl_FragColor = vec4(col, 1);
+  float zFar = 5.0;
+  float zNear = 0.0001;
+  float a = zFar / (zFar - zNear);
+  float b = zFar * zNear / (zNear - zFar);
+  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
+  gl_FragDepth = depth;
+  gl_FragColor = vec4(col, depth);
 }
