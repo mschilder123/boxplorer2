@@ -257,7 +257,8 @@ float getFPS(void) {
   PROCESS(float, z_far, "z_far", true) \
   PROCESS(float, dof_scale, "dof_scale", true) \
   PROCESS(float, dof_offset, "dof_offset", true) \
-  PROCESS(int, enable_dof, "enable_dof", false)
+  PROCESS(int, enable_dof, "enable_dof", false) \
+  PROCESS(int, no_spline, "no_spline", false)
 
 char* parName[10][3];
 
@@ -841,6 +842,11 @@ int setupShaders(void) {
   } else {
      printf(__FUNCTION__ " : using default shader\n");
   }
+  if (vs != default_vs) {
+     printf(__FUNCTION__ " : read vertex shader from %s\n", VERTEX_SHADER_FILE);
+  } else {
+     printf(__FUNCTION__ " : using default vertex shader\n");
+  }
 
   glsl_source.assign(fs);
 
@@ -1343,7 +1349,10 @@ int main(int argc, char **argv) {
     camera.render(stereoMode);
     glUseProgram(0);
 
-    if (stereoMode == ST_NONE && keyframes.size() > 1 && splines.empty()) {
+    if (!config.no_spline &&
+        stereoMode == ST_NONE &&
+        keyframes.size() > 1 &&
+        splines.empty()) {
       // Draw keyframe splined path, if we have 2+ keyframes and not rendering
       glDepthFunc(GL_LESS);
 
@@ -1773,7 +1782,6 @@ int main(int argc, char **argv) {
     }
 
     if (done) break;
-    if (!grabbedInput) continue;
 
     // Get keyboard and mouse state.
     Uint8* keystate = SDL_GetKeyState(0);
@@ -1781,6 +1789,10 @@ int main(int argc, char **argv) {
     Uint8 mouse_buttons = SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
     int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
     int mouse_button_right = mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
+
+    // Continue after calling SDL_GetRelativeMouseState() so view direction
+    // does not jump after closing AntTweakBar.
+    if (!grabbedInput) continue;
 
     (void)mouse_buttons;
     (void)mouse_button_left;
