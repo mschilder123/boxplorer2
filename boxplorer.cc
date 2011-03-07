@@ -1313,6 +1313,7 @@ int main(int argc, char **argv) {
         if (splines_index > 0) {
           dist_along_spline += camera.distanceTo(splines[splines_index - 1]);
         }
+        size_t prev_splines_index = splines_index;
         ++splines_index;
         if (useTime) {
           if (rendering) {
@@ -1321,7 +1322,12 @@ int main(int argc, char **argv) {
             render_time += frame_time;
           } else {
             // Previewing. Use real time (low framerate == jumpy preview!).
-            if (now() > render_start + camera.time) continue;
+            float n = now();
+            if (n > render_start + camera.time) continue;  // late, skip frame.
+            float w = (render_start + camera.time) - n; 
+            if (w >= frame_time) {  // early, redraw frame.
+              splines_index = prev_splines_index;
+            }
           }
         } else {
          if (dist_along_spline < (configSpeed?config.speed:camera.speed))
