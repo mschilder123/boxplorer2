@@ -53,7 +53,8 @@ void main() {
   float totalD = -p.z / dir.z;
   p += totalD * dir;
 
-  vec3 col = getColor2D(vec2(p));
+  vec3 col = vec3(0.0);
+  if (totalD > 0.0) col = getColor2D(vec2(p));
 
   // Write zBuffer and pixel
   float zFar = 5.0;
