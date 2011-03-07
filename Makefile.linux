@@ -1,4 +1,4 @@
-all: boxplorer shadershrink
+all: boxplorer shadershrink edit-cfg
 
 CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX
 
@@ -14,6 +14,9 @@ boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.linux
 
 shadershrink: shadershrink.cc shadershrink.h Makefile.linux
 	g++ $(CFLAGS) shadershrink.cc -o shadershrink
+
+edit-cfg: edit-cfg.cc Makefile.linux
+	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CFLAGS) $<
