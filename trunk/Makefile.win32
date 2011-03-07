@@ -1,4 +1,4 @@
-all: boxplorer.exe shadershrink.exe
+all: boxplorer.exe shadershrink.exe edit-cfg.exe
 
 CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
 LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
@@ -12,6 +12,9 @@ boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h Makefile.win32 $(TW
 
 shadershrink.exe: shadershrink.cc Makefile.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
+
+edit-cfg.exe: edit-cfg.cc Makefile.win32
+	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
 TwBar.obj: AntTweakBar\src\TwBar.cpp
 	cl -c $(CFLAGS) $**
