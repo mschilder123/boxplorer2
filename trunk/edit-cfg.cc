@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     vector<string> content;
 
     // read file content
-    ifstream infile(filename);
+    ifstream infile(filename.c_str());
     if (!infile.is_open()) {
       printf("failed to open for read\n");
       continue;
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     }
 
     // write file
-    ofstream outfile(filename);
+    ofstream outfile(filename.c_str());
     if (outfile.is_open()) {
       for(vector<string>::const_iterator it = content.begin();
           it != content.end(); ++it) {
