@@ -14,7 +14,7 @@
 #define CY par[7].x// {min=-3 max=3 step=.001}
 //#define CZ par[8].x// {min=-3 max=3 step=.001}
 
-#define iters2 par[5].x// {min=-3 max=20 step=1}
+#define prefolds par[5].x// {min=0 max=5 step=1}
 
 #define Angle par[3].x// {min=-3 max=6 step=.001}
 #define scale par[4].x// {min=0 max=9 step=.001}
@@ -26,9 +26,6 @@
 
 #define IN3  (1./sqrt(14.+6.*sqrt(5.)))
 #define n3 normalize(vec3(IN3*_PHI_,-IN3*(pow(_PHI_,2.)),-IN3*(2.*_PHI_+1.)))
-//#define stc vec3(_PHI_,1.,0.)
-//#define IN3  (1./sqrt(14.+6.*sqrt(5.)))
-//#define n3 vec3(IN3*_PHI_,-IN3*(pow(_PHI_,2.)),-IN3*(2.*_PHI_+1.))
 
 #define DIST_MULTIPLIER 1.0
 #define MAX_DIST 4.0
@@ -101,7 +98,7 @@ float de_box(vec3 pos) {
 float de_menger(vec3 z0) {
     int i;float t=0.0; float r=0.0;
     
-    for(int j=0;j<iters2;j++){//Pre-fold maxFoldIterations//EXTRA
+    for(int j=0;j<prefolds;j++){//Pre-fold maxFoldIterations//EXTRA
       z0.y=abs(z0.y);
       z0.z=abs(z0.z);
       //z0.x=abs(z0.x);
