@@ -258,7 +258,8 @@ float getFPS(void) {
   PROCESS(float, dof_scale, "dof_scale", true) \
   PROCESS(float, dof_offset, "dof_offset", true) \
   PROCESS(int, enable_dof, "enable_dof", false) \
-  PROCESS(int, no_spline, "no_spline", false)
+  PROCESS(int, no_spline, "no_spline", false) \
+  PROCESS(float, asymmetry, "asymmetry", true)
 
 char* parName[10][3];
 
@@ -508,25 +509,25 @@ class KeyFrame {
        case ST_OVERUNDER:
          move(speed, 0, 0);  // step right
          activate();
-         setUniforms(1.0, 0.0, 2.0, 1.0);
+         setUniforms(1.0-asymmetry/2, -asymmetry/2, 2.0, 1.0);
          glRects(-1,-1,1,0);  // draw bottom half of screen
          pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];  // restore pos
          move(-speed, 0, 0);  // step left
          activate();
-         setUniforms(1.0, 0.0, 2.0, -1.0);
+         setUniforms(1.0-asymmetry/2, asymmetry/2, 2.0, -1.0);
          glRects(-1,0,1,1);  // draw top half of screen
          pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];
          break;
        case ST_XEYED:
          move(speed, 0, 0);  // step right
          activate();
-         setUniforms(2.0, 1.0, 1.0, 0.0);
-         glRectf(-1,-1,-0.005,1);  // draw left half of screen
+         setUniforms(2.0*(1.0-asymmetry/2), 1.0-asymmetry, 1.0, 0.0);
+         glRectf(-1,-1,0,1);  // draw left half of screen
          pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];
          move(-speed, 0, 0);  // step left
          activate();
-         setUniforms(2.0, -1.0, 1.0, 0.0);
-         glRectf(0.005,-1,1,1);  // draw right half of screen
+         setUniforms(2.0*(1.0-asymmetry/2), -1.0+asymmetry, 1.0, 0.0);
+         glRectf(0,-1,1,1);  // draw right half of screen
          pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];
          break;
        case ST_NONE:
@@ -536,6 +537,7 @@ class KeyFrame {
          break;
        case ST_INTERLACED:
          activate();
+         //TODO: add asymmetric frustum to interlaced rendering.
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
          glRects(-1,-1,1,1);  // draw entire screen
          break;
@@ -645,8 +647,8 @@ typedef enum Controller {
   // user parameters: 0..9
   // other parameters:
   CTL_FOV = lengthof(camera.par), CTL_RAY, CTL_ITER, CTL_AO, CTL_GLOW,
-  CTL_TIME, CTL_CAM,
-  CTL_LAST = CTL_CAM,
+  CTL_TIME, CTL_CAM, CTL_3D,
+  CTL_LAST = CTL_3D,
 } Controller;
 
 
@@ -689,12 +691,14 @@ char* printController(char* s, Controller c) {
               (int)(camera.ahead()[2]*100));
     } break;
     case CTL_TIME: {
-      sprintf(s, "Speed %f DeltaT %f", camera.speed, camera.delta_time);
+      sprintf(s, "Speed %f DeltaT %.3f", camera.speed, camera.delta_time);
+    } break;
+    case CTL_3D: {
+      sprintf(s, "Sep %f Asym %.3f", camera.speed, camera.asymmetry);
     } break;
   }
   return s;
 }
-
 
 // Update controller.y by the signed count of consecutive changes.
 void updateControllerY(Controller c, int d) {
@@ -707,10 +711,13 @@ void updateControllerY(Controller c, int d) {
     case CTL_AO: m_mulSlow(&camera.ao_strength, d); break;
     case CTL_GLOW: m_progressiveAdd(&camera.glow_strength, d); break;
     case CTL_CAM: m_rotateY(d); break;
-    case CTL_TIME: m_mulSlow(&camera.delta_time, d); break;
+    case CTL_TIME: m_progressiveAdd(&camera.delta_time, d); break;
+    case CTL_3D: m_progressiveAdd(&camera.asymmetry, d); break;
   }
+  // Enforce sane bounds.
+  if (camera.delta_time < 0) camera.delta_time = 0;
+  if (camera.asymmetry < 0) camera.asymmetry = 0;
 }
-
 
 // Update controller.x by the signed count of consecutive changes.
 void updateControllerX(Controller c, int d) {
@@ -724,9 +731,9 @@ void updateControllerX(Controller c, int d) {
     case CTL_GLOW: m_mul(&camera.dist_to_color, d); break;
     case CTL_CAM: m_rotateX(d); break;
     case CTL_TIME: m_mulSlow(&camera.speed, d); break;
+    case CTL_3D: m_mulSlow(&camera.speed, d); break;
   }
 }
-
 
 // Change the active controller with a keypress.
 void changeController(SDLKey key, Controller* c) {
@@ -748,6 +755,7 @@ void changeController(SDLKey key, Controller* c) {
     case SDLK_o: *c = CTL_AO; break;
     case SDLK_r: *c = CTL_RAY; break;
     case SDLK_t: *c = CTL_TIME; break;
+    case SDLK_v: *c = CTL_3D; break;
     default: break;  // no change
   }
 }
@@ -876,7 +884,7 @@ int setupShaders(void) {
 
   if (glGetError()) die("setupShaders() fails");
 
-  return p;
+  return p>0?p:0;
 }
 
 // Compile and activate shader programs for frame buffer manipulation.
@@ -924,7 +932,7 @@ int setupShaders2(void) {
 
   if (glGetError()) die("setupShaders() fails");
 
-  return p;
+  return p>0?p:0;
 }
 
 // Detach & delete any shaders, delete program.
@@ -1248,6 +1256,7 @@ int main(int argc, char **argv) {
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
+  if (stereoMode == ST_XEYED) config.width *= 2; 
 
   camera = config;
 

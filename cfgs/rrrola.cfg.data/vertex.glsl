@@ -22,7 +22,7 @@ void main() {
   zoom = min(fov2scale(fov_x), fov2scale(fov_y));  // min delta ray at dist 1
   dir = vec3(gl_ModelViewMatrix *
     vec4(
-      fov2scale(fov_x)/x_scale*(x_scale*gl_Vertex.x + x_offset),
+      fov2scale(fov_x)*(x_scale*gl_Vertex.x + x_offset),
       fov2scale(fov_y)*(y_scale*gl_Vertex.y + y_offset),
       1,
       0));
