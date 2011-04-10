@@ -41,7 +41,7 @@ vec2 c2 = vec2(JuliaX,JuliaY);
 
 // Mandelbrot for c.x,c.y
 vec3 getColor2D(vec2 c) {
-  bool Julia=1;
+  bool Julia=true;
 
   vec2 z = Julia ?  c : vec2(1.0,0.0);  
 
@@ -53,11 +53,11 @@ vec3 getColor2D(vec2 c) {
   for (i = 0; i < iters; i++) {
 
      z = zlog(vec2(z.x,abs(z.y)))+(Julia ? c2 : c);
-     if (i>PrItrs) mean+=length(z);
+     if (float(i)>PrItrs) mean+=length(z);
   }
     //dist = min(dist, abs(length(z)-Radius));
   
-  mean/=float(iters-PrItrs);
+  mean/=float(iters)-PrItrs;
   // from Inigo Quilez's Shader Toy:
 	float co =   1.0 - log2(.5*log2(mean/C));
 	return vec3( .5+.5*cos(6.2831*co+R),.5+.5*cos(6.2831*co + G),.5+.5*cos(6.2831*co +B) );
