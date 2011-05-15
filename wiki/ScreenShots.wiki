@@ -1,6 +1,6 @@
 #summary Random screenshots
 
-Depth of field rendering using texture mipmapping:
+Limited depth of field rendering using texture mipmapping:
 
 [https://lh4.googleusercontent.com/_uqT1DECwpD8/TVD9-BXvwVI/AAAAAAAASq4/LN9Qbct0jXs/dof.jpg]
 
