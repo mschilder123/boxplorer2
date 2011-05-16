@@ -10,3 +10,6 @@
  * [http://www.youtube.com/watch?v=BKKReHQ6bvo]
  `./boxplorer cfgs/colonoscopy.cfg --render --fixedfov ---overunder`
  to regenerate the stereoscopic footage as uploaded to youtube.
+
+ * [http://www.youtube.com/watch?v=MZRZ7KNsx9U]
+ `./boxplorer cfgs/knighty/SpendFuelRods.cfg --render -fixedfov -overunder --time` to regenerate.
