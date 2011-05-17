@@ -114,7 +114,7 @@ vec3 color_PKlein(vec3 p) {
 #define PKColor par[6]
 #define ColRatio par[7].x //{min=0 max=1 step=.01}
 //	return mix(vec3(sqrt(rmin)),(0.5+0.5*sin(col.z*PKColor)),ColRatio);//vec3(sqrt(rmin));//*col.xyz/(iters+1.);
-	return mix(sqrt(rmin)*col.xyz/(color_iters+1.),(0.5+0.5*sin(col.z*PKColor)),ColRatio);//vec3(sqrt(rmin));//*;
+	return mix(sqrt(rmin)*col.xyz/(float(color_iters)+1.),(0.5+0.5*sin(col.z*PKColor)),ColRatio);//vec3(sqrt(rmin));//*;
 }
 
 float normal_eps = 0.00001;
