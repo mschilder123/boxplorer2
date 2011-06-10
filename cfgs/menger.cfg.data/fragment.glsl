@@ -42,6 +42,8 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
+#define SHINE par[9].x  // {min=0 max=1 step=.01}
+
 // precomputed constants
 float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
 vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
@@ -166,6 +168,25 @@ float ambient_occlusion(vec3 p, vec3 n) {
   return clamp(ao, 0.0, 1.0);
 }
 
+// return dist
+float trace(vec3 p, vec3 dp) {
+  float totalD = 0.0, D;
+  for (int steps = 0; steps < max_steps; ++steps) {
+    D = d(p + totalD*dp);
+    if (D < min_dist) break;
+    totalD += D;
+    if (D > MAX_DIST) break;
+  }
+  return totalD;
+}
+
+vec3 do_color(vec3 p, vec3 dp, vec3 n) {
+  //vec3 col = color(p);
+  vec3 col = surfaceColor3;
+  col = blinn_phong(n, -dp, normalize(vec3(0,1,0)+dp), col);
+  col = mix(aoColor, col, ambient_occlusion(p, n));
+  return col;
+}
 
 void main() {
   // Interlaced stereoscopic eye fiddling
@@ -174,10 +195,6 @@ void main() {
       vec3(gl_ModelViewMatrix[0]);
 
   vec3 p = eye_in, dp = normalize(dir);
-
-  float odd = fract(gl_FragCoord.y * .5);
-  float displace = (4. * odd - 1.) * speed;
-  p += displace * vec3(gl_ModelViewMatrix[0]);
 
   float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
 
@@ -211,9 +228,26 @@ void main() {
 
   // We've got a hit or we're not sure.
   if (D < MAX_DIST) {
-    vec3 n = normal(p, D);
     col = color(p);
-    col = blinn_phong(n, -dp, normalize(eye_in+vec3(0,1,0)+dp), col);
+    //col = surfaceColor1;
+
+    vec3 n = normal(p, D);
+
+    if (SHINE > 0.) {
+      // do 1 level of reflection tracing
+      vec3 bounce_dir = normalize(dp - 2*n*dot(n,dp));
+      float rd = trace(
+                       // Start bounce a bit over 1x min_dist away
+                       p + bounce_dir * 1.1 * min_dist,
+                       bounce_dir);
+      if (rd < MAX_DIST) {  // hit something?
+        col = mix(col, do_color(p+rd*bounce_dir,
+                                bounce_dir,
+                                normal(p+rd*bounce_dir,D)), SHINE);
+      }
+    }
+
+    col = blinn_phong(n, -dp, normalize(/*eye_in+*/vec3(0,1,0)+dp), col);
     col = mix(aoColor, col, ambient_occlusion(p, n));
 
     // We've gone through all steps, but we haven't hit anything.
