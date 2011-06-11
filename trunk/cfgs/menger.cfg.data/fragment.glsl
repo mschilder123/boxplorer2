@@ -15,6 +15,8 @@
 
 // Camera position and direction.
 varying vec3 eye, dir;
+varying float zoom;
+uniform float xres;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -169,20 +171,22 @@ float ambient_occlusion(vec3 p, vec3 n) {
 }
 
 // return dist
-float trace(vec3 p, vec3 dp) {
+float trace(vec3 p, vec3 dp, float min_dist, float m_zoom) {
   float totalD = 0.0, D;
+  float m_dist = min_dist;
   for (int steps = 0; steps < max_steps; ++steps) {
     D = d(p + totalD*dp);
-    if (D < min_dist) break;
+    if (D < m_dist) break;
     totalD += D;
     if (D > MAX_DIST) break;
+    m_dist = max(min_dist, m_zoom * totalD);
   }
   return totalD;
 }
 
 vec3 do_color(vec3 p, vec3 dp, vec3 n) {
   //vec3 col = color(p);
-  vec3 col = surfaceColor3;
+  vec3 col = surfaceColor1;
   col = blinn_phong(n, -dp, normalize(vec3(0,1,0)+dp), col);
   col = mix(aoColor, col, ambient_occlusion(p, n));
   return col;
@@ -195,30 +199,21 @@ void main() {
       vec3(gl_ModelViewMatrix[0]);
 
   vec3 p = eye_in, dp = normalize(dir);
+  float m_zoom = length(dir) * zoom * .5 / xres;
 
-  float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
+  float D = d(p);
+  float side = sign(D);
+  float totalD = abs(D);
 
-  // Intersect the view ray with the Mandelbox using raymarching.
+  // Intersect the view ray with the fractal using raymarching.
+  float m_dist = min_dist;
   int steps;
   for (steps=0; steps<max_steps; steps++) {
-    lastD = D;
-    D = d(p + totalD * dp);
-
-    // Overstepping: have we jumped too far? Cancel last step.
-    if (extraD > 0.0 && D < extraD) {
-      totalD -= extraD;
-      extraD = 0.0;
-      D = 3.4e38;
-      steps--;
-      continue;
-    }
-
-    if (D < min_dist || D > MAX_DIST) break;
-
+    D = (side * d(p + totalD * dp) - totalD * m_dist) / (1.0 + m_dist);
+    if (abs(D) < m_dist) break;
     totalD += D;
-
-    // Overstepping is based on the optimal length of the last step.
-    totalD += extraD = 0.096 * D*(D+extraD)/lastD;
+    if (totalD > MAX_DIST) break;
+    m_dist = max(min_dist, m_zoom * totalD);
   }
 
   p += totalD * dp;
@@ -238,13 +233,16 @@ void main() {
       vec3 bounce_dir = normalize(dp - 2*n*dot(n,dp));
       float rd = trace(
                        // Start bounce a bit over 1x min_dist away
-                       p + bounce_dir * 1.1 * min_dist,
-                       bounce_dir);
+                       p + bounce_dir * 1.5 * m_dist,
+                       bounce_dir,
+				 m_dist, m_zoom);
       if (rd < MAX_DIST) {  // hit something?
         col = mix(col, do_color(p+rd*bounce_dir,
                                 bounce_dir,
                                 normal(p+rd*bounce_dir,D)), SHINE);
-      }
+      } else {
+		col = mix(col, backgroundColor, SHINE);
+	}
     }
 
     col = blinn_phong(n, -dp, normalize(/*eye_in+*/vec3(0,1,0)+dp), col);
@@ -252,8 +250,8 @@ void main() {
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
-    if (D > min_dist) {
-      col = mix(col, backgroundColor, clamp(log(D/min_dist) * dist_to_color, 0.0, 1.0));
+    if (D > m_dist) {
+      col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
   }
 
