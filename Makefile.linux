@@ -1,3 +1,4 @@
+# Needs libsdl and dependencies: sudo apt-get install libsdl1.2-dev
 all: boxplorer shadershrink edit-cfg
 
 CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX

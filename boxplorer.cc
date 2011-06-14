@@ -274,7 +274,7 @@ class KeyFrame {
    #undef PROCESS
 
    // Par[] parameter array.
-   float par[10][3];
+   float par[20][3];  // min(this, glsl) gets sent to shader.
 
    bool isKey_;  // Whether this frame is actually a KeyFrame.
 
@@ -967,6 +967,7 @@ void changeWorkingDirectory(const char* configFile) {
 // Initializes the video mode, OpenGL state, shaders, camera and shader parameters.
 // Exits the program if an error occurs.
 void initGraphics() {
+  GLenum status = GL_NO_ERROR;
   // If not fullscreen, use the color depth of the current video mode.
   int bpp = 24;  // FSAA works reliably only in 24bit modes
   if (!config.fullscreen) {
@@ -1041,10 +1042,12 @@ void initGraphics() {
 
   if (!config.enable_dof) return;
 
+  if ((status = glGetError()) != GL_NO_ERROR)
+    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+
   (dof_program = setupShaders2()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
-  GLenum status = GL_NO_ERROR;
 
   // Create depthbuffer
   glDeleteRenderbuffers(1, &depthBuffer);
@@ -1053,6 +1056,9 @@ void initGraphics() {
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
                         config.width, config.height);
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+  if ((status = glGetError()) != GL_NO_ERROR)
+    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
   // Create texture to render to
   glDeleteTextures(1, &texture);
@@ -1084,6 +1090,9 @@ void initGraphics() {
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                             GL_RENDERBUFFER, depthBuffer);
 
+  if ((status = glGetError()) != GL_NO_ERROR)
+    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+
   status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   if (status != GL_FRAMEBUFFER_COMPLETE)
     die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
@@ -1091,8 +1100,7 @@ void initGraphics() {
   // Back to normal framebuffer.
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  status = glGetError();
-  if (status != GL_NO_ERROR)
+  if ((status = glGetError()) != GL_NO_ERROR)
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 }
 
