@@ -13,3 +13,6 @@
 
  * [http://www.youtube.com/watch?v=MZRZ7KNsx9U]
  `./boxplorer cfgs/knighty/SpendFuelRods.cfg --render -fixedfov -overunder --time` to regenerate.
+
+ * [http://www.youtube.com/watch?v=I0ilmEcsj8c]
+ `./boxplorer cfgs/knighty/Reflectoids.cfg --render --fixedfov --overunder` to regenerate.
