@@ -10,17 +10,19 @@ uniform vec3 par[10];
 uniform int iters;  // Number of fractal iterations. {min=10 max=1000}
 
 #define surfaceColor par[2]
+#define surfaceColor2 par[3]
 #define R par[2].x
 #define G par[2].y
 #define B par[2].z
 #define Divider par[0].x  // {min=0 max=50}
-#define Power par[0].y  // {min=0 max=6}
+#define Power par[0].y  // {min=0 max=6 step=1e-4}
 #define Radius par[0].z // {min=0 max=5}
 
 vec2 complexMul(vec2 a, vec2 b) {
   return vec2(a.x*b.x - a.y*b.y,a.x*b.y + a.y * b.x);
 }
 
+#if 1
 // Mandelbrot for c.x,c.y
 vec3 getColor2D(vec2 c) {
   vec2 z = vec2(0.0,0.0);
@@ -45,6 +47,24 @@ vec3 getColor2D(vec2 c) {
     return vec3(0.0);
   }
 }
+#else
+// kali's grid deform coloring
+// http://www.fractalforums.com/mandelbrot-and-julia-set/how-mandelbrot-deforms-a-grid/
+vec3 getColor2D(vec2 c) {
+  vec2 z = vec2(0.0,0.0);
+  for (int i = 0; i < iters; i++) {
+    z = complexMul(z,z) + c;
+  }
+  z.xy *= Power;
+  float dx = fract(z.x);
+  float dy = fract(z.y);
+  if ((dx > .5 && dy > .5) ||
+      (dx < .5 && dy < .5))
+      return surfaceColor;
+  else
+      return surfaceColor2;
+}
+#endif
 
 void main() {
   vec3 p = eye;
