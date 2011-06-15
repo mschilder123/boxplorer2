@@ -261,7 +261,8 @@ float getFPS(void) {
   PROCESS(int, no_spline, "no_spline", false) \
   PROCESS(float, asymmetry, "asymmetry", true)
 
-char* parName[10][3];
+#define NUMPARS 20
+char* parName[NUMPARS][3];
 
 class KeyFrame {
   public:
@@ -274,7 +275,7 @@ class KeyFrame {
    #undef PROCESS
 
    // Par[] parameter array.
-   float par[20][3];  // min(this, glsl) gets sent to shader.
+   float par[NUMPARS][3];  // min(this, glsl) gets sent to shader.
 
    bool isKey_;  // Whether this frame is actually a KeyFrame.
 
@@ -810,7 +811,7 @@ unsigned int getBGRpixel(int x, int y) {
 
 // Read out Z-buffer around the center of the view.
 float distanceToSurface() {
-#if TRY_DISTANCE_TO_SURFACE
+#ifdef TRY_DISTANCE_TO_SURFACE
   const int SIZE = 1;
   float z[SIZE*SIZE];
   int x = config.width / 2 - SIZE / 2;
@@ -1341,7 +1342,7 @@ int main(int argc, char **argv) {
             // Previewing. Use real time (low framerate == jumpy preview!).
             float n = now();
             if (n > render_start + camera.time) continue;  // late, skip frame.
-            float w = (render_start + camera.time) - n; 
+            float w = (render_start + camera.time) - n;
             if (w >= frame_time) {  // early, redraw frame.
               splines_index = prev_splines_index;
             }
