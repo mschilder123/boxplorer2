@@ -98,7 +98,7 @@ float de_box(vec3 pos) {
 float de_menger(vec3 z0) {
     int i;float t=0.0; float r=0.0;
     
-    for(int j=0;j<prefolds;j++){//Pre-fold maxFoldIterations//EXTRA
+    for(int j=0;j<int(prefolds);j++){//Pre-fold maxFoldIterations//EXTRA
       z0.y=abs(z0.y);
       z0.z=abs(z0.z);
       //z0.x=abs(z0.x);

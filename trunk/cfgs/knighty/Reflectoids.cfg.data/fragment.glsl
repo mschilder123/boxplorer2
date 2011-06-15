@@ -253,7 +253,7 @@ void main() {
 	int i=0;
 	bool cont=true;
      float firstD = 0.;  // save first step for depth buffer
-while(i<REFITER && cont){
+while(i<int(REFITER) && cont){
   float steps=marche(p, dp, D, totalD, side, MINDIST_MULT);
   if (i == 0) firstD = totalD + D;
   vec3 col = backgroundColor;
