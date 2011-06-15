@@ -230,7 +230,7 @@ void main() {
 
     if (SHINE > 0.) {
       // do 1 level of reflection tracing
-      vec3 bounce_dir = normalize(dp - 2*n*dot(n,dp));
+      vec3 bounce_dir = normalize(dp - 2.*n*dot(n,dp));
       float rd = trace(
                        // Start bounce a bit over 1x min_dist away
                        p + bounce_dir * 1.5 * m_dist,
