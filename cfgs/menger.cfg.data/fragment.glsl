@@ -1,9 +1,10 @@
 // menger shader.
 // Original shader by rrrola for mandelbox
-// bermarte: formula from Knigthy
-// marius: refactored w/ reflections
+// bermarte: formula from Knighty
+// marius: refactored w/ reflections, background dome.
 
-#define d de_menger
+#define d de_menger  // distance estimator
+#define c c_menger  // color at position p
 
 #define MAX_DIST 4.0
 #define ULP 0.000000059604644775390625
@@ -24,13 +25,13 @@ uniform float
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
 
-uniform float speed;
+uniform float speed;  // eye separation really.
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
   max_steps;          // Maximum raymarching steps.
 
-// Colors. Can be negative or >1 for interestiong effects.
+// Colors. Can be negative or >1 for interesting effects.
 vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   surfaceColor1 = vec3(0.95, 0.64, 0.1),
   surfaceColor2 = vec3(0.89, 0.95, 0.75),
@@ -39,7 +40,7 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
-#define SHINE par[9].x  // {min=0 max=1 step=.01}
+#define SHINE par[9].x  // {min=0 max=1 step=.01} reflection contribution.
 
 float de_menger(vec3 z0) {
   //menger box
@@ -64,33 +65,21 @@ float de_menger(vec3 z0) {
   return r*pow(scale,1.0-float(i));
 }
 
+vec3 c_menger(in vec3 p) {
+  return surfaceColor1;  // Boring but reflections make it interesting.
+}
+
 float normal_eps = 0.00001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
-  //vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
   vec2 Eps = vec2(0, max(d_pos, normal_eps));
   return normalize(vec3(
-  // 2-tap forward differences, error = O(eps)
-//    -d_pos+d(pos+Eps.yxx),
-//    -d_pos+d(pos+Eps.xyx),
-//    -d_pos+d(pos+Eps.xxy)
-
   // 3-tap central differences, error = O(eps^2)
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
     -d(pos-Eps.xyx)+d(pos+Eps.xyx),
     -d(pos-Eps.xxy)+d(pos+Eps.xxy)
-
-  // 4-tap forward differences, error = O(eps^3)
-  //  -2.0*d(pos-Eps.yxx)-3.0*d_pos+6.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-  //  -2.0*d(pos-Eps.xyx)-3.0*d_pos+6.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-  //  -2.0*d(pos-Eps.xxy)-3.0*d_pos+6.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
-
-  // 5-tap central differences, error = O(eps^4)
-//    d(pos-Eps.zxx)-8.0*d(pos-Eps.yxx)+8.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    d(pos-Eps.xzx)-8.0*d(pos-Eps.xyx)+8.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    d(pos-Eps.xxz)-8.0*d(pos-Eps.xxy)+8.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
   ));
 }
 
@@ -101,6 +90,24 @@ vec3 blinn_phong(in vec3 normal, in vec3 view, in vec3 light, in vec3 diffuseCol
   float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0);
   float dif = dot(normal, light) * 0.5 + 0.75;
   return dif*diffuseColor + spe*specularColor;
+}
+
+// Mix reflected ray contribution.
+vec3 mix_reflection(in vec3 normal, in vec3 view, in vec3 baseColor, in vec3 reflectionColor, in float factor) {
+  // An attempt at Oren-Nayar reflectance
+#define SIGMA par[9].y  //{min=0 max=1 step=.01} surface roughness
+#define ALBEDO par[9].z  //{min=0 max=1 step=.01} surface reflection
+
+  float alpha = acos(dot(normal, -view));
+  float s2 = SIGMA * SIGMA;
+  float A = 1. - .5 * (s2 / (s2 + .33));
+  float B = .45 * s2 / (s2 + .09);
+  float rho = ALBEDO;
+  float li = 1.0;  // incident intensity, oegged at 1 for now.
+  float a = max(alpha, alpha);  // incident and reflection angles are same..
+  float b = min(alpha, alpha);
+  float ri = rho * cos(alpha) * ( A + (B * max(0., cos(alpha - alpha)) * sin(a) * tan(b))) * li;
+  return mix(baseColor, reflectionColor, abs(factor * ri));
 }
 
 // Ambient occlusion approximation.
@@ -132,8 +139,9 @@ int rayMarch(in vec3 p, in vec3 dp, inout float totalD, in float side, inout flo
   return steps;
 }
 
+// Get base color at p, plus Blinn_phing and ambient occulusion.
 vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist) {
-  vec3 col = surfaceColor1;
+  vec3 col = c(p);
   col = blinn_phong(n, -dp, normalize(vec3(0,1,0)+dp), col);
   col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist));
   return col;
@@ -151,7 +159,7 @@ vec3 background_color(in vec3 eye, in vec3 dir) {
   if (d < 0.0) {
     return backgroundColor;
   } else {
-    // Got intersection, compute texture coords for that location.
+    // Got intersection: compute texture coords for that location.
 	vec3 vp = normalize(eye + (v - sqrt(d)) * dir);
 	vec3 vn = vec3(0.0, 1.0, 0.0);
 	vec3 ve = vec3(1.0, 0.0, 0.0);
@@ -179,33 +187,46 @@ void main() {
   vec3 p = eye_in, dp = normalize(dir);
   float m_zoom = length(dir) * zoom * .5 / xres;  // screen error at dist 1.
 
-  float D = d(p);
-  float side = sign(D);
-  float totalD = abs(D) * .5;
+  float totalD = d(p);
+  float side = sign(totalD);
+  totalD *= side * .5;  // start with conservative step.
   float m_dist = m_zoom * totalD;
 
   int steps = 0;  // number of marching steps we've taken for this ray.
-  vec3 finalCol = vec3(0.,0.,0.);
-  float colFactor = 1.;
-  float firstD = MAX_DIST;
+  float colFactor = SHINE;
 
-  for (int ray = 0; ray < color_iters && totalD < MAX_DIST; ++ray) {
+  // March first ray.
+  steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
+  vec3 rayCol, n;
+  if (totalD < MAX_DIST) {
+    p += totalD * dp;
+	n = normal(p, m_dist * .5);
+	rayCol = rayColor(p, dp, n, totalD, m_dist);
+	rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
+  } else {
+    rayCol = background_color(p, dp);
+  }
+
+  float firstD = totalD;
+  vec3 finalCol = rayCol;
+
+  // March reflected ray a couple of times.
+  for (int ray = 1; ray < color_iters && totalD < MAX_DIST; ++ray) {
+    dp = reflect(dp, n);  // reflect view direction
+    p += (-totalD + 2.0 * m_dist) * dp;  // reproject eye
+
     steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
-	vec3 rayCol;
 	if (totalD < MAX_DIST) {
       p += totalD * dp;
-      vec3 n = normal(p, m_dist * .5);
+      n = normal(p, m_dist * .5);
 	  rayCol = rayColor(p, dp, n, totalD, m_dist);
 	  rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
-      
-      dp = reflect(dp, n);  // reflect direction
-	  p += (-totalD + 2.0 * m_dist) * dp;  // reproject eye
     } else {
 	  rayCol = background_color(p, dp);
 	}
-	finalCol = mix(rayCol, finalCol, 1. - colFactor);
-	colFactor *= SHINE;
-	firstD = min(totalD, firstD);  // track first dist for z-buffer
+
+	finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
+	colFactor *= SHINE * SHINE;  // reflection drop-off.
   }
 
   float zFar = 5.0;
