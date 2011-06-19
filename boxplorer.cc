@@ -142,6 +142,8 @@ GLuint texture;
 GLuint depthBuffer;
 // the dof mipmapper program
 int dof_program;
+// texture holding background image
+GLuint background_texture;
 
 ////////////////////////////////////////////////////////////////
 // Helper functions
@@ -772,27 +774,99 @@ int viewportOffset[2];
 // Is the mouse and keyboard input grabbed?
 int grabbedInput = 1;
 
-void saveScreenshot(char const* tgaFile) {
-  FILE *f;
-
-  int width = config.width;
-  int height = config.height;
-
-  if ((f = fopen(tgaFile, "wb")) != 0) {
-    unsigned char header[18] = {
-      0,0,2,0,0,0,0,0,0,0,0,0,width%256,width/256,height%256,height/256,24,0
+// Simple TGA class, only suports 24bpp.
+class TGA {
+ public:
+  TGA() : data_(NULL) {}
+  ~TGA() { delete data_; }
+  bool readFile(const char* filename) {
+    FILE* f = NULL;
+    bool result = false;
+    while ((f = fopen(filename, "rb")) != NULL) {
+      unsigned char header[18];
+      if (fread(header, sizeof header, 1, f) != 1) break;
+      unsigned char expected[18] = {
+        0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0
+      };
+      expected[12] = header[12]; expected[13] = header[13];
+      expected[14] = header[14]; expected[15] = header[15];
+      if (memcmp(header, expected, sizeof header) != 0) {
+        printf(__FUNCTION__ " : unsupported TGA format, only 24bpp supported\n");
+        break;
+      }
+      int width = header[13] * 256 + header[12];
+      int height = header[15] * 256 + header[14];
+      if (width > 32768 || height > 32768) {
+        printf(__FUNCTION__ " : oversized TGA image not supported\n");
+        break;
+      }
+      unsigned char* data = new unsigned char[width * height * 3];
+      if (fread(data, width * height * 3, 1, f) != 1) {
+        printf(__FUNCTION__ " : failed to load TGA pixel data\n");
+        delete data;
+        break;
+      }
+      delete data_;
+      data_ = data;
+      width_ = width;
+      height_ = height;
+      result = true;
+      break;
+    }
+    if (f) fclose(f);
+    return result;
+  }
+  bool writeFile(const char* filename) {
+    const unsigned char header[18] = {
+      0,0,2,0,0,0,0,0,0,0,0,0,width_%256,width_/256,height_%256,height_/256,24,0
     };
-    unsigned char* img = (unsigned char*)malloc(width * height * 3);
+    FILE* f = NULL;
+    bool result = false;
+    if ((f = fopen(filename, "wb")) != NULL) {
+      fwrite(header, 18, 1, f);
+      fwrite(data_, 3, width_*height_, f);
+      result = true;
+    }
+    if (f) fclose(f);
+    return result;
+  }
+  bool readFramebuffer(int width, int height) {
+    width_ = width;
+    height_ = height;
+    delete data_;
+    data_ = new unsigned char[width_ * height_ * 3];
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadBuffer(GL_FRONT);
-    glReadPixels(viewportOffset[0], viewportOffset[1], width, height, GL_BGR, GL_UNSIGNED_BYTE, img);
+    glReadPixels(viewportOffset[0], viewportOffset[1],
+                 width_, height_,
+                 GL_BGR, GL_UNSIGNED_BYTE,
+                 data_);
+    return true;
+  }
+  int width() { return width_; }
+  int height() { return height_; }
+  const unsigned char* data() { return data_; }
+private:
+ int width_;
+ int height_;
+ unsigned char* data_;
+};
 
-    fwrite(header, 18, 1, f);
-    fwrite(img, 3, width*height, f);
-
-    free(img);
-    fclose(f);
+void saveScreenshot(char const* tgaFile) {
+  TGA tga;
+  tga.readFramebuffer(config.width, config.height);
+  if (tga.writeFile(tgaFile))
     printf(__FUNCTION__ " : wrote %s\n", tgaFile);
+  else
+    printf(__FUNCTION__ " : failed to write %s\n", tgaFile);
+}
+
+TGA background;
+
+void LoadBackground() {
+  background.readFile("background.tga");
+  if (background.data()) {
+    printf(__FUNCTION__ " : loaded background image from '%s'\n", "background.tga");
   }
 }
 
@@ -1042,6 +1116,23 @@ void initGraphics() {
   (program = setupShaders()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
+  if (background_texture == 0 && background.data() != NULL) {
+    // Load background image into texture
+    glGenTextures(1, &background_texture);
+    glBindTexture(GL_TEXTURE_2D, background_texture);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, background.width(), background.height(),
+                 0, GL_BGR, GL_UNSIGNED_BYTE, background.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    printf(__FUNCTION__ " : background texture at %d\n", background_texture);
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
+
+  if ((status = glGetError()) != GL_NO_ERROR)
+    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+
   if (!config.enable_dof) return;
 
   if ((status = glGetError()) != GL_NO_ERROR)
@@ -1071,8 +1162,7 @@ void initGraphics() {
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height,
                0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 
-  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                   GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
   // Allocate / generate mips
   glGenerateMipmap(GL_TEXTURE_2D);
@@ -1272,6 +1362,7 @@ int main(int argc, char **argv) {
 
   bool keyframesChanged = false;
   LoadKeyFrames(fixedFov);
+  LoadBackground();
 
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
@@ -1370,9 +1461,23 @@ int main(int argc, char **argv) {
       glDepthFunc(GL_ALWAYS);
     }
 
-    glUseProgram(program);
+    if (background_texture) {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, background_texture);
+      glUseProgram(program);
+      glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
+    } else {
+      glUseProgram(program);
+    }
+    glUniform1i(glGetUniformLocation(program, "use_bg_texture"), background_texture);
+
     camera.render(stereoMode);
+
     glUseProgram(0);
+
+    if (background_texture) {
+      glBindTexture(GL_TEXTURE_2D, 0);
+    }
 
     if (!config.no_spline &&
         stereoMode == ST_NONE &&

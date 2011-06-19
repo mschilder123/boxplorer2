@@ -145,7 +145,7 @@ const char frame_default_fs[]=
   "uniform float dof_offset;  // {min=-5. max=5. step=.01}\n"
   "uniform float dof_scale;  // {min=0. max=2. step=.01}\n"
   "void main(){"
-  " vec4 c=texture2DLod(my_texture, texture_coordinate,0.);"
+  " vec4 c=texture2DLod(my_texture, texture_coordinate, 0.);"
   " float a = z_far / (z_far - z_near);"
   " float b = z_far * z_near / (z_near - z_far);"
   " float d = b / (c.w - a);"
