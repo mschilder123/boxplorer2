@@ -1,17 +1,13 @@
-// Mandelbox shader by Rrrola
-// Original formula by Tglad
-// - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
-//bermarte: formula from Knigthy
+// menger shader.
+// Original shader by rrrola for mandelbox
+// bermarte: formula from Knigthy
+// marius: refactored w/ reflections
+
 #define d de_menger
 
-#define P0 p0                    // standard Mandelbox
-//#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
-
-#define SCALE par[0].y
-#define MINRAD2 par[0].x
-
-#define DIST_MULTIPLIER 1.0
 #define MAX_DIST 4.0
+#define ULP 0.000000059604644775390625
+#define PI 3.14159265
 
 // Camera position and direction.
 varying vec3 eye, dir;
@@ -19,7 +15,7 @@ varying float zoom;
 uniform float xres;
 
 // Interactive parameters.
-uniform vec3 par[10];
+uniform vec3 par[20];
 
 uniform float
   min_dist,           // Distance at which raymarching stops.
@@ -32,8 +28,7 @@ uniform float speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
-  max_steps,          // Maximum raymarching steps.
-  frameno;
+  max_steps;          // Maximum raymarching steps.
 
 // Colors. Can be negative or >1 for interestiong effects.
 vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
@@ -46,82 +41,36 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 
 #define SHINE par[9].x  // {min=0 max=1 step=.01}
 
-// precomputed constants
-float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
-vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
-float absScalem1 = abs(SCALE - 1.0);
-float AbsScaleRaisedTo1mIters = pow(abs(SCALE), float(1-iters));
-
-// Compute the distance from `pos` to the Mandelbox.
-float de_box(vec3 pos) {
-  vec4 p = vec4(pos,1), p0 = p;  // p.w is the distance estimate
-
-  for (int i=0; i<iters; i++) {
-    // box folding: if (p>1) p = 2-p; else if (p<-1) p = -2-p;
-//    p.xyz = abs(1.0+p.xyz) - p.xyz - abs(1.0-p.xyz);  // add;add;abs.add;abs.add (130.4%)
-//    p.xyz = clamp(p.xyz*0.5+0.5, 0.0, 1.0) * 4.0 - 2.0 - p.xyz;  // mad.sat;mad;add (102.3%)
-    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;  // min;max;mad
-
-    // sphere folding: if (r2 < minRad2) p /= minRad2; else if (r2 < 1.0) p /= r2;
-    float r2 = dot(p.xyz, p.xyz);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);  // dp3,div,max.sat,mul
-
-    // scale, translate
-    p = p*scale + P0;
-  }
-  return ((length(p.xyz) - absScalem1) / p.w - AbsScaleRaisedTo1mIters) * DIST_MULTIPLIER;
-}
-
 float de_menger(vec3 z0) {
-//menger box
-//from Master-Knighty
-//brutal test
-int i;
-float scale=3.0;
-float r=0.;
-for (i=0;i<iters;i++){
-vec3 zz0;
-z0.x=abs(z0.x);z0.y=abs(z0.y);z0.z=abs(z0.z);
-if( z0.x- z0.y<0.0){zz0.x=z0.y;z0.y=z0.x;z0.x=zz0.x;}
-if( z0.x- z0.z<0.0){zz0.x=z0.z;z0.z=z0.x;z0.x=zz0.x;}
-if( z0.y- z0.z<0.0){zz0.y=z0.z;z0.z=z0.y;z0.y=zz0.y;}
-zz0.x=z0.x-1.0;zz0.y=z0.y-1.0;zz0.z=z0.z-1.0;
-r=max(zz0.x,max(zz0.y,zz0.z));
-z0.x=z0.x*scale-1.0*(scale-1.0);
-z0.y=z0.y*scale-1.0*(scale-1.0);
-z0.z=z0.z*scale;
-if(z0.z>0.5*(scale-1.0)) z0.z-=(scale-1.0);
+  //menger box
+  //from Master-Knighty
+  //brutal test
+  int i;
+  float scale=3.;
+  float r=0.;
+  for (i=0;i<iters;i++){
+	vec3 zz0;
+	z0.x=abs(z0.x);z0.y=abs(z0.y);z0.z=abs(z0.z);
+	if( z0.x- z0.y<0.0){zz0.x=z0.y;z0.y=z0.x;z0.x=zz0.x;}
+	if( z0.x- z0.z<0.0){zz0.x=z0.z;z0.z=z0.x;z0.x=zz0.x;}
+	if( z0.y- z0.z<0.0){zz0.y=z0.z;z0.z=z0.y;z0.y=zz0.y;}
+	zz0.x=z0.x-1.0;zz0.y=z0.y-1.0;zz0.z=z0.z-1.0;
+	r=max(zz0.x,max(zz0.y,zz0.z));
+	z0.x=z0.x*scale-1.0*(scale-1.0);
+	z0.y=z0.y*scale-1.0*(scale-1.0);
+	z0.z=z0.z*scale;
+	if(z0.z>0.5*(scale-1.0)) z0.z-=(scale-1.0);
+	}
+  return r*pow(scale,1.0-float(i));
 }
-float menger= r*pow(scale,1.0-float(i));
-return max(menger,-menger);
-}
-
-// Compute the color at `pos`.
-vec3 color(vec3 pos) {
-  vec3 p = pos, p0 = p;
-  float trap = 1.0;
-
-  for (int i=0; i<color_iters; i++) {
-    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
-    float r2 = dot(p.xyz, p.xyz);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale.xyz + P0.xyz;
-    trap = min(trap, r2);
-  }
-  // c.x: log final distance (fractional iteration count)
-  // c.y: spherical orbit trap at (0,0,0)
-  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
-
-  return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
-}
-
 
 float normal_eps = 0.00001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
-  vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
+  //vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
+  vec2 Eps = vec2(0, max(d_pos, normal_eps));
   return normalize(vec3(
   // 2-tap forward differences, error = O(eps)
 //    -d_pos+d(pos+Eps.yxx),
@@ -134,9 +83,9 @@ vec3 normal(vec3 pos, float d_pos) {
     -d(pos-Eps.xxy)+d(pos+Eps.xxy)
 
   // 4-tap forward differences, error = O(eps^3)
-//    -2.0*d(pos-Eps.yxx)-3.0*d_pos+6.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    -2.0*d(pos-Eps.xyx)-3.0*d_pos+6.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    -2.0*d(pos-Eps.xxy)-3.0*d_pos+6.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
+  //  -2.0*d(pos-Eps.yxx)-3.0*d_pos+6.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
+  //  -2.0*d(pos-Eps.xyx)-3.0*d_pos+6.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
+  //  -2.0*d(pos-Eps.xxy)-3.0*d_pos+6.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
 
   // 5-tap central differences, error = O(eps^4)
 //    d(pos-Eps.zxx)-8.0*d(pos-Eps.yxx)+8.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
@@ -145,51 +94,80 @@ vec3 normal(vec3 pos, float d_pos) {
   ));
 }
 
-
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
 // `normal`, `view` and `light` should be normalized.
-vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
+vec3 blinn_phong(in vec3 normal, in vec3 view, in vec3 light, in vec3 diffuseColor) {
   vec3 halfLV = normalize(light + view);
   float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0);
   float dif = dot(normal, light) * 0.5 + 0.75;
   return dif*diffuseColor + spe*specularColor;
 }
 
-
 // Ambient occlusion approximation.
-float ambient_occlusion(vec3 p, vec3 n) {
-  float ao = 1.0, w = ao_strength/ao_eps;
-  float dist = 2.0 * ao_eps;
+float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist) {
+  float ao_ed = totalD*ao_eps/m_dist;
+  float ao = 1.0, w = ao_strength/ao_ed;
+  float dist = 2.0 * ao_ed;
 
   for (int i=0; i<5; i++) {
     float D = d(p + n*dist);
     ao -= (dist-D) * w;
     w *= 0.5;
-    dist = dist*2.0 - ao_eps;  // 2,3,5,9,17
+    dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
   return clamp(ao, 0.0, 1.0);
 }
 
-// return dist
-float trace(vec3 p, vec3 dp, float min_dist, float m_zoom) {
-  float totalD = 0.0, D;
-  float m_dist = min_dist;
-  for (int steps = 0; steps < max_steps; ++steps) {
-    D = d(p + totalD*dp);
+// Intersect the view ray with the fractal using raymarching.
+// returns # steps
+int rayMarch(in vec3 p, in vec3 dp, inout float totalD, in float side, inout float m_dist, in float m_zoom) {
+  int steps;
+  for (steps = 0; steps < max_steps; ++steps) {
+    float D = (side * d(p + totalD * dp) - totalD * m_dist) / (1.0 + m_dist);
     if (D < m_dist) break;
     totalD += D;
-    if (D > MAX_DIST) break;
-    m_dist = max(min_dist, m_zoom * totalD);
+    if (totalD > MAX_DIST) break;
+    m_dist = max(2.*ULP, m_zoom * totalD);
   }
-  return totalD;
+  return steps;
 }
 
-vec3 do_color(vec3 p, vec3 dp, vec3 n) {
-  //vec3 col = color(p);
+vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist) {
   vec3 col = surfaceColor1;
   col = blinn_phong(n, -dp, normalize(vec3(0,1,0)+dp), col);
-  col = mix(aoColor, col, ambient_occlusion(p, n));
+  col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist));
   return col;
+}
+
+// Intersect ray w/ large encapsulating sphere.
+// If hit (always does), sphere map texture onto it.
+uniform sampler2D bg_texture;
+uniform int use_bg_texture;
+vec3 background_color(in vec3 eye, in vec3 dir) {
+  if (use_bg_texture == 0) return backgroundColor;
+  float v = dot(eye, dir);
+  float r = 100.0; // universe radius
+  float d = r*r - (dot(eye, eye) - v*v);
+  if (d < 0.0) {
+    return backgroundColor;
+  } else {
+    // Got intersection, compute texture coords for that location.
+	vec3 vp = normalize(eye + (v - sqrt(d)) * dir);
+	vec3 vn = vec3(0.0, 1.0, 0.0);
+	vec3 ve = vec3(1.0, 0.0, 0.0);
+	float phi = acos(-dot(vn, vp));
+	float v = phi / PI;
+	float theta = (acos(dot(vp, ve) / sin(phi))) / (2. * PI);
+	float u;
+	if (dot(cross(vn, ve), vp) > 0.) {
+	  u = theta;
+	} else {
+	  u = 1. - theta;
+	}
+	return texture2DLod(bg_texture, vec2(u,v),
+	                    0.  // pick one mipmap down to kill seam?
+                        ).xyz;
+  }
 }
 
 void main() {
@@ -199,70 +177,42 @@ void main() {
       vec3(gl_ModelViewMatrix[0]);
 
   vec3 p = eye_in, dp = normalize(dir);
-  float m_zoom = length(dir) * zoom * .5 / xres;
+  float m_zoom = length(dir) * zoom * .5 / xres;  // screen error at dist 1.
 
   float D = d(p);
   float side = sign(D);
-  float totalD = abs(D);
+  float totalD = abs(D) * .5;
+  float m_dist = m_zoom * totalD;
 
-  // Intersect the view ray with the fractal using raymarching.
-  float m_dist = min_dist;
-  int steps;
-  for (steps=0; steps<max_steps; steps++) {
-    D = (side * d(p + totalD * dp) - totalD * m_dist) / (1.0 + m_dist);
-    if (abs(D) < m_dist) break;
-    totalD += D;
-    if (totalD > MAX_DIST) break;
-    m_dist = max(min_dist, m_zoom * totalD);
-  }
+  int steps = 0;  // number of marching steps we've taken for this ray.
+  vec3 finalCol = vec3(0.,0.,0.);
+  float colFactor = 1.;
+  float firstD = MAX_DIST;
 
-  p += totalD * dp;
-
-  // Color the surface with Blinn-Phong shading, ambient occlusion and glow.
-  vec3 col = backgroundColor;
-
-  // We've got a hit or we're not sure.
-  if (D < MAX_DIST) {
-    col = color(p);
-    //col = surfaceColor1;
-
-    vec3 n = normal(p, D);
-
-    if (SHINE > 0.) {
-      // do 1 level of reflection tracing
-      vec3 bounce_dir = normalize(dp - 2.*n*dot(n,dp));
-      float rd = trace(
-                       // Start bounce a bit over 1x min_dist away
-                       p + bounce_dir * 1.5 * m_dist,
-                       bounce_dir,
-				 m_dist, m_zoom);
-      if (rd < MAX_DIST) {  // hit something?
-        col = mix(col, do_color(p+rd*bounce_dir,
-                                bounce_dir,
-                                normal(p+rd*bounce_dir,D)), SHINE);
-      } else {
-		col = mix(col, backgroundColor, SHINE);
+  for (int ray = 0; ray < color_iters && totalD < MAX_DIST; ++ray) {
+    steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
+	vec3 rayCol;
+	if (totalD < MAX_DIST) {
+      p += totalD * dp;
+      vec3 n = normal(p, m_dist * .5);
+	  rayCol = rayColor(p, dp, n, totalD, m_dist);
+	  rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
+      
+      dp = reflect(dp, n);  // reflect direction
+	  p += (-totalD + 2.0 * m_dist) * dp;  // reproject eye
+    } else {
+	  rayCol = background_color(p, dp);
 	}
-    }
-
-    col = blinn_phong(n, -dp, normalize(/*eye_in+*/vec3(0,1,0)+dp), col);
-    col = mix(aoColor, col, ambient_occlusion(p, n));
-
-    // We've gone through all steps, but we haven't hit anything.
-    // Mix in the background color.
-    if (D > m_dist) {
-      col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
-    }
+	finalCol = mix(rayCol, finalCol, 1. - colFactor);
+	colFactor *= SHINE;
+	firstD = min(totalD, firstD);  // track first dist for z-buffer
   }
-
-  // Glow is based on the number of steps.
-  col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
   float zFar = 5.0;
   float zNear = 0.0001;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
+  float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
   gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  gl_FragColor = vec4(finalCol, depth);
 }
