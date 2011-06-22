@@ -3,10 +3,10 @@
 // bermarte: formula from Knighty
 // marius: refactored w/ reflections, background dome.
 
-#define d de_menger  // distance estimator
+#define d de_menger // menger,mandelbox  // distance estimator
 #define c c_menger  // color at position p
 
-#define MAX_DIST 4.0
+#define MAX_DIST 5.0
 #define ULP 0.000000059604644775390625
 #define PI 3.14159265
 
@@ -40,33 +40,47 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
-#define SHINE par[9].x  // {min=0 max=1 step=.01} reflection contribution.
+#define SHINE par[9].x  // {min=0 max=1 step=.01} reflection contribution drop-off
+#define SIGMA par[9].y  //{min=0 max=1 step=.01} surface roughness
+#define ALBEDO par[9].z  //{min=0 max=1 step=.01} surface reflection
 
 float de_menger(vec3 z0) {
-  //menger box
-  //from Master-Knighty
-  //brutal test
+#define offsetVector par[2]
   int i;
-  float scale=3.;
-  float r=0.;
+  float scale=2.;
+  float r=1.;
+
   for (i=0;i<iters;i++){
-	vec3 zz0;
-	z0.x=abs(z0.x);z0.y=abs(z0.y);z0.z=abs(z0.z);
-	if( z0.x- z0.y<0.0){zz0.x=z0.y;z0.y=z0.x;z0.x=zz0.x;}
-	if( z0.x- z0.z<0.0){zz0.x=z0.z;z0.z=z0.x;z0.x=zz0.x;}
-	if( z0.y- z0.z<0.0){zz0.y=z0.z;z0.z=z0.y;z0.y=zz0.y;}
-	zz0.x=z0.x-1.0;zz0.y=z0.y-1.0;zz0.z=z0.z-1.0;
-	r=max(zz0.x,max(zz0.y,zz0.z));
-	z0.x=z0.x*scale-1.0*(scale-1.0);
-	z0.y=z0.y*scale-1.0*(scale-1.0);
-	z0.z=z0.z*scale;
-	if(z0.z>0.5*(scale-1.0)) z0.z-=(scale-1.0);
-	}
-  return r*pow(scale,1.0-float(i));
+    z0 = abs(z0) + par[2];
+    if( z0.x < z0.y){z0.xyz = z0.yxz;}
+    if( z0.x < z0.z){z0.xyz = z0.zyx;}
+    if( z0.y < z0.z){z0.xyz = z0.xzy;}
+    r = z0.x;
+    z0 += z0*scale - scale;
+    if(z0.z<-0.5*scale) z0.z+=scale;
+  }
+  return (r-1.0)*pow(scale+1.,float(1-i));
 }
 
 vec3 c_menger(in vec3 p) {
   return surfaceColor1;  // Boring but reflections make it interesting.
+}
+
+float de_mandelbox(vec3 pos) {
+#define SCALE par[0].y  //{min=-3 max=3 step=.01}
+#define MINRAD2 par[0].x  //{min=0 max=1 step=.001}
+  vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
+  float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
+  vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
+  float r2 = dot(p.xyz, p.xyz);
+  for (int i=0; i<iters && r2<10000.0; i++) {
+    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
+    r2 = dot(p.xyz, p.xyz);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+	p = p*scale + p0;
+    r2 = dot(p.xyz, p.xyz);
+  }
+  return ((length(p.xyz) - abs(SCALE - 1.)) / p.w);
 }
 
 float normal_eps = 0.00001;
@@ -95,8 +109,6 @@ vec3 blinn_phong(in vec3 normal, in vec3 view, in vec3 light, in vec3 diffuseCol
 // Mix reflected ray contribution.
 vec3 mix_reflection(in vec3 normal, in vec3 view, in vec3 baseColor, in vec3 reflectionColor, in float factor) {
   // An attempt at Oren-Nayar reflectance
-#define SIGMA par[9].y  //{min=0 max=1 step=.01} surface roughness
-#define ALBEDO par[9].z  //{min=0 max=1 step=.01} surface reflection
 
   float alpha = acos(dot(normal, -view));
   float s2 = SIGMA * SIGMA;
@@ -134,7 +146,7 @@ int rayMarch(in vec3 p, in vec3 dp, inout float totalD, in float side, inout flo
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
-    m_dist = max(2.*ULP, m_zoom * totalD);
+    m_dist = max(min_dist, m_zoom * totalD);
   }
   return steps;
 }
@@ -190,7 +202,7 @@ void main() {
   float totalD = d(p);
   float side = sign(totalD);
   totalD *= side * .5;  // start with conservative step.
-  float m_dist = m_zoom * totalD;
+  float m_dist = max(min_dist, m_zoom * totalD);
 
   int steps = 0;  // number of marching steps we've taken for this ray.
   float colFactor = SHINE;
