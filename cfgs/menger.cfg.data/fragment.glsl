@@ -3,7 +3,7 @@
 // bermarte: formula from Knighty
 // marius: refactored w/ reflections, background dome.
 
-#define d de_menger // menger,mandelbox  // distance estimator
+#define d de_menger // menger,mandelbox,ssponge  // distance estimator
 #define c c_menger  // color at position p
 
 #define MAX_DIST 5.0
@@ -81,6 +81,23 @@ float de_mandelbox(vec3 pos) {
     r2 = dot(p.xyz, p.xyz);
   }
   return ((length(p.xyz) - abs(SCALE - 1.)) / p.w);
+}
+
+float de_ssponge(vec3 pos) {
+#define MOD par[8].x  // {min=1 max=5 step=.01}
+#define SSCALE par[8].y  // {min=1 max=5 step=.01}
+#define INTRA_D par[8].z  // {min=.01 max=10.0 step=.01}
+#define INITIAL_K par[0].z  // {min=0 max=5 step=.01}
+  float k = INITIAL_K;
+  float d = -100.0;
+  for(int i=0; i<iters; i++) {
+    vec3 x = mod(pos * k, MOD) - .5 * MOD;
+    float r = length(x);
+    float d1 = (INTRA_D - r) / k;
+    d = max(d, d1);
+    k *= SSCALE;
+  }
+  return d;
 }
 
 float normal_eps = 0.00001;
