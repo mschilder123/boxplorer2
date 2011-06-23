@@ -1,12 +1,12 @@
 // menger shader.
 // Original shader by rrrola for mandelbox
 // bermarte: formula from Knighty
-// marius: refactored w/ reflections, background dome.
+// marius: refactored w/ reflections, background dome, ssponge, combi etc.
 
-#define d de_menger // menger,mandelbox,ssponge  // distance estimator
+#define d de_menger // combi,menger,mandelbox,ssponge  // distance estimator
 #define c c_menger  // color at position p
 
-#define MAX_DIST 5.0
+#define MAX_DIST 6.0
 #define ULP 0.000000059604644775390625
 #define PI 3.14159265
 
@@ -28,17 +28,17 @@ uniform float
 uniform float speed;  // eye separation really.
 
 uniform int iters,    // Number of fractal iterations.
-  color_iters,        // Number of fractal iterations for coloring.
+  color_iters,        // Number of reflection rays.
   max_steps;          // Maximum raymarching steps.
 
 // Colors. Can be negative or >1 for interesting effects.
-vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
-  surfaceColor1 = vec3(0.95, 0.64, 0.1),
-  surfaceColor2 = vec3(0.89, 0.95, 0.75),
-  surfaceColor3 = vec3(0.55, 0.06, 0.03),
-  specularColor = vec3(1.0, 0.8, 0.4),
-  glowColor = vec3(0.03, 0.4, 0.4),
-  aoColor = vec3(0, 0, 0);
+#define backgroundColor par[10]
+#define surfaceColor1 par[11]
+#define surfaceColor2 par[12]
+#define surfaceColor3 par[13]
+#define specularColor par[14]
+#define glowColor par[15]
+#define aoColor par[16]
 
 #define SHINE par[9].x  // {min=0 max=1 step=.01} reflection contribution drop-off
 #define SIGMA par[9].y  //{min=0 max=1 step=.01} surface roughness
@@ -46,11 +46,13 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 
 float de_menger(vec3 z0) {
 #define offsetVector par[2]
-  int i;
-  float scale=2.;
-  float r=1.;
-
-  for (i=0;i<iters;i++){
+#define M_ITERS par[1].x //{min=0 max=20 step=1} iterations
+#define M_SIZE par[1].y //{min=0 max=5 step=.01} size of menger box
+  float scale=2.;  // size of holes
+  float r=1.0;
+  z0 /= M_SIZE;
+  int n_iters = int(M_ITERS);
+  for (int i=0;i<n_iters;i++){
     z0 = abs(z0) + par[2];
     if( z0.x < z0.y){z0.xyz = z0.yxz;}
     if( z0.x < z0.z){z0.xyz = z0.zyx;}
@@ -59,30 +61,32 @@ float de_menger(vec3 z0) {
     z0 += z0*scale - scale;
     if(z0.z<-0.5*scale) z0.z+=scale;
   }
-  return (r-1.0)*pow(scale+1.,float(1-i));
+  return (r-1.0)*pow(scale+1.,float(1-n_iters))*M_SIZE;
 }
 
 vec3 c_menger(in vec3 p) {
   return surfaceColor1;  // Boring but reflections make it interesting.
 }
 
-float de_mandelbox(vec3 pos) {
 #define SCALE par[0].y  //{min=-3 max=3 step=.01}
 #define MINRAD2 par[0].x  //{min=0 max=1 step=.001}
+
+float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
+vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
+
+float de_mandelbox(vec3 pos) {
   vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
-  float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
-  vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
-  float r2 = dot(p.xyz, p.xyz);
-  for (int i=0; i<iters && r2<10000.0; i++) {
+  for (int i=0; i<iters; i++) {
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
-    r2 = dot(p.xyz, p.xyz);
+    float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
 	p = p*scale + p0;
-    r2 = dot(p.xyz, p.xyz);
   }
-  return ((length(p.xyz) - abs(SCALE - 1.)) / p.w);
+  return ((length(p.xyz) - abs(SCALE - 1.0)) / p.w
+           - pow(abs(SCALE), float(1-iters))) * .85;
 }
 
+// Infinite construction menger sphere sponge.
 float de_ssponge(vec3 pos) {
 #define MOD par[8].x  // {min=1 max=5 step=.01}
 #define SSCALE par[8].y  // {min=1 max=5 step=.01}
@@ -100,7 +104,12 @@ float de_ssponge(vec3 pos) {
   return d;
 }
 
-float normal_eps = 0.00001;
+float de_combi(vec3 z0) {
+  // Use min() for union, max() for intersection of shapes.
+  return min(max(de_ssponge(z0),de_mandelbox(z0)), de_menger(z0));
+}
+
+const float normal_eps = 0.00001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
@@ -126,13 +135,12 @@ vec3 blinn_phong(in vec3 normal, in vec3 view, in vec3 light, in vec3 diffuseCol
 // Mix reflected ray contribution.
 vec3 mix_reflection(in vec3 normal, in vec3 view, in vec3 baseColor, in vec3 reflectionColor, in float factor) {
   // An attempt at Oren-Nayar reflectance
-
   float alpha = acos(dot(normal, -view));
   float s2 = SIGMA * SIGMA;
   float A = 1. - .5 * (s2 / (s2 + .33));
   float B = .45 * s2 / (s2 + .09);
   float rho = ALBEDO;
-  float li = 1.0;  // incident intensity, oegged at 1 for now.
+  float li = 1.0;  // incident intensity, pegged at 1 for now.
   float a = max(alpha, alpha);  // incident and reflection angles are same..
   float b = min(alpha, alpha);
   float ri = rho * cos(alpha) * ( A + (B * max(0., cos(alpha - alpha)) * sin(a) * tan(b))) * li;
@@ -176,35 +184,25 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist) {
   return col;
 }
 
-// Intersect ray w/ large encapsulating sphere.
-// If hit (always does), sphere map texture onto it.
+// Intersect direction ray w/ large encapsulating sphere.
+// Sphere map texture onto it.
 uniform sampler2D bg_texture;
 uniform int use_bg_texture;
-vec3 background_color(in vec3 eye, in vec3 dir) {
-  if (use_bg_texture == 0) return backgroundColor;
-  float v = dot(eye, dir);
-  float r = 100.0; // universe radius
-  float d = r*r - (dot(eye, eye) - v*v);
-  if (d < 0.0) {
-    return backgroundColor;
-  } else {
-    // Got intersection: compute texture coords for that location.
-	vec3 vp = normalize(eye + (v - sqrt(d)) * dir);
-	vec3 vn = vec3(0.0, 1.0, 0.0);
-	vec3 ve = vec3(1.0, 0.0, 0.0);
+vec3 background_color(in vec3 vp) {
+#define BG_BLUR par[1].z  //{min=0 max=8 step=.1}
+	if (use_bg_texture == 0) return backgroundColor;
+	const vec3 vn = vec3(0.0, 1.0, 0.0);
+	const vec3 ve = vec3(1.0, 0.0, 0.0);
 	float phi = acos(-dot(vn, vp));
 	float v = phi / PI;
 	float theta = (acos(dot(vp, ve) / sin(phi))) / (2. * PI);
 	float u;
 	if (dot(cross(vn, ve), vp) > 0.) {
-	  u = theta;
+		u = theta;
 	} else {
-	  u = 1. - theta;
+		u = 1. - theta;
 	}
-	return texture2DLod(bg_texture, vec2(u,v),
-	                    0.  // pick one mipmap down to kill seam?
-                        ).xyz;
-  }
+	return texture2DLod(bg_texture, vec2(u,v), BG_BLUR).xyz;
 }
 
 void main() {
@@ -233,7 +231,7 @@ void main() {
 	rayCol = rayColor(p, dp, n, totalD, m_dist);
 	rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
   } else {
-    rayCol = background_color(p, dp);
+    rayCol = background_color(dp);
   }
 
   float firstD = totalD;
@@ -251,7 +249,7 @@ void main() {
 	  rayCol = rayColor(p, dp, n, totalD, m_dist);
 	  rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
     } else {
-	  rayCol = background_color(p, dp);
+	  rayCol = background_color(dp);
 	}
 
 	finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
