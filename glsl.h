@@ -1,5 +1,6 @@
 /*
- * Minimalist glsl funcs and defs needed to compile some shader code as plain C++.
+ * Minimalist glsl funcs and defs needed to compile
+ * compliant shader code as plain C++.
  */
 #ifndef _F_INCLUDE_GLSL_H__
 #define _F_INCLUDE_GLSL_H__
@@ -118,7 +119,7 @@ class mat4 {
 #define xxy xxy()
 
 // inout (reference params) need a rewrite.
-#define INOUT(a,b) a##& b
+#define INOUT(a,b) a & b
 
 // These attributes are meaningless for now in C++.
 #define varying

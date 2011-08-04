@@ -1,17 +1,19 @@
+/*
+ * Simple TGA handler. Only knows about 24bpp.
+ */
+
 #ifndef _F_INCLUDE_TGA_H__
 #define _F_INCLUDE_TGA_H__
 
 #include <string.h>
 
-/*
- * Simple TGA handler. Only knows about 24bpp.
- */
-
 class TGA {
 public:
   TGA() : data_(NULL) {}
   ~TGA() { delete[] data_; }
-  TGA(int width, int height) : width_(width), height_(height), data_(new unsigned char[width*height*3]) {}
+  TGA(int width, int height) :
+      width_(width), height_(height),
+      data_(new unsigned char[width*height*3]) {}
   bool readFile(const char* filename) {
     FILE* f = NULL;
     bool result = false;
@@ -24,18 +26,21 @@ public:
       expected[12] = header[12]; expected[13] = header[13];
       expected[14] = header[14]; expected[15] = header[15];
       if (memcmp(header, expected, sizeof header) != 0) {
-        fprintf(stderr, __FUNCTION__ " : unsupported TGA format, only 24bpp supported\n");
+        fprintf(stderr, __FUNCTION__
+                " : unsupported TGA format, only 24bpp supported\n");
         break;
       }
       int width = header[13] * 256 + header[12];
       int height = header[15] * 256 + header[14];
       if (width > 32768 || height > 32768) {
-        fprintf(stderr, __FUNCTION__ " : oversized TGA image not supported\n");
+        fprintf(stderr, __FUNCTION__
+                " : oversized TGA image not supported\n");
         break;
       }
       unsigned char* data = new unsigned char[width * height * 3];
       if (fread(data, width * height * 3, 1, f) != 1) {
-        fprintf(stderr, __FUNCTION__ " : failed to load TGA pixel data\n");
+        fprintf(stderr, __FUNCTION__
+                " : failed to load TGA pixel data\n");
         delete data;
         break;
       }
@@ -51,7 +56,8 @@ public:
   }
   bool writeFile(const char* filename) {
     const unsigned char header[18] = {
-      0,0,2,0,0,0,0,0,0,0,0,0,width_%256,width_/256,height_%256,height_/256,24,0
+      0,0,2,0,0,0,0,0,0,0,0,0,
+      width_%256,width_/256,height_%256,height_/256,24,0
     };
     FILE* f = NULL;
     bool result = false;

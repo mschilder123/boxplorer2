@@ -87,7 +87,7 @@ float de_mandelbox(vec3 pos) {
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-	p = p*scale + p0;
+    p = p*scale + p0;
   }
   return ((length(p.xyz) - abs(SCALE - 1.0)) / p.w
            - pow(abs(SCALE), float(1-iters))) * .85;
@@ -199,19 +199,19 @@ uniform sampler2D bg_texture;
 uniform int use_bg_texture;
 vec3 background_color(in vec3 vp) {
 #define BG_BLUR par[1].z  //{min=0 max=8 step=.1}
-	if (use_bg_texture == 0) return backgroundColor;
-	const vec3 vn = vec3(0.0, 1.0, 0.0);
-	const vec3 ve = vec3(1.0, 0.0, 0.0);
-	float phi = acos(-dot(vn, vp));
-	float v = phi / PI;
-	float theta = (acos(dot(vp, ve) / sin(phi))) / (2. * PI);
-	float u;
-	if (dot(cross(vn, ve), vp) > 0.) {
-		u = theta;
-	} else {
-		u = 1. - theta;
-	}
-	return texture2DLod(bg_texture, vec2(u,v), BG_BLUR).xyz;
+  if (use_bg_texture == 0) return backgroundColor;
+  const vec3 vn = vec3(0.0, 1.0, 0.0);
+  const vec3 ve = vec3(1.0, 0.0, 0.0);
+  float phi = acos(-dot(vn, vp));
+  float v = phi / PI;
+  float theta = (acos(dot(vp, ve) / sin(phi))) / (2. * PI);
+  float u;
+  if (dot(cross(vn, ve), vp) > 0.) {
+    u = theta;
+  } else {
+    u = 1. - theta;
+  }
+  return texture2DLod(bg_texture, vec2(u,v), BG_BLUR).xyz;
 }
 
 void main() {
@@ -236,9 +236,9 @@ void main() {
   vec3 rayCol, n;
   if (totalD < MAX_DIST) {
     p += totalD * dp;
-	n = normal(p, m_dist * .5);
-	rayCol = rayColor(p, dp, n, totalD, m_dist);
-	rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
+    n = normal(p, m_dist * .5);
+    rayCol = rayColor(p, dp, n, totalD, m_dist);
+    rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
   } else {
     rayCol = background_color(dp);
   }
@@ -247,22 +247,24 @@ void main() {
   vec3 finalCol = rayCol;
 
   // March reflected ray a couple of times.
-  for (int ray = 1; ray < color_iters && totalD < MAX_DIST; ++ray) {
+  for (int ray = 1; ray < color_iters &&
+                    totalD < MAX_DIST &&
+                    colFactor > 0.0; ++ray) {
     dp = reflect(dp, n);  // reflect view direction
     p += (-totalD + 2.0 * m_dist) * dp;  // reproject eye
 
     steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
-	if (totalD < MAX_DIST) {
+    if (totalD < MAX_DIST) {
       p += totalD * dp;
       n = normal(p, m_dist * .5);
-	  rayCol = rayColor(p, dp, n, totalD, m_dist);
-	  rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
+      rayCol = rayColor(p, dp, n, totalD, m_dist);
+      rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
     } else {
-	  rayCol = background_color(dp);
-	}
+      rayCol = background_color(dp);
+    }
 
-	finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
-	colFactor *= SHINE * SHINE;  // reflection drop-off.
+    finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
+    colFactor *= SHINE * SHINE;  // reflection drop-off.
   }
 
   float zFar = 5.0;

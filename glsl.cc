@@ -5,10 +5,15 @@
 #include <math.h>
 #include <time.h>
 
+#if !defined(_WIN32)
+#define __FUNCTION__ "glsl"
+#else
+
 #pragma warning(disable: 4996) // unsafe function
 #pragma warning(disable: 4244) // conversion loss
 #pragma warning(disable: 4305) // truncation
 #pragma warning(disable: 4800) // forcing value to bool
+#endif
 
 #include "glsl.h"
 #include "TGA.h"
