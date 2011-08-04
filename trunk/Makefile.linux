@@ -1,5 +1,5 @@
 # Needs libsdl and dependencies: sudo apt-get install libsdl1.2-dev
-all: boxplorer shadershrink edit-cfg
+all: boxplorer shadershrink edit-cfg glsl
 
 CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX
 
@@ -10,7 +10,7 @@ TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o 
 boxplorer: boxplorer.o Makefile.linux $(TW_OBJS)
 	g++ boxplorer.o $(TW_OBJS) -o boxplorer $(LDFLAGS)
 
-boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.linux
+boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.linux
 	g++ -c $(CFLAGS) boxplorer.cc
 
 shadershrink: shadershrink.cc shadershrink.h Makefile.linux
@@ -18,6 +18,9 @@ shadershrink: shadershrink.cc shadershrink.h Makefile.linux
 
 edit-cfg: edit-cfg.cc Makefile.linux
 	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
+
+glsl: glsl.cc TGA.h glsl.h Makefile.linux
+	g++ $(CFLAGS) glsl.cc -o glsl
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CFLAGS) $<
