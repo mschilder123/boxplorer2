@@ -51,6 +51,8 @@ using namespace std;
 #include "shader_procs.h"
 #include "default_shaders.h"
 
+#include "TGA.h"
+
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
@@ -774,87 +776,9 @@ int viewportOffset[2];
 // Is the mouse and keyboard input grabbed?
 int grabbedInput = 1;
 
-// Simple TGA class, only suports 24bpp.
-class TGA {
- public:
-  TGA() : data_(NULL) {}
-  ~TGA() { delete data_; }
-  bool readFile(const char* filename) {
-    FILE* f = NULL;
-    bool result = false;
-    while ((f = fopen(filename, "rb")) != NULL) {
-      unsigned char header[18];
-      if (fread(header, sizeof header, 1, f) != 1) break;
-      unsigned char expected[18] = {
-        0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0
-      };
-      expected[12] = header[12]; expected[13] = header[13];
-      expected[14] = header[14]; expected[15] = header[15];
-      if (memcmp(header, expected, sizeof header) != 0) {
-        printf(__FUNCTION__ " : unsupported TGA format, only 24bpp supported\n");
-        break;
-      }
-      int width = header[13] * 256 + header[12];
-      int height = header[15] * 256 + header[14];
-      if (width > 32768 || height > 32768) {
-        printf(__FUNCTION__ " : oversized TGA image not supported\n");
-        break;
-      }
-      unsigned char* data = new unsigned char[width * height * 3];
-      if (fread(data, width * height * 3, 1, f) != 1) {
-        printf(__FUNCTION__ " : failed to load TGA pixel data\n");
-        delete data;
-        break;
-      }
-      delete data_;
-      data_ = data;
-      width_ = width;
-      height_ = height;
-      result = true;
-      break;
-    }
-    if (f) fclose(f);
-    return result;
-  }
-  bool writeFile(const char* filename) {
-    const unsigned char header[18] = {
-      0,0,2,0,0,0,0,0,0,0,0,0,width_%256,width_/256,height_%256,height_/256,24,0
-    };
-    FILE* f = NULL;
-    bool result = false;
-    if ((f = fopen(filename, "wb")) != NULL) {
-      fwrite(header, 18, 1, f);
-      fwrite(data_, 3, width_*height_, f);
-      result = true;
-    }
-    if (f) fclose(f);
-    return result;
-  }
-  bool readFramebuffer(int width, int height) {
-    width_ = width;
-    height_ = height;
-    delete data_;
-    data_ = new unsigned char[width_ * height_ * 3];
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadBuffer(GL_FRONT);
-    glReadPixels(viewportOffset[0], viewportOffset[1],
-                 width_, height_,
-                 GL_BGR, GL_UNSIGNED_BYTE,
-                 data_);
-    return true;
-  }
-  int width() { return width_; }
-  int height() { return height_; }
-  const unsigned char* data() { return data_; }
-private:
- int width_;
- int height_;
- unsigned char* data_;
-};
-
 void saveScreenshot(char const* tgaFile) {
   TGA tga;
-  tga.readFramebuffer(config.width, config.height);
+  tga.readFramebuffer(config.width, config.height, viewportOffset);
   if (tga.writeFile(tgaFile))
     printf(__FUNCTION__ " : wrote %s\n", tgaFile);
   else

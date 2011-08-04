@@ -1,14 +1,21 @@
-// menger shader.
+// menger and then some shader.
 // Original shader by rrrola for mandelbox
 // bermarte: formula from Knighty
 // marius: refactored w/ reflections, background dome, ssponge, combi etc.
+// marius: massaged so can be compiled as plain C++.
 
 #define d de_menger // combi,menger,mandelbox,ssponge  // distance estimator
 #define c c_menger  // color at position p
 
 #define MAX_DIST 6.0
 #define ULP 0.000000059604644775390625
+
+#ifndef PI
 #define PI 3.14159265
+#endif
+#ifndef INOUT
+#define INOUT(a,b) inout a b
+#endif
 
 // Camera position and direction.
 varying vec3 eye, dir;
@@ -54,30 +61,30 @@ float de_menger(vec3 z0) {
   int n_iters = int(M_ITERS);
   for (int i=0;i<n_iters;i++){
     z0 = abs(z0) + par[2];
-    if( z0.x < z0.y){z0.xyz = z0.yxz;}
-    if( z0.x < z0.z){z0.xyz = z0.zyx;}
-    if( z0.y < z0.z){z0.xyz = z0.xzy;}
+    if( z0.x < z0.y){z0 = z0.yxz;}
+    if( z0.x < z0.z){z0 = z0.zyx;}
+    if( z0.y < z0.z){z0 = z0.xzy;}
     r = z0.x;
     z0 += z0*scale - scale;
     if(z0.z<-0.5*scale) z0.z+=scale;
   }
-  return (r-1.0)*pow(scale+1.,float(1-n_iters))*M_SIZE;
+  return (r-1.0)*pow(scale+1.f,float(1-n_iters))*M_SIZE;
 }
 
-vec3 c_menger(in vec3 p) {
+vec3 c_menger(vec3 p) {
   return surfaceColor1;  // Boring but reflections make it interesting.
 }
 
 #define SCALE par[0].y  //{min=-3 max=3 step=.01}
 #define MINRAD2 par[0].x  //{min=0 max=1 step=.001}
 
-float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
-vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
 
 float de_mandelbox(vec3 pos) {
+  float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
+  vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
   vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
-    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
+    p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
 	p = p*scale + p0;
@@ -125,15 +132,15 @@ vec3 normal(vec3 pos, float d_pos) {
 
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
 // `normal`, `view` and `light` should be normalized.
-vec3 blinn_phong(in vec3 normal, in vec3 view, in vec3 light, in vec3 diffuseColor) {
+vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
   vec3 halfLV = normalize(light + view);
-  float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0);
+  float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0f);
   float dif = dot(normal, light) * 0.5 + 0.75;
-  return dif*diffuseColor + spe*specularColor;
+  return diffuseColor*dif + specularColor*spe;
 }
 
 // Mix reflected ray contribution.
-vec3 mix_reflection(in vec3 normal, in vec3 view, in vec3 baseColor, in vec3 reflectionColor, in float factor) {
+vec3 mix_reflection(vec3 normal, vec3 view, vec3 baseColor, vec3 reflectionColor, float factor) {
   // An attempt at Oren-Nayar reflectance
   float alpha = acos(dot(normal, -view));
   float s2 = SIGMA * SIGMA;
@@ -164,10 +171,10 @@ float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist) {
 
 // Intersect the view ray with the fractal using raymarching.
 // returns # steps
-int rayMarch(in vec3 p, in vec3 dp, inout float totalD, in float side, inout float m_dist, in float m_zoom) {
+int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dist), float m_zoom) {
   int steps;
   for (steps = 0; steps < max_steps; ++steps) {
-    float D = (side * d(p + totalD * dp) - totalD * m_dist) / (1.0 + m_dist);
+    float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
@@ -183,6 +190,8 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist) {
   col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist));
   return col;
 }
+
+#ifndef _FAKE_GLSL_
 
 // Intersect direction ray w/ large encapsulating sphere.
 // Sphere map texture onto it.
@@ -264,3 +273,5 @@ void main() {
   gl_FragDepth = depth;
   gl_FragColor = vec4(finalCol, depth);
 }
+
+#endif  // _FAKE_GLSL_
