@@ -1,4 +1,4 @@
-all: boxplorer.exe shadershrink.exe edit-cfg.exe
+all: boxplorer.exe shadershrink.exe edit-cfg.exe glsl.exe
 
 CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
 LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
@@ -6,12 +6,15 @@ LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwEventSDL.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj TwEventWin.obj TwDirect3D10.obj TwDirect3D9.obj
 
-boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h Makefile.win32 $(TW_OBJS)
+boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 $(TW_OBJS)
 	cl -c $(CFLAGS) boxplorer.cc
 	link $(LDFLAGS) boxplorer.obj  $(TW_OBJS)
 
 shadershrink.exe: shadershrink.cc Makefile.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
+
+glsl.exe: glsl.cc TGA.h glsl.h Makefile.win32 cfgs\menger.cfg.data\fragment.glsl
+        cl $(CFLAGS) glsl.cc $(LDFLAGS)
 
 edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
