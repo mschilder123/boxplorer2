@@ -1,4 +1,4 @@
-all: boxplorer shadershrink edit-cfg
+all: boxplorer shadershrink edit-cfg glsl
 
 CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/
 
@@ -9,7 +9,8 @@ TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o 
 boxplorer: boxplorer.o Makefile.osx $(TW_OBJS)
 	g++ boxplorer.o SDLmain.m $(TW_OBJS) -o boxplorer $(LDFLAGS)
 
-boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.osx
+boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.osx \
+             TGA.h
 	g++ -c $(CFLAGS) boxplorer.cc
 
 shadershrink: shadershrink.cc shadershrink.h Makefile.osx
@@ -17,6 +18,9 @@ shadershrink: shadershrink.cc shadershrink.h Makefile.osx
 
 edit-cfg: edit-cfg.cc Makefile.osx
 	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
+
+glsl: glsl.cc glsl.h TGA.h Makefile.osx cfgs/menger.cfg.data/fragment.glsl
+	g++ $(CFLAGS) glsl.cc -o glsl
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CFLAGS) $<
