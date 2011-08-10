@@ -13,70 +13,120 @@ namespace GLSL {  // Wrap in namespace so we collide less w/ globals.
 #define PI 3.14159265358979324
 #endif
 
-class vec3 {
-public:
-vec3() : x(0), y(0), z(0) {}
-vec3(float k) : x(k), y(k), z(k) {}
-vec3(float xx, float yy, float zz) { x = xx; y = yy; z = zz; }
-vec3(const vec3& b) : x(b.x), y(b.y), z(b.z) {}
-vec3& operator=(const vec3& b) { x = b.x; y = b.y; z = b.z; return *this; }
-vec3& operator*=(const float k) { x*= k; y*= k; z*= k; return *this; }
-vec3& operator/=(const float k) { x/= k; y/= k; z/= k; return *this; }
-vec3& operator+=(const float k) { x+= k; y+= k; z+= k; return *this; }
-vec3& operator+=(const vec3& b) { x+= b.x; y+= b.y; z+= b.z; return *this; }
-vec3 operator*(const vec3& b) const { return vec3(x*b.x, y*b.y, z*b.z); }
-vec3 operator*(const float k) const { return vec3(x*k, y*k, z*k); }
-vec3 operator-(const vec3& b) const { return vec3(x-b.x, y-b.y, z-b.z); }
-vec3 operator-() const { return vec3(-x,-y,-z); }
-vec3 operator+(const vec3& b) const { return vec3(x+b.x, y+b.y, z+b.z); }
-vec3 operator/(const float k) const { return vec3(x/k, y/k, z/k); }
-vec3 cross(const vec3& b) const {
-  return vec3(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x);
-}
-void print(const char* a) const { printf("%s(%f,%f,%f)\n",a,x,y,z); }
-vec3 yxz() const { return vec3(y,x,z); }
-vec3 xzy() const { return vec3(x,z,y); }
-vec3 zyx() const { return vec3(z,y,x); }
-vec3 zxy() const { return vec3(z,x,y); }
-float x; float y; float z;
-};
+class vec2;
+class vec3;
 
 class vec2 {
 public:
-  vec2(float a, float b) : x(a), y(b) {}
-  vec3 xxy() { return vec3(x,x,y); }
-  vec3 xyx() { return vec3(x,y,x); }
-  vec3 yxx() { return vec3(y,x,x); }
-float x; float y;
+  vec2(float a, float b);
+  vec3 xxy() const;
+  vec3 xyx() const;
+  vec3 yxx() const;
+  float x,y;
+};
+
+class vec3 {
+ public:
+  vec3();
+  vec3(float k);
+  vec3(float xx, float yy, float zz);
+  vec3(const vec3& b);
+  vec3& operator=(const vec3& b);
+  vec3& operator*=(const float k);
+  vec3& operator/=(const float k);
+  vec3& operator+=(const float k);
+  vec3& operator+=(const vec3& b);
+  vec3 operator*(const vec3& b) const;
+  vec3 operator*(const float k) const;
+  vec3 operator-(const vec3& b) const;
+  vec3 operator-() const;
+  vec3 operator+(const vec3& b) const;
+  vec3 operator/(const float k) const;
+  vec3 cross(const vec3& b) const;
+  void print(const char* a) const;
+  vec3 yxz() const;
+  vec3 xzy() const;
+  vec3 zyx() const;
+  vec3 zxy() const;
+  vec2 xy() const;
+  float x; float y; float z;
 };
 
 class vec4 {
-public:
-vec4() : x(0), y(0), z(0), w(0) {}
-vec4(float xx, float yy, float zz, float ww) : x(xx), y(yy), z(zz), w(ww) {}
-vec4(const vec3& v3, float ww) { x = v3.x; y = v3.y; z = v3.z; w = ww; }
-vec3 xyz() const { return vec3(x,y,z); }
-vec4& operator=(const vec4& a) { x = a.x; y = a.y; z = a.z; w = a.w; return *this; }
-vec4& operator/=(const float k) { x/= k; y/= k; z/= k; w/= k; return *this; }
-vec4& operator*=(const float k) { x*= k; y*= k; z*= k; w*= k; return *this; }
-vec4 operator*(const vec4& b) const { return vec4(x*b.x, y*b.y, z*b.z, w*b.w); }
-vec4 operator+(const vec4& b) const { return vec4(x+b.x, y+b.y, z+b.z, w+b.w); }
-vec4 operator/(const float k) const { return vec4(x/k, y/k, z/k, w/k); }
-float dot(const vec4& b) const { return x*b.x + y*b.y + z*b.z + w*b.w; }
-float x; float y; float z; float w;
+ public:
+  vec4();
+  vec4(float xx, float yy, float zz, float ww);
+  vec4(const vec3& v3, float ww);
+  vec4(float v);
+  vec3 xyz() const;
+  vec4& operator=(const vec4& a);
+  vec4& operator/=(const float k);
+  vec4& operator*=(const float k);
+  vec4 operator*(const vec4& b) const;
+  vec4 operator+(const vec4& b) const;
+  vec4 operator/(const float k) const;
+  float dot(const vec4& b) const;
+  float x; float y; float z; float w;
 };
+
+vec2::vec2(float a, float b) : x(a), y(b) {}
+vec3 vec2::xxy() const { return vec3(x,x,y); }
+vec3 vec2::xyx() const { return vec3(x,y,x); }
+vec3 vec2::yxx() const { return vec3(y,x,x); }
+
+vec3::vec3() : x(0), y(0), z(0) {}
+vec3::vec3(float k) : x(k), y(k), z(k) {}
+vec3::vec3(float xx, float yy, float zz) { x = xx; y = yy; z = zz; }
+vec3::vec3(const vec3&b) : x(b.x), y(b.y), z(b.z) {}
+vec3& vec3::operator=(const vec3& b) { x= b.x; y= b.y; z= b.z; return *this; }
+vec3& vec3::operator*=(const float k) { x*= k; y*= k; z*= k; return *this; }
+vec3& vec3::operator/=(const float k) { x/= k; y/= k; z/= k; return *this; }
+vec3& vec3::operator+=(const float k) { x+= k; y+= k; z+= k; return *this; }
+vec3& vec3::operator+=(const vec3& b) { x+= b.x; y+= b.y; z+= b.z; return *this; }
+vec3 vec3::operator*(const vec3& b) const { return vec3(x*b.x, y*b.y, z*b.z); }
+vec3 vec3::operator*(const float k) const { return vec3(x*k, y*k, z*k); }
+vec3 vec3::operator-(const vec3& b) const { return vec3(x-b.x, y-b.y, z-b.z); }
+vec3 vec3::operator-() const { return vec3(-x,-y,-z); }
+vec3 vec3::operator+(const vec3& b) const { return vec3(x+b.x, y+b.y, z+b.z); }
+vec3 vec3::operator/(const float k) const { return vec3(x/k, y/k, z/k); }
+vec3 vec3::cross(const vec3& b) const { return vec3(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x); }
+void vec3::print(const char* a) const { printf("%s(%f,%f,%f)\n",a,x,y,z); }
+vec3 vec3::yxz() const { return vec3(y,x,z); }
+vec3 vec3::xzy() const { return vec3(x,z,y); }
+vec3 vec3::zyx() const { return vec3(z,y,x); }
+vec3 vec3::zxy() const { return vec3(z,x,y); }
+vec2 vec3::xy() const { return vec2(x,y); }
+
+vec4::vec4() : x(0), y(0), z(0), w(0) {}
+vec4::vec4(float xx, float yy, float zz, float ww) : x(xx), y(yy), z(zz), w(ww) {}
+vec4::vec4(const vec3& v3, float ww) { x = v3.x; y = v3.y; z = v3.z; w = ww; }
+vec4::vec4(float v) : x(v), y(v), z(v), w(v) {}
+vec3 vec4::xyz() const { return vec3(x,y,z); }
+vec4& vec4::operator=(const vec4& a) { x = a.x; y = a.y; z = a.z; w = a.w; return *this; }
+vec4& vec4::operator/=(const float k) { x/= k; y/= k; z/= k; w/= k; return *this; }
+vec4& vec4::operator*=(const float k) { x*= k; y*= k; z*= k; w*= k; return *this; }
+vec4 vec4::operator*(const vec4& b) const { return vec4(x*b.x, y*b.y, z*b.z, w*b.w); }
+vec4 vec4::operator+(const vec4& b) const { return vec4(x+b.x, y+b.y, z+b.z, w+b.w); }
+vec4 vec4::operator/(const float k) const { return vec4(x/k, y/k, z/k, w/k); }
+float vec4::dot(const vec4& b) const { return x*b.x + y*b.y + z*b.z + w*b.w; }
 
 float mod(float a, float b) { return a - b*floor(a/b); }
 vec3 mod(const vec3& a, float b) { return vec3(mod(a.x, b), mod(a.y, b), mod(a.z, b)); }
 float max(float a, float b) { return a>b?a:b; }
 float min(float a, float b) { return a<b?a:b; }
 float dot(const vec3& a, const vec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+float dot(const vec2& a, const vec2& b) { return a.x*b.x + a.y*b.y; }
 float length(const vec3& a) { return sqrt(dot(a, a)); }
+float length(const vec2& a) { return sqrt(dot(a, a)); }
 float abs(float a) { return fabs(a); }
 vec3 abs(const vec3& a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 float clamp(float v, float l, float h) { if (v < l) return l; if (v > h) return h; return v; }
 vec3 clamp(const vec3& v, float l, float h) {
-  return vec3(clamp(v.x, l, h), clamp(v.y, l, h), clamp(v.z, l, h)); }
+  return vec3(clamp(v.x, l, h), clamp(v.y, l, h), clamp(v.z, l, h));
+}
+vec3 clamp(const vec3& v, const vec3& l, const vec3& h) {
+  return vec3(clamp(v.x, l.x, h.x), clamp(v.y, l.y, h.y), clamp(v.z, l.z, h.z));
+}
 vec3 normalize(const vec3& a) { return vec3(a) / length(a); }
 float sign(float a) {if (a<0) return -1; else return 1;}
 vec3 mix(const vec3& a, const vec3&b, float r) {
@@ -85,6 +135,14 @@ vec3 mix(const vec3& a, const vec3&b, float r) {
   return vec3(a.x*ra + b.x*rb, a.y*ra + b.y*rb, a.z*ra + b.z*rb);
 }
 float radians(float degrees) { return (degrees * PI) / 180.0; }
+vec3 reflect(const vec3& d, const vec3& n) {
+  return normalize(d - n*2*dot(n,d));
+}
+float sin(const float& a) { return (float)::sin(a); }
+float cos(const float& a) { return (float)::cos(a); }
+vec3 sin(const vec3& a) {
+  return vec3(sin(a.x), sin(a.y), sin(a.z));
+}
 
 class mat4 {
  public:
@@ -117,6 +175,7 @@ class mat4 {
 #define yxx yxx()
 #define xyx xyx()
 #define xxy xxy()
+#define xy xy()
 
 // inout (reference params) need a rewrite.
 #define INOUT(a,b) a & b

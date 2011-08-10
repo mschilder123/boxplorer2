@@ -19,7 +19,7 @@ float fov2scale(float fov) { return tan(radians(fov/2.0)); }
 void main() {
   gl_Position = gl_Vertex;
   eye = vec3(gl_ModelViewMatrix[3]);
-  zoom = min(fov2scale(fov_x), fov2scale(fov_y));  // min delta ray at dist 1
+  zoom = fov2scale(fov_x);  // min delta ray at dist 1
   dir = vec3(gl_ModelViewMatrix *
     vec4(
       fov2scale(fov_x)*(x_scale*gl_Vertex.x + x_offset),

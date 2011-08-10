@@ -8,7 +8,6 @@
 #if !defined(_WIN32)
 #define __FUNCTION__ "glsl"
 #else
-
 #pragma warning(disable: 4996) // unsafe function
 #pragma warning(disable: 4244) // conversion loss
 #pragma warning(disable: 4305) // truncation
@@ -22,46 +21,102 @@ namespace GLSL {
 
 #include "cfgs/menger.cfg.data/fragment.glsl"
 
+vec3 pos;
+vec3 ahead;
+vec3 up;
+
+float fov_x, fov_y;
+
+#define XRES 720
+#define YRES 480
+
+// Make sure parameters are OK.
+void sanitizeParameters(void) {
+  // FOV: keep pixels square unless stated otherwise.
+  // Default FOV_y is 75 degrees.
+  if (fov_x <= 0) {
+    if (fov_y <= 0) { fov_y = 75; }
+    fov_x = atan(tan(fov_y*PI/180/2)*XRES/YRES)/PI*180*2;
+  }
+  if (fov_y <= 0) fov_y = atan(tan(fov_x*PI/180/2)*XRES/YRES)/PI*180*2;
+
+  if (max_steps < 1) max_steps = 128;
+  if (min_dist <= 0) min_dist = 0.0001;
+  if (iters < 1) iters = 13;
+  if (color_iters < 0) color_iters = 9;
+  if (ao_eps <= 0) ao_eps = 0.0005;
+  if (ao_strength <= 0) ao_strength = 0.1;
+  if (glow_strength <= 0) glow_strength = 0.25;
+  if (dist_to_color <= 0) dist_to_color = 0.2;
+}
+
+#define PROCESS_CONFIG_PARAMS \
+  PROCESS(fov_x, "fov_x") \
+  PROCESS(fov_y, "fov_y") \
+  PROCESS(min_dist, "min_dist") \
+  PROCESS(max_steps, "max_steps") \
+  PROCESS(ao_eps, "ao_eps") \
+  PROCESS(ao_strength, "ao_strength") \
+  PROCESS(glow_strength, "glow_strength") \
+  PROCESS(dist_to_color, "dist_to_color") \
+  PROCESS(speed, "speed") \
+  PROCESS(iters, "iters") \
+  PROCESS(color_iters, "color_iters")
+
+// Load configuration.
+  bool loadConfig(char const* configFile) {
+    bool result = false;
+    FILE* f;
+    if ((f = fopen(configFile, "r")) != 0) {
+    size_t i;
+    char s[32768];  // max line length
+    while (fscanf(f, " %s", s) == 1) {  // read word
+      if (s[0] == 0 || s[0] == '#') continue;
+
+      double val;
+      int v;
+
+      if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos.x, &pos.y, &pos.z); continue; }
+      if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead.x, &ahead.y, &ahead.z); continue; }
+      if (!strcmp(s, "upDirection")) { v=fscanf(f, " %f %f %f", &up.x, &up.y, &up.z); continue; }
+
+      #define PROCESS(name, nameString) \
+        if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
+      PROCESS_CONFIG_PARAMS
+      #undef PROCESS
+
+      for (i=0; i<(sizeof(par) / sizeof(par[0])); i++) {
+        char p[256];
+        sprintf(p, "par%lu", (unsigned long)i);
+        if (!strcmp(s, p)) {
+          v=fscanf(f, " %f %f %f", &par[i].x, &par[i].y, &par[i].z);
+          break;
+        }
+      }
+    }
+    fclose(f);
+    printf(__FUNCTION__ " : read '%s'\n", configFile);
+    result = true;
+    } else {
+      printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
+    }
+    if (result) sanitizeParameters();
+    return result;
+  }
+
 int main(int argc, char* argv[]) {
   printf("glsl as C++ test:\n");
 
-  // Setup up params.
-  // TODO: read from .cfg
-  iters = 6;
-  min_dist = 0.0001;
-  max_steps = 1162;
-  ao_eps = 0.000792447;
-  ao_strength = 0.0707946;
-  glow_strength = 5.5;
-  par[0] = vec3(0.25, -1.77, 1.59);
-  par[1] = vec3(6, 1, 0);
-  par[8] = vec3(3.63, 2.64, 1.71);
-  par[9] = vec3(0, 0, 0);
-  par[11] = vec3(0.95, 0.64, 0.1);
-  par[14] = vec3(1.0, 0.8, 0.4);
-  par[15] = vec3(.03, .4, .4);
-  par[16] = vec3(0, 0, 0);
-
-  float fov_x = 91.3085;
-  float fov_y = 75;
-
-  // eye position
-  vec3 pos(-0.885181,0.633865,-0.915299);
-  // view direction
-  vec3 ahead(0.174267,-0.820984,-0.543707);
-  vec3 up(-0.976163,-0.0714907,-0.204927);
-  vec3 right = up.cross(ahead);
+  loadConfig(argv[1]);
 
   time_t start, end;
   float minTotal = MAX_DIST;
   float maxTotal = 0;
   int maxSteps = 0;
 
-#define XRES 720
-#define YRES 480
-
   TGA tga(XRES, YRES);
 
+  vec3 right = up.cross(ahead);
   mat4 proj(right.x, up.x, ahead.x, 0,
             right.y, up.y, ahead.y, 0,
             right.z, up.z, ahead.z, 0,
@@ -91,7 +146,7 @@ int main(int argc, char* argv[]) {
       if (totalD < MAX_DIST) {
         vec3 p = pos + dp*totalD;
         vec3 n = normal(p, m_dist * .5);
-        vec3 col = rayColor(p,dp,n,totalD,m_dist);
+        vec3 col = rayColor(p,dp,n,totalD,m_dist,side);
         col = mix(col, glowColor, float(steps)/float(max_steps)*glow_strength);
         tga.set(scr_x,scr_y,col);
       }
