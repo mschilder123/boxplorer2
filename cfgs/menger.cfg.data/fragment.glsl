@@ -4,8 +4,8 @@
 // marius: refactored w/ reflections, background dome, ssponge, combi etc.
 // marius: massaged so can be compiled as plain C++.
 
-#define d de_menger // combi,menger,mandelbox,ssponge  // distance estimator
-#define c c_menger  // c_menger
+#define d de_menger // PKlein,combi,menger,mandelbox,ssponge  // distance estimator
+#define c c_menger  // PKlein,menger
 
 #define MAX_DIST 10.0
 #define ULP 0.000000059604644775390625
@@ -268,7 +268,6 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side) {
 }
 
 #ifndef _FAKE_GLSL_
-
 // Intersect direction ray w/ large encapsulating sphere.
 // Sphere map texture onto it.
 uniform sampler2D bg_texture;
@@ -288,12 +287,18 @@ vec3 background_color(in vec3 vp) {
   }
   return texture2DLod(bg_texture, vec2(u,v), BG_BLUR).xyz;
 }
+#else
+vec3 background_color(vec3 vp) { return backgroundColor; }
+#endif
 
 void main() {
   // Interlaced stereoscopic eye fiddling
   vec3 eye_in = eye;
+
+#ifndef _FAKE_GLSL_
   eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
       vec3(gl_ModelViewMatrix[0]);
+#endif
 
   vec3 p = eye_in, dp = normalize(dir);
   float m_zoom = length(dir) * zoom * .5 / xres;  // screen error at dist 1.
@@ -310,7 +315,7 @@ void main() {
   steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
   vec3 rayCol, n;
   if (totalD < MAX_DIST) {
-    p += totalD * dp;
+    p += dp * totalD;
     n = normal(p, m_dist * .5);
     rayCol = rayColor(p, dp, n, totalD, m_dist, side);
     rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
@@ -326,11 +331,11 @@ void main() {
                     totalD < MAX_DIST &&
                     colFactor > 0.0; ++ray) {
     dp = reflect(dp, n);  // reflect view direction
-    p += (-totalD + 2.0 * m_dist) * dp;  // reproject eye
+    p += dp * (-totalD + 2.0 * m_dist);  // reproject eye
 
     steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
     if (totalD < MAX_DIST) {
-      p += totalD * dp;
+      p += dp * totalD;
       n = normal(p, m_dist * .5);
       rayCol = rayColor(p, dp, n, totalD, m_dist, side);
       rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
@@ -351,4 +356,3 @@ void main() {
   gl_FragColor = vec4(finalCol, depth);
 }
 
-#endif  // _FAKE_GLSL_
