@@ -19,18 +19,25 @@
 
 namespace GLSL {
 
+// 'globals' capturing the fragment shader output.
+float gl_FragDepth;
+vec4 gl_FragColor;
+
+// Compile the fragment shader right here.
+// This defines a bunch more 'globals' and functions.
 #include "cfgs/menger.cfg.data/fragment.glsl"
 
+// Other globals, not referenced by fragment shader,
+// We read them from the .cfg file.
 vec3 pos;
 vec3 ahead;
 vec3 up;
-
 float fov_x, fov_y;
 
 #define XRES 720
 #define YRES 480
 
-// Make sure parameters are OK.
+// Make sure read parameters are OK.
 void sanitizeParameters(void) {
   // FOV: keep pixels square unless stated otherwise.
   // Default FOV_y is 75 degrees.
@@ -64,55 +71,55 @@ void sanitizeParameters(void) {
   PROCESS(color_iters, "color_iters")
 
 // Load configuration.
-  bool loadConfig(char const* configFile) {
-    bool result = false;
-    FILE* f;
-    if ((f = fopen(configFile, "r")) != 0) {
-    size_t i;
-    char s[32768];  // max line length
-    while (fscanf(f, " %s", s) == 1) {  // read word
-      if (s[0] == 0 || s[0] == '#') continue;
+bool loadConfig(char const* configFile) {
+  bool result = false;
+  FILE* f;
+  if ((f = fopen(configFile, "r")) != 0) {
+  size_t i;
+  char s[32768];  // max line length
+  while (fscanf(f, " %s", s) == 1) {  // read word
+    if (s[0] == 0 || s[0] == '#') continue;
 
-      double val;
-      int v;
+    double val;
+    int v;
 
-      if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos.x, &pos.y, &pos.z); continue; }
-      if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead.x, &ahead.y, &ahead.z); continue; }
-      if (!strcmp(s, "upDirection")) { v=fscanf(f, " %f %f %f", &up.x, &up.y, &up.z); continue; }
+    if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos.x, &pos.y, &pos.z); continue; }
+    if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead.x, &ahead.y, &ahead.z); continue; }
+    if (!strcmp(s, "upDirection")) { v=fscanf(f, " %f %f %f", &up.x, &up.y, &up.z); continue; }
 
-      #define PROCESS(name, nameString) \
-        if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
-      PROCESS_CONFIG_PARAMS
-      #undef PROCESS
+    #define PROCESS(name, nameString) \
+      if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
+    PROCESS_CONFIG_PARAMS
+    #undef PROCESS
 
-      for (i=0; i<(sizeof(par) / sizeof(par[0])); i++) {
-        char p[256];
-        sprintf(p, "par%lu", (unsigned long)i);
-        if (!strcmp(s, p)) {
-          v=fscanf(f, " %f %f %f", &par[i].x, &par[i].y, &par[i].z);
-          break;
-        }
+    for (i=0; i<(sizeof(par) / sizeof(par[0])); i++) {
+      char p[256];
+      sprintf(p, "par%lu", (unsigned long)i);
+      if (!strcmp(s, p)) {
+        v=fscanf(f, " %f %f %f", &par[i].x, &par[i].y, &par[i].z);
+        break;
       }
     }
-    fclose(f);
-    printf(__FUNCTION__ " : read '%s'\n", configFile);
-    result = true;
-    } else {
-      printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
-    }
-    if (result) sanitizeParameters();
-    return result;
   }
+  fclose(f);
+  printf(__FUNCTION__ " : read '%s'\n", configFile);
+  result = true;
+  } else {
+    printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
+  }
+  if (result) sanitizeParameters();
+  return result;
+}
 
-int main(int argc, char* argv[]) {
+// This simulates a pinhole vertex shader
+// and sets up the various varying inputs to the
+// fragment shader (aka GLSL::main()).
+int vertex_main(int argc, char* argv[]) {
   printf("glsl as C++ test:\n");
 
   loadConfig(argv[1]);
 
   time_t start, end;
-  float minTotal = MAX_DIST;
-  float maxTotal = 0;
-  int maxSteps = 0;
 
   TGA tga(XRES, YRES);
 
@@ -121,6 +128,7 @@ int main(int argc, char* argv[]) {
             right.y, up.y, ahead.y, 0,
             right.z, up.z, ahead.z, 0,
             0,       0,    0,       1);
+  xres = XRES;
 
   start = clock();
   for (int scr_y = 0; scr_y < YRES; ++scr_y) {
@@ -132,39 +140,22 @@ int main(int argc, char* argv[]) {
       dy *= tan(radians(fov_y * .5));
 
       vec4 ddir = proj * vec4(dx,dy,1,0);
-      vec3 dir(ddir.x, ddir.y, ddir.z);
 
-      float totalD = d(pos);
-      float side = sign(totalD);
-      totalD *= side * .5;
+      // Setup the various varying inputs for the fragment shader.
+      dir = ddir.xyz;
+      eye = pos;
+      zoom = tan(radians(fov_x * .5));
 
-      vec3 dp = normalize(dir);
+      GLSL::main();  // Call the fragment shader code, compiled as C++
 
-      float m_zoom = tan(radians(fov_x * .5)) * length(dir) * .5 / XRES;
-      float m_dist = max(min_dist, m_zoom * totalD);
-      int steps = rayMarch(pos, dp, totalD, side, m_dist, m_zoom);
-      if (totalD < MAX_DIST) {
-        vec3 p = pos + dp*totalD;
-        vec3 n = normal(p, m_dist * .5);
-        vec3 col = rayColor(p,dp,n,totalD,m_dist,side);
-        col = mix(col, glowColor, float(steps)/float(max_steps)*glow_strength);
-        tga.set(scr_x,scr_y,col);
-      }
-
-      if (totalD < minTotal) minTotal = totalD;
-      if (totalD > maxTotal) maxTotal = totalD;
-      if (steps > maxSteps) maxSteps = steps;
+      tga.set(scr_x, scr_y, gl_FragColor.xyz);
     }
   }
   end = clock();
 
   printf("%lf sec\n", (double)(end-start)/CLOCKS_PER_SEC);
-  printf("min dist %f\n", minTotal);
-  printf("max dist %f\n", maxTotal);
-  printf("max steps %d\n", maxSteps);
 
-  if (tga.writeFile("test.tga"))
-    printf("wrote ./test.tga\n");
+  if (tga.writeFile("test.tga")) printf("wrote ./test.tga\n");
 
   return 0;
 }
@@ -172,5 +163,9 @@ int main(int argc, char* argv[]) {
 } // namespace GLSL
 
 int main(int argc, char* argv[]) {
-  return GLSL::main(argc, argv);
+  if (argc != 2) {
+    fprintf(stderr, "Usage: glsl .cfg-file\n");
+    return 1;
+  }
+  return GLSL::vertex_main(argc, argv);
 }
