@@ -19,7 +19,7 @@ shadershrink: shadershrink.cc shadershrink.h Makefile.linux
 edit-cfg: edit-cfg.cc Makefile.linux
 	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
 
-glsl: glsl.cc TGA.h glsl.h Makefile.linux
+glsl: glsl.cc TGA.h glsl.h Makefile.linux cfgs/menger.cfg.data/fragment.glsl
 	g++ $(CFLAGS) glsl.cc -o glsl
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
