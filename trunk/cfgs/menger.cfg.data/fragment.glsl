@@ -151,7 +151,7 @@ float de_menger(vec3 z0) {
     z0 += z0*scale - scale;
     if(z0.z<-0.5*scale) z0.z+=scale;
   }
-  return (r-1.0)*pow(scale+1.f,float(1-n_iters))*ME_SIZE;
+  return (r-1.0)*pow(scale+1.,float(1-n_iters))*ME_SIZE;
 }
 
 vec3 c_menger(vec3 p) {
@@ -210,7 +210,7 @@ vec3 normal(vec3 pos, float d_pos) {
 // `normal`, `view` and `light` should be normalized.
 vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
   vec3 halfLV = normalize(light + view);
-  float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0f);
+  float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0);
   float dif = dot(normal, light) * 0.5 + 0.75;
   return diffuseColor*dif + specularColor*spe;
 }
