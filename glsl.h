@@ -127,6 +127,9 @@ vec3 clamp(const vec3& v, float l, float h) {
 vec3 clamp(const vec3& v, const vec3& l, const vec3& h) {
   return vec3(clamp(v.x, l.x, h.x), clamp(v.y, l.y, h.y), clamp(v.z, l.z, h.z));
 }
+vec2 clamp(const vec2& v, float l, float h) {
+  return vec2(clamp(v.x, l, h), clamp(v.y, l, h));
+}
 vec3 normalize(const vec3& a) { return vec3(a) / length(a); }
 float sign(float a) {if (a<0) return -1; else return 1;}
 vec3 mix(const vec3& a, const vec3&b, float r) {

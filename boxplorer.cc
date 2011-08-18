@@ -265,7 +265,8 @@ float getFPS(void) {
   PROCESS(float, dof_offset, "dof_offset", true) \
   PROCESS(int, enable_dof, "enable_dof", false) \
   PROCESS(int, no_spline, "no_spline", false) \
-  PROCESS(float, asymmetry, "asymmetry", true)
+  PROCESS(float, asymmetry, "asymmetry", true) \
+  PROCESS(int, nrays, "nrays", true)
 
 #define NUMPARS 20
 char* parName[NUMPARS][3];
@@ -478,22 +479,24 @@ class KeyFrame {
    }
 
    // Save configuration.
-   void saveConfig(char const* configFile) {
+   void saveConfig(char const* configFile, string* defines = NULL) {
      FILE* f;
      if ((f = fopen(configFile, "w")) != 0) {
-        #define PROCESS(type, name, nameString, doSpline) \
-          fprintf(f, nameString " %g\n", (double)name);
-        PROCESS_CONFIG_PARAMS
-        #undef PROCESS
+       if (defines != NULL)
+         fprintf(f, "%s", defines->c_str());
+       #define PROCESS(type, name, nameString, doSpline) \
+         fprintf(f, nameString " %g\n", (double)name);
+       PROCESS_CONFIG_PARAMS
+       #undef PROCESS
 
-        fprintf(f, "position %g %g %g\n", pos()[0], pos()[1], pos()[2]);
-        fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
-        fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
-        for (size_t i=0; i<lengthof(par); i++) {
-          fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
-        }
-        fclose(f);
-        printf(__FUNCTION__ " : wrote '%s'\n", configFile);
+       fprintf(f, "position %g %g %g\n", pos()[0], pos()[1], pos()[2]);
+       fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
+       fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
+       for (size_t i=0; i<lengthof(par); i++) {
+         fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
+       }
+       fclose(f);
+       printf(__FUNCTION__ " : wrote '%s'\n", configFile);
      }
    }
 
@@ -515,7 +518,7 @@ class KeyFrame {
      glSetUniformf(glow_strength); glSetUniformf(dist_to_color);
      glSetUniformf(x_scale); glSetUniformf(x_offset);
      glSetUniformf(y_scale); glSetUniformf(y_offset);
-     glSetUniformf(speed);
+     glSetUniformf(speed); glSetUniformi(nrays);
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
      glSetUniformv(par);
@@ -1908,6 +1911,6 @@ int main(int argc, char **argv) {
   if (!rendering && keyframesChanged) {
     // TODO: ask whether to save keyframes
   }
-  camera.saveConfig("last.cfg");  // Save a config file on exit, just in case.
+  camera.saveConfig("last.cfg", &defines);  // Save a config file on exit, just in case.
   return 0;
 }

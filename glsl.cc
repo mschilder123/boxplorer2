@@ -98,7 +98,8 @@ void sanitizeParameters(void) {
   PROCESS(dist_to_color, "dist_to_color") \
   PROCESS(speed, "speed") \
   PROCESS(iters, "iters") \
-  PROCESS(color_iters, "color_iters")
+  PROCESS(color_iters, "color_iters") \
+  PROCESS(nrays, "nrays")
 
 // Load configuration.
 bool loadConfig(char const* configFile) {

@@ -1,10 +1,11 @@
 // menger and then some shader.
 // Original shader by rrrola for mandelbox
-// bermarte: formula from Knighty
+// bermarte, marius: formulae from Knighty
 // marius: refactored w/ reflections, background dome, ssponge, combi etc.
 // marius: massaged so can be compiled as plain C++.
 
 #ifndef _FAKE_GLSL_
+
 #define DECLARE_DE(x)
 #define DECLARE_COLORING(x)
 #define INOUT(a,b) inout a b
@@ -19,7 +20,7 @@
 #define c c_menger  // PKlein,menger
 #endif
 
-#endif
+#endif  // _FAKE_GLSL_
 
 #define MAX_DIST 10.0
 #define ULP 0.000000059604644775390625
@@ -45,9 +46,10 @@ uniform float
 
 uniform float speed;  // eye separation really.
 
-uniform int iters,    // Number of fractal iterations.
-  color_iters,        // Number of reflection rays.
-  max_steps;          // Maximum raymarching steps.
+uniform int iters;        // {min=1 max=1000} Number of fractal iterations.
+uniform int color_iters;  // {min=0 max=1000} Coloration iterations.
+uniform int max_steps;    // {min=1 max=1000} Maximum raymarching steps.
+uniform int nrays;        // {min=1 max=10} # of ray bounces.
 
 // Colors. Can be negative or >1 for interesting effects.
 #define backgroundColor par[10]
@@ -90,7 +92,7 @@ uniform int iters,    // Number of fractal iterations.
 #define PZ_rxy par[7].y  // {min=0 max=25 step=.01}
 
 #define PK_BSize vec3(par[1].y,par[1].x,par[2].y)
-#define PK_CSize par[0].y
+#define PK_CSize par[0].y // {min=0.0 max=10.0 step=.001}
 #define PK_CVector par[3]
 #define PK_Offset vec3(par[4].y,par[4].x,par[5].y)
 #define PK_Color par[17]
@@ -164,7 +166,7 @@ float de_menger(vec3 z0) {
     z0 += z0*scale - scale;
     if(z0.z<-0.5*scale) z0.z+=scale;
   }
-  return (r-1.0)*pow(scale+1.,float(1-n_iters))*ME_SIZE;
+  return (r-1.0)*pow(float(scale+1.),float(1-n_iters))*ME_SIZE;
 }
 DECLARE_DE(de_menger)
 
@@ -184,9 +186,30 @@ float de_mandelbox(vec3 pos) {
     p = p*scale + p0;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-           - pow(abs(MB_SCALE), float(1-iters))) * .85;
+           - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
+
+// Compute the color at `pos`.
+vec3 c_mandelbox(vec3 pos) {
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
+  vec3 p = pos, p0 = p;
+  float trap = 1.0;
+
+  for (int i=0; i<color_iters; i++) {
+    p = clamp(p, -1.0, 1.0) * 2.0 - p;
+    float r2 = dot(p, p);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + p0;
+    trap = min(trap, r2);
+  }
+  // c.x: log final distance (fractional iteration count)
+  // c.y: spherical orbit trap at (0,0,0)
+  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
+  return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
+}
+DECLARE_COLORING(c_mandelbox)
 
 // Infinite construction menger sphere sponge.
 float de_ssponge(vec3 pos) {
@@ -228,7 +251,7 @@ vec3 normal(vec3 pos, float d_pos) {
 // `normal`, `view` and `light` should be normalized.
 vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
   vec3 halfLV = normalize(light + view);
-  float spe = pow(max( dot(normal, halfLV), 0.0 ), 32.0);
+  float spe = pow(max( dot(normal, halfLV), 0.0 ), float(32.0));
   float dif = dot(normal, light) * 0.5 + 0.75;
   return diffuseColor*dif + specularColor*spe;
 }
@@ -345,7 +368,7 @@ void main() {
   vec3 finalCol = rayCol;
 
   // March reflected ray a couple of times.
-  for (int ray = 1; ray < color_iters &&
+  for (int ray = 1; ray < nrays &&
                     totalD < MAX_DIST &&
                     colFactor > 0.0; ++ray) {
     dp = reflect(dp, n);  // reflect view direction
