@@ -171,7 +171,7 @@ DECLARE_DE(de_menger)
 vec3 c_menger(vec3 p) {
   return surfaceColor1;  // Boring but reflections make it interesting.
 }
-DECLARE_COLORING(c_menger);
+DECLARE_COLORING(c_menger)
 
 float de_mandelbox(vec3 pos) {
   float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
