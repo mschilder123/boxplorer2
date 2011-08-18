@@ -1,9 +1,15 @@
 /*
  * Little test program to experiment w/ compiling glsl code as C++.
  */
+
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+
+#include <string>
+#include <map>
+
+using namespace std;
 
 #if !defined(_WIN32)
 #define __FUNCTION__ "glsl"
@@ -17,18 +23,42 @@
 #include "glsl.h"
 #include "TGA.h"
 
+// Hackery to get the list of DE and COLORING funcs from the glsl.
+map<string, float (*)(GLSL::vec3)> DE_funcs;
+map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
+
+class DE_initializer {
+ public:
+  DE_initializer(string name, float (*func)(GLSL::vec3)) {
+    DE_funcs[name] = func;
+  }
+};
+#define DECLARE_DE(a) DE_initializer _init##a(#a, &a);
+class COLORING_initializer {
+ public:
+  COLORING_initializer(string name, GLSL::vec3 (*func)(GLSL::vec3)) {
+    COLOR_funcs[name] = func;
+  }
+};
+#define DECLARE_COLORING(a) COLORING_initializer _init##a(#a, &a);
+
 namespace GLSL {
 
 // 'globals' capturing the fragment shader output.
 float gl_FragDepth;
 vec4 gl_FragColor;
 
+// In the c++ version, these are func ptrs, not straight #defines.
+// We assign them based on values in .cfg
+float (*d)(vec3);
+vec3 (*c)(vec3);
+
 // Compile the fragment shader right here.
 // This defines a bunch more 'globals' and functions.
 #include "cfgs/menger.cfg.data/fragment.glsl"
 
 // Other globals, not referenced by fragment shader,
-// We read them from the .cfg file.
+// We read them from the .cfg file though.
 vec3 pos;
 vec3 ahead;
 vec3 up;
@@ -37,7 +67,7 @@ float fov_x, fov_y;
 #define XRES 720
 #define YRES 480
 
-// Make sure read parameters are OK.
+// Make sure read parameters are sane.
 void sanitizeParameters(void) {
   // FOV: keep pixels square unless stated otherwise.
   // Default FOV_y is 75 degrees.
@@ -80,8 +110,31 @@ bool loadConfig(char const* configFile) {
   while (fscanf(f, " %s", s) == 1) {  // read word
     if (s[0] == 0 || s[0] == '#') continue;
 
-    double val;
     int v;
+
+    // Re-assign d() or c() if the .cfg says so.
+    if (!strcmp(s, "d")) {
+      v = fscanf(f, " %s", s);
+      if (v == 1) {
+        if (DE_funcs.find(s) != DE_funcs.end()) {
+          d = DE_funcs[s];
+          printf(__FUNCTION__ " : DE func '%s'\n", s);
+        } else
+          printf(__FUNCTION__
+                 " : WARNING : unknown DE func '%s'\n", s);
+    } }
+    if (!strcmp(s, "c")) {
+      v = fscanf(f, " %s", s);
+      if (v == 1) {
+        if (COLOR_funcs.find(s) != COLOR_funcs.end()) {
+          c = COLOR_funcs[s];
+          printf(__FUNCTION__ " : coloring func '%s'\n", s);
+        } else
+          printf(__FUNCTION__
+                 " : WARNING : unknown coloring func '%s'\n", s);
+    } }
+
+    double val;
 
     if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos.x, &pos.y, &pos.z); continue; }
     if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead.x, &ahead.y, &ahead.z); continue; }
@@ -118,6 +171,17 @@ int vertex_main(int argc, char* argv[]) {
   printf("glsl as C++ test:\n");
 
   loadConfig(argv[1]);
+
+  if (d == NULL) {
+    d = DE_funcs.begin()->second;
+    printf(__FUNCTION__ " : using DE func '%s'\n",
+           DE_funcs.begin()->first.c_str());
+  }
+  if (c == NULL) {
+    c = COLOR_funcs.begin()->second;
+    printf(__FUNCTION__ " : using coloring func '%s'\n",
+           COLOR_funcs.begin()->first.c_str());
+  }
 
   time_t start, end;
 

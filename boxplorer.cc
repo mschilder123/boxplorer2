@@ -131,6 +131,8 @@ SDL_Cursor* hand_cursor;
 int program;
 // Our SDL handle.
 SDL_Surface* screen;
+// Optional #defines for glsl compilation from .cfg file.
+string defines;
 
 // Pinhole camera modes.
 enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED }
@@ -379,7 +381,7 @@ class KeyFrame {
    }
 
    // Load configuration.
-   bool loadConfig(char const* configFile) {
+   bool loadConfig(char const* configFile, string* defines = NULL) {
      bool result = false;
      FILE* f;
      if ((f = fopen(configFile, "r")) != 0) {
@@ -388,8 +390,22 @@ class KeyFrame {
       while (fscanf(f, " %s", s) == 1) {  // read word
         if (s[0] == 0 || s[0] == '#') continue;
 
-        double val;
         int v;
+
+        // Parse #defines out of config.cfg to prepend to .glsl
+        if (defines) {
+          if (!strcmp(s, "d") || !strcmp(s, "c")) {
+            string a(s);
+            v = fscanf(f, " %s", s);
+            if (v == 1) {
+              string define = "#define " + a + " " + s + "\n";
+              printf(__FUNCTION__ " : %s", define.c_str());
+              defines->append(define);
+            }
+          }
+        }
+
+        double val;
 
         if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos()[0], &pos()[1], &pos()[2]); continue; }
         if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
@@ -856,7 +872,7 @@ int setupShaders(void) {
      printf(__FUNCTION__ " : using default vertex shader\n");
   }
 
-  glsl_source.assign(fs);
+  glsl_source.assign(defines + fs);
 
   p = glCreateProgram();
 
@@ -867,7 +883,12 @@ int setupShaders(void) {
   if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
 
   f = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(f, 1, &fs, 0);
+  if (!defines.empty()) {
+    const char* srcs[2] = {defines.c_str(), fs};
+    glShaderSource(f, 2, srcs, 0);
+  } else {
+    glShaderSource(f, 1, &fs, 0);
+  }
   glCompileShader(f);
   glGetShaderInfoLog(f, sizeof(log), &logLength, log);
   if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
@@ -1269,7 +1290,7 @@ int main(int argc, char **argv) {
   const char* configFile = (argc>=2 ? argv[1] : DEFAULT_CONFIG_FILE);
 
   // Load configuration.
-  if (config.loadConfig(configFile)) {
+  if (config.loadConfig(configFile, &defines)) {
     changeWorkingDirectory(configFile);
   } else {
     die("Usage: boxplorer <configuration-file.cfg>");
@@ -1280,7 +1301,7 @@ int main(int argc, char **argv) {
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
-  if (stereoMode == ST_XEYED) config.width *= 2; 
+  if (stereoMode == ST_XEYED) config.width *= 2;
 
   camera = config;
 
