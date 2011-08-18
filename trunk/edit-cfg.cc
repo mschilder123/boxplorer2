@@ -43,9 +43,14 @@ int main(int argc, char* argv[]) {
     string line;
     while(infile.good()) {
       getline(infile,line);
-      content.push_back(line);
+      if (line.find_first_of("\r\n") != string::npos)
+        line.erase(line.find_first_of("\r\n"));
+      if (!line.empty())
+        content.push_back(line);
     }
     infile.close();
+
+    bool found = false;
 
     // change key value
     for (vector<string>::iterator it = content.begin();
@@ -53,8 +58,12 @@ int main(int argc, char* argv[]) {
       if (it->find(key) == 0) {
         it = content.erase(it);
         if (!doDelete) it = content.insert(it, kv);
+        found = true;
       }
     }
+
+    if (!found && !doDelete)
+      content.insert(content.begin(), kv);
 
     // write file
     ofstream outfile(filename.c_str());
@@ -62,7 +71,7 @@ int main(int argc, char* argv[]) {
       for(vector<string>::const_iterator it = content.begin();
           it != content.end(); ++it) {
         outfile.write(it->data(), it->size());
-        outfile.write("\r\n", 2);
+        outfile.write("\n", 1);
       }
       outfile.close();
     }

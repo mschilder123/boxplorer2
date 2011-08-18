@@ -4,17 +4,28 @@
 // marius: refactored w/ reflections, background dome, ssponge, combi etc.
 // marius: massaged so can be compiled as plain C++.
 
-#define d de_menger // PKlein,combi,menger,mandelbox,ssponge  // distance estimator
+#ifndef _FAKE_GLSL_
+#define DECLARE_DE(x)
+#define DECLARE_COLORING(x)
+#define INOUT(a,b) inout a b
+
+// distance estimator func
+#ifndef d
+#define d de_menger // PKlein,combi,menger,mandelbox,ssponge
+#endif
+
+// surface coloring func
+#ifndef c
 #define c c_menger  // PKlein,menger
+#endif
+
+#endif
 
 #define MAX_DIST 10.0
 #define ULP 0.000000059604644775390625
 
 #ifndef PI
 #define PI 3.14159265
-#endif
-#ifndef INOUT
-#define INOUT(a,b) inout a b
 #endif
 
 // Camera position and direction.
@@ -96,46 +107,48 @@ float de_PZshape(vec3 p) {
 // Compute the distance from `pos` to the PKlein.
 float de_PKlein(vec3 p) {
    //Just scale=1 Julia box
-	float r2=dot(p,p);
-	float DEfactor=1.;
-	vec3 ap=p+vec3(1.);
+  float r2=dot(p,p);
+  float DEfactor=1.;
+  vec3 ap=p+vec3(1.);
 
-	for(int i=0;i<iters;i++) {
-		ap=p;
-		p=clamp(p, -PK_BSize, PK_BSize)*2.-p;  // Box folding
-		r2=dot(p,p);  // Inversion
-		float k=max(PK_CSize/r2,1.);
-		p*=k; DEfactor*=k;
-		p+=PK_CVector;  // julia seed
-	}
-	//Call basic shape and scale its DE
-	//Ok... not perfect because the inversion transformation is tricky
-	//but works Ok with this shape (maybe because of the "tube" along Z-axis
-	//You may need to adjust DIST_MULTIPLIER especialy with non zero Julia seed
-	return (DIST_MULTIPLIER*de_PZshape(p-PK_Offset)/abs(DEfactor)-PK_DEoffset);
+  for(int i=0;i<iters;i++) {
+    ap=p;
+    p=clamp(p, -PK_BSize, PK_BSize)*2.-p;  // Box folding
+    r2=dot(p,p);  // Inversion
+    float k=max(PK_CSize/r2,1.);
+    p*=k; DEfactor*=k;
+    p+=PK_CVector;  // julia seed
+  }
+  //Call basic shape and scale its DE
+  //Ok... not perfect because the inversion transformation is tricky
+  //but works Ok with this shape (maybe because of the "tube" along Z-axis
+  //You may need to adjust DIST_MULTIPLIER especialy with non zero Julia seed
+  return (DIST_MULTIPLIER*de_PZshape(p-PK_Offset)/abs(DEfactor)-PK_DEoffset);
 }
+DECLARE_DE(de_PKlein)
 
 // Compute the color.
 vec3 c_PKlein(vec3 p) {
    //Just scale=1 Julia box
-	float r2=dot(p,p);
-	float DEfactor=1.;
-	vec3  col=vec3(0.0);
-	float rmin=10000.0;
+  float r2=dot(p,p);
+  float DEfactor=1.;
+  vec3  col=vec3(0.0);
+  float rmin=10000.0;
 
-	for(int i=0;i<color_iters;i++){
-		vec3 p1=clamp(p, -PK_BSize, PK_BSize)*2. - p;  // Box folding
-		col+=abs(p-p1);
-		p=p1;
-		r2=dot(p,p);  // Inversion
-		float k=max(PK_CSize/r2,1.);
-		p*=k; DEfactor*=k;
-		p+=PK_CVector;  // julia seed
-		r2=dot(p,p);
-		rmin=min(rmin,r2);
-	}
-	return mix(vec3(sqrt(rmin)),(vec3(0.5)+sin(PK_Color*col.z)*0.5),PK_CMix);
+  for(int i=0;i<color_iters;i++){
+    vec3 p1=clamp(p, -PK_BSize, PK_BSize)*2. - p;  // Box folding
+    col+=abs(p-p1);
+    p=p1;
+    r2=dot(p,p);  // Inversion
+    float k=max(PK_CSize/r2,1.);
+    p*=k; DEfactor*=k;
+    p+=PK_CVector;  // julia seed
+    r2=dot(p,p);
+    rmin=min(rmin,r2);
+  }
+  return mix(vec3(sqrt(rmin)),(vec3(0.5)+sin(PK_Color*col.z)*0.5),PK_CMix);
 }
+DECLARE_COLORING(c_PKlein)
 
 float de_menger(vec3 z0) {
   float scale=2.;  // size of holes
@@ -153,10 +166,12 @@ float de_menger(vec3 z0) {
   }
   return (r-1.0)*pow(scale+1.,float(1-n_iters))*ME_SIZE;
 }
+DECLARE_DE(de_menger)
 
 vec3 c_menger(vec3 p) {
   return surfaceColor1;  // Boring but reflections make it interesting.
 }
+DECLARE_COLORING(c_menger);
 
 float de_mandelbox(vec3 pos) {
   float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
@@ -171,6 +186,7 @@ float de_mandelbox(vec3 pos) {
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
            - pow(abs(MB_SCALE), float(1-iters))) * .85;
 }
+DECLARE_DE(de_mandelbox)
 
 // Infinite construction menger sphere sponge.
 float de_ssponge(vec3 pos) {
@@ -185,11 +201,13 @@ float de_ssponge(vec3 pos) {
   }
   return d;
 }
+DECLARE_DE(de_ssponge)
 
 float de_combi(vec3 z0) {
   // Use min() for union, max() for intersection of shapes.
   return min(max(de_ssponge(z0),de_mandelbox(z0)), de_menger(z0));
 }
+DECLARE_DE(de_combi)
 
 const float normal_eps = 0.00001;
 
