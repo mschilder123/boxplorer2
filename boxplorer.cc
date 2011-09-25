@@ -72,6 +72,8 @@ using namespace std;
 
 #define FPS_FRAMES_TO_AVERAGE 20
 
+const char* kKEYFRAME = "keyframe";
+
 static const char *kHand[] = {
   "     XX                 ",
   "    X..X                ",
@@ -1231,7 +1233,7 @@ void initTwBar() {
 void LoadKeyFrames(bool fixedFov) {
   char filename[256];
   for (int i = 0; ; ++i) {
-    sprintf(filename, "keyframe-%u.cfg", i);
+    sprintf(filename, "%s-%u.cfg", kKEYFRAME, i);
     KeyFrame tmp;
     if (!tmp.loadConfig(filename)) break;
     if (fixedFov) {
@@ -1249,7 +1251,7 @@ void LoadKeyFrames(bool fixedFov) {
 void SaveKeyFrames() {
   char filename[256];
   for (size_t i = 0; i < keyframes.size(); ++i) {
-    sprintf(filename, "keyframe-%lu.cfg", (unsigned long)i);
+    sprintf(filename, "%s-%lu.cfg", kKEYFRAME, (unsigned long)i);
     keyframes[i].saveConfig(filename);
   }
 }
@@ -1286,6 +1288,8 @@ int main(int argc, char **argv) {
       fixedFov = true;
     } else if (!strcmp(argv[argc-1], "--loop")) {
       loop = true;
+    } else if (!strncmp(argv[argc-1], "--kf=", 5)) {
+      kKEYFRAME = argv[argc-1] + 5;
     } else break;
     --argc;
   }
@@ -1719,7 +1723,7 @@ int main(int argc, char **argv) {
           keyframes[index] = camera;  // Overwrite current keyframe.
         }
         char filename[256];
-        sprintf(filename, "keyframe-%lu.cfg", (unsigned long)index);
+        sprintf(filename, "%s-%lu.cfg", kKEYFRAME, (unsigned long)index);
         camera.saveConfig(filename);
       } break;
 
