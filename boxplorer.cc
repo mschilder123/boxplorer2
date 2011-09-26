@@ -521,6 +521,7 @@ class KeyFrame {
      glSetUniformf(x_scale); glSetUniformf(x_offset);
      glSetUniformf(y_scale); glSetUniformf(y_offset);
      glSetUniformf(speed); glSetUniformi(nrays);
+     glSetUniformf(time);
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
      glSetUniformv(par);

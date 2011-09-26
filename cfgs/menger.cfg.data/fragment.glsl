@@ -33,6 +33,7 @@
 varying vec3 eye, dir;
 varying float zoom;
 uniform float xres;
+uniform float time;
 
 // Interactive parameters.
 uniform vec3 par[20];
@@ -99,6 +100,9 @@ uniform int nrays;        // {min=1 max=10} # of ray bounces.
 #define PK_CMix par[7].x
 #define PK_DEoffset par[0].x
 
+#define L1_Vector par[19]
+#define L1_Size par[18].x  // {min=0.001 max=1.0 step=.001}
+
 // Compute the distance from `pos` to the PKlein basic shape.
 float de_PZshape(vec3 p) {
    float rxy=sign(PZ_rxy)*(length(p.xy)-abs(PZ_rxy));
@@ -133,7 +137,7 @@ DECLARE_DE(de_PKlein)
 vec3 c_PKlein(vec3 p) {
    //Just scale=1 Julia box
   float r2=dot(p,p);
-  float DEfactor=1.;
+  //float DEfactor=1.;
   vec3  col=vec3(0.0);
   float rmin=10000.0;
 
@@ -143,7 +147,7 @@ vec3 c_PKlein(vec3 p) {
     p=p1;
     r2=dot(p,p);  // Inversion
     float k=max(PK_CSize/r2,1.);
-    p*=k; DEfactor*=k;
+    p*=k; //DEfactor*=k;
     p+=PK_CVector;  // julia seed
     r2=dot(p,p);
     rmin=min(rmin,r2);
@@ -189,27 +193,6 @@ float de_mandelbox(vec3 pos) {
            - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
-
-// Compute the color at `pos`.
-vec3 c_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
-  vec3 p = pos, p0 = p;
-  float trap = 1.0;
-
-  for (int i=0; i<color_iters; i++) {
-    p = clamp(p, -1.0, 1.0) * 2.0 - p;
-    float r2 = dot(p, p);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + p0;
-    trap = min(trap, r2);
-  }
-  // c.x: log final distance (fractional iteration count)
-  // c.y: spherical orbit trap at (0,0,0)
-  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
-  return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
-}
-DECLARE_COLORING(c_mandelbox)
 
 // Infinite construction menger sphere sponge.
 float de_ssponge(vec3 pos) {
@@ -286,28 +269,6 @@ float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist, float side) 
   return clamp(ao, 0.0, 1.0);
 }
 
-// Intersect the view ray with the fractal using raymarching.
-// returns # steps
-int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dist), float m_zoom) {
-  int steps;
-  for (steps = 0; steps < max_steps; ++steps) {
-    float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
-    if (D < m_dist) break;
-    totalD += D;
-    if (totalD > MAX_DIST) break;
-    m_dist = max(min_dist, m_zoom * totalD);
-  }
-  return steps;
-}
-
-// Get base color at p, plus Blinn_phing and ambient occulusion.
-vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side) {
-  vec3 col = c(p);
-  col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col);
-  col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist, side));
-  return col;
-}
-
 #ifndef _FAKE_GLSL_
 // Intersect direction ray w/ large encapsulating sphere.
 // Sphere map texture onto it.
@@ -326,23 +287,102 @@ vec3 background_color(in vec3 vp) {
   } else {
     u = 1. - theta;
   }
-  return texture2DLod(bg_texture, vec2(u,v), BG_BLUR).xyz;
+  return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
 }
 #else
+// TODO: add texture2DLod to fake glsl
 vec3 background_color(vec3 vp) { return backgroundColor; }
 #endif
+
+// Intersect the view ray with the fractal using raymarching.
+// returns # steps
+int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dist), float m_zoom) {
+  int steps;
+  for (steps = 0; steps < max_steps; ++steps) {
+    float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
+    if (D < m_dist) break;
+    totalD += D;
+    if (totalD > MAX_DIST) break;
+    m_dist = max(min_dist, m_zoom * totalD);
+  }
+  return steps;
+}
+
+// Compute the color at `pos`.
+vec3 c_mandelbox(vec3 pos) {
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
+  vec3 p = pos, p0 = p;
+  float trap = 1.0;
+
+  for (int i=0; i<color_iters; i++) {
+    p = clamp(p, -1.0, 1.0) * 2.0 - p;
+    float r2 = dot(p, p);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + p0;
+    trap = min(trap, r2);
+  }
+  // c.x: log final distance (fractional iteration count)
+  // c.y: spherical orbit trap at (0,0,0)
+  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
+  // return texture2DLod(bg_texture, c, 0.0).xyz;
+  return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
+}
+DECLARE_COLORING(c_mandelbox)
+
+// Trace from point p back to light(s). Return received direct light.
+vec3 shade(vec3 p, vec3 l1, float side, float m_zoom) {
+  vec3 dir = l1 - p;
+  float l1_dist = length(dir);
+  dir = normalize(dir);
+  float fudge = 2.0 * min_dist;
+  p += dir * fudge;
+  float totalD = 0;
+  float m_dist = max(min_dist, m_zoom * totalD);  // reset m_dist, fresh ray
+  rayMarch(p, dir, totalD, side, m_dist, m_zoom);  // trace towards light
+  if (totalD >= l1_dist - fudge) {
+    float falloff = pow(1.0 + l1_dist, 2.0);
+	return vec3(0.,0.,1.0) * clamp(2.0 / falloff, 0.0, 1.0);
+	}
+  return vec3(0.0, 0.0, 0.0);
+}
+
+// return color and ratio to mix in pure light from L1_Vector (direct visibility).
+vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
+  vec3 x1 = x2 - dp * totalD;
+  vec3 x0 = L1_Vector;
+  float t = -dot(x1 - x0, x2 - x1) / dot(x2 - x1, x2 - x1);
+  if (t < 0.0 || t > 1.0) return vec4(0.0);  // not near this segment.
+  float d = length(cross(x0 - x1, x0 - x2)) / length(x2 - x1);
+  if (d > L1_Size) return vec4(0.0);  // larger than light radius
+  return vec4(
+    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+    1.0,
+	clamp(3.0*(L1_Size-d)/L1_Size, 0.0, 1.0));
+}
+
+// Get base color at p, plus Blinn_phing and ambient occulusion.
+vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, float m_zoom) {
+  vec3 col = c(p);
+  col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col);
+  col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist, side));
+  col += shade(p, L1_Vector, side, m_zoom);
+  return col;
+}
 
 void main() {
   // Interlaced stereoscopic eye fiddling
   vec3 eye_in = eye;
 
 #ifndef _FAKE_GLSL_
+  // TODO: add gl_FragCoord.xy and gl_ModelViewMatrix to fake glsl
   eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
       vec3(gl_ModelViewMatrix[0]);
 #endif
 
   vec3 p = eye_in, dp = normalize(dir);
-  float m_zoom = length(dir) * zoom * .5 / xres;  // screen error at dist 1.
+  float m_zoom = /*length(dir) * */ zoom * .25 / xres;  // screen error at dist 1.
 
   float totalD = d(p);
   float side = sign(totalD);
@@ -355,10 +395,11 @@ void main() {
   // March first ray.
   steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
   vec3 rayCol, n;
+  vec4 light = lightBulb(p + dp * totalD, dp, totalD);
   if (totalD < MAX_DIST) {
     p += dp * totalD;
     n = normal(p, m_dist * .5);
-    rayCol = rayColor(p, dp, n, totalD, m_dist, side);
+    rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
     rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
   } else {
     rayCol = background_color(dp);
@@ -374,19 +415,25 @@ void main() {
     dp = reflect(dp, n);  // reflect view direction
     p += dp * (-totalD + 2.0 * m_dist);  // reproject eye
 
+	float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
     steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
+
+	vec4 rlight = lightBulb(p + dp * totalD, dp, totalD - oldTotalD);
     if (totalD < MAX_DIST) {
       p += dp * totalD;
       n = normal(p, m_dist * .5);
-      rayCol = rayColor(p, dp, n, totalD, m_dist, side);
+      rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
       rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
     } else {
       rayCol = background_color(dp);
     }
-
     finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
+	finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
     colFactor *= SHINE * SHINE;  // reflection drop-off.
   }
+
+  // draw lights, if any on primary ray.
+  finalCol = mix(finalCol, light.xyz, light.w);
 
   float zFar = 5.0;
   float zNear = 0.0001;
