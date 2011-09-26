@@ -116,6 +116,7 @@ float max(float a, float b) { return a>b?a:b; }
 float min(float a, float b) { return a<b?a:b; }
 float dot(const vec3& a, const vec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 float dot(const vec2& a, const vec2& b) { return a.x*b.x + a.y*b.y; }
+vec3 cross(const vec3& a, const vec3& b) { return a.cross(b); }
 float length(const vec3& a) { return sqrt(dot(a, a)); }
 float length(const vec2& a) { return sqrt(dot(a, a)); }
 float abs(float a) { return fabs(a); }
