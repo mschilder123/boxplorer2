@@ -337,7 +337,7 @@ vec3 shade(vec3 p, vec3 l1, float side, float m_zoom) {
   dir = normalize(dir);
   float fudge = 2.0 * min_dist;
   p += dir * fudge;
-  float totalD = 0;
+  float totalD = 0.0;
   float m_dist = max(min_dist, m_zoom * totalD);  // reset m_dist, fresh ray
   rayMarch(p, dir, totalD, side, m_dist, m_zoom);  // trace towards light
   if (totalD >= l1_dist - fudge) {
