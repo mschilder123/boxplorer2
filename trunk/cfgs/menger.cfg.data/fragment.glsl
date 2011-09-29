@@ -100,6 +100,8 @@ uniform int nrays;        // {min=1 max=10} # of ray bounces.
 #define PK_CMix par[7].x
 #define PK_DEoffset par[0].x
 
+#define CYL_Vector par[17]
+
 #define L1_Vector par[19]
 #define L1_Size par[18].x  // {min=0.001 max=1.0 step=.001}
 
@@ -209,9 +211,17 @@ float de_ssponge(vec3 pos) {
 }
 DECLARE_DE(de_ssponge)
 
+// DE for cylinder
+float de_cylinder(vec3 pos) {
+  return length(pos.xz - CYL_Vector.xy) - CYL_Vector.z;
+}
+DECLARE_DE(de_cylinder)
+
 float de_combi(vec3 z0) {
   // Use min() for union, max() for intersection of shapes.
-  return min(max(de_ssponge(z0),de_mandelbox(z0)), de_menger(z0));
+  // max(-a, b) for subtraction.
+  //return min(max(de_ssponge(z0),de_mandelbox(z0)), de_menger(z0));
+  return max(-de_cylinder(z0), de_mandelbox(z0));
 }
 DECLARE_DE(de_combi)
 
@@ -287,7 +297,8 @@ vec3 background_color(in vec3 vp) {
   } else {
     u = 1. - theta;
   }
-  return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
+  //return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
+  return texture2DLod(bg_texture, vec2(u+time/10.0,v), BG_BLUR).xyz;
 }
 #else
 // TODO: add texture2DLod to fake glsl

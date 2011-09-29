@@ -22,6 +22,7 @@ public:
   vec3 xxy() const;
   vec3 xyx() const;
   vec3 yxx() const;
+  vec2 operator-(const vec2& b) const;
   float x,y;
 };
 
@@ -49,6 +50,7 @@ class vec3 {
   vec3 zyx() const;
   vec3 zxy() const;
   vec2 xy() const;
+  vec2 xz() const;
   float x; float y; float z;
 };
 
@@ -73,6 +75,7 @@ vec2::vec2(float a, float b) : x(a), y(b) {}
 vec3 vec2::xxy() const { return vec3(x,x,y); }
 vec3 vec2::xyx() const { return vec3(x,y,x); }
 vec3 vec2::yxx() const { return vec3(y,x,x); }
+vec2 vec2::operator-(const vec2& b) const { return vec2(x-b.x, y-b.y); }
 
 vec3::vec3() : x(0), y(0), z(0) {}
 vec3::vec3(float k) : x(k), y(k), z(k) {}
@@ -96,6 +99,7 @@ vec3 vec3::xzy() const { return vec3(x,z,y); }
 vec3 vec3::zyx() const { return vec3(z,y,x); }
 vec3 vec3::zxy() const { return vec3(z,x,y); }
 vec2 vec3::xy() const { return vec2(x,y); }
+vec2 vec3::xz() const { return vec2(x,z); }
 
 vec4::vec4() : x(0), y(0), z(0), w(0) {}
 vec4::vec4(float xx, float yy, float zz, float ww) : x(xx), y(yy), z(zz), w(ww) {}
@@ -180,6 +184,7 @@ class mat4 {
 #define xyx xyx()
 #define xxy xxy()
 #define xy xy()
+#define xz xz()
 
 // inout (reference params) need a rewrite.
 #define INOUT(a,b) a & b
