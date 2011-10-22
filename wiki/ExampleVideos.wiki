@@ -22,3 +22,4 @@
 
  * [http://www.youtube.com/watch?v=20xv8U-B-G8]
  `./boxplorer cfgs/menger.cfg.data/ionized-0.cfg --kf=ionized --time --loop --render` to regenerate.
+ I first made a loop flight like normal. Then renamed position to par19 (aka light 1 coordinate) using `edit-cfg -r`. Then added final camera flight path, chasing the light. Pretty tedious..
