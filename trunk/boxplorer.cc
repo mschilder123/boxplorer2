@@ -137,7 +137,7 @@ SDL_Surface* screen;
 string defines;
 
 // Pinhole camera modes.
-enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED }
+enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED, ST_SIDEBYSIDE }
     stereoMode = ST_NONE;
 
 // ogl framebuffer object
@@ -268,6 +268,7 @@ float getFPS(void) {
   PROCESS(int, enable_dof, "enable_dof", false) \
   PROCESS(int, no_spline, "no_spline", false) \
   PROCESS(float, asymmetry, "asymmetry", true) \
+  PROCESS(float, toein, "toein", true) \
   PROCESS(int, nrays, "nrays", true)
 
 #define NUMPARS 20
@@ -544,20 +545,42 @@ class KeyFrame {
          activate();
          setUniforms(1.0-asymmetry/2, asymmetry/2, 2.0, -1.0);
          glRects(-1,0,1,1);  // draw top half of screen
-         pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];
+         pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];  // restore pos
          break;
-       case ST_XEYED:
+       case ST_XEYED: {  // right | left
+         float ov[16]; memcpy(ov, v, sizeof ov);  // save view
          move(speed, 0, 0);  // step right
+         rotate(-toein, 0, 1, 0);
          activate();
          setUniforms(2.0*(1.0-asymmetry/2), 1.0-asymmetry, 1.0, 0.0);
          glRectf(-1,-1,0,1);  // draw left half of screen
-         pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];
+
+         memcpy(v, ov, sizeof v);  // restore view
          move(-speed, 0, 0);  // step left
+         rotate(+toein, 0, 1, 0);
          activate();
          setUniforms(2.0*(1.0-asymmetry/2), -1.0+asymmetry, 1.0, 0.0);
          glRectf(0,-1,1,1);  // draw right half of screen
-         pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];
-         break;
+
+         memcpy(v, ov, sizeof v);  // restore view
+         } break;
+       case ST_SIDEBYSIDE: {  // left | right
+         float ov[16]; memcpy(ov, v, sizeof ov);  // save view
+         move(-speed, 0, 0);  // step left
+         rotate(+toein, 0, 1, 0);
+         activate();
+         setUniforms(2.0*(1.0-asymmetry/2), 1.0, 1.0, 0.0);
+         glRectf(-1,-1,0,1);  // draw left half of screen
+
+         memcpy(v, ov, sizeof v);  // restore view
+         move(speed, 0, 0);  // step right
+         rotate(-toein, 0, 1, 0);
+         activate();
+         setUniforms(2.0*(1.0-asymmetry/2), -1.0, 1.0, 0.0);
+         glRectf(0,-1,1,1);  // draw right half of screen
+         
+         memcpy(v, ov, sizeof v);  // restore view
+         } break;
        case ST_NONE:
          activate();
          setUniforms(1.0, 0.0, 1.0, 0.0);
@@ -710,8 +733,8 @@ char* printController(char* s, Controller c) {
     case CTL_FOV: sprintf(s, "Fov %.3g %.3g", camera.fov_x, camera.fov_y); break;
     case CTL_RAY: sprintf(s, "Ray %.2e steps %d", camera.min_dist, camera.max_steps); break;
     case CTL_ITER: sprintf(s, "It %d|%d", camera.iters, camera.color_iters); break;
-    case CTL_AO: sprintf(s, "aO %.2e d %.2e", camera.ao_strength, camera.ao_eps); break;
-    case CTL_GLOW: sprintf(s, "Glow %.3f bgd %.2e", camera.glow_strength, camera.dist_to_color); break;
+    case CTL_AO: sprintf(s, "aO %.2e aOeps %.2e", camera.ao_strength, camera.ao_eps); break;
+    case CTL_GLOW: sprintf(s, "Glow %.3f Dist %.2e", camera.glow_strength, camera.dist_to_color); break;
     case CTL_CAM: {
       sprintf(s, "Look [%4d %4d %4d]",
               (int)(camera.ahead()[0]*100),
@@ -722,14 +745,14 @@ char* printController(char* s, Controller c) {
       sprintf(s, "Speed %f DeltaT %.3f", camera.speed, camera.delta_time);
     } break;
     case CTL_3D: {
-      sprintf(s, "Sep %f Asym %.3f", camera.speed, camera.asymmetry);
+      sprintf(s, "Sep %f Asym %.3f X %.3f", camera.speed, camera.asymmetry, camera.toein);
     } break;
   }
   return s;
 }
 
 // Update controller.y by the signed count of consecutive changes.
-void updateControllerY(Controller c, int d) {
+void updateControllerY(Controller c, int d, bool alt) {
   assert(c <= CTL_LAST);
   switch (c) {
     default: m_progressiveAdd(&camera.par[c][1], d); break;
@@ -748,10 +771,10 @@ void updateControllerY(Controller c, int d) {
 }
 
 // Update controller.x by the signed count of consecutive changes.
-void updateControllerX(Controller c, int d) {
+void updateControllerX(Controller c, int d, bool alt) {
   assert(c <= CTL_LAST);
   switch (c) {
-    default: m_progressiveAdd(&camera.par[c][0], d); break;
+    default: m_progressiveAdd(&camera.par[c][alt?2:0], d); break;
     case CTL_FOV: m_tan(&camera.fov_x, d); break;
     case CTL_RAY: m_progressiveInc(&camera.max_steps, d); break;
     case CTL_ITER: m_singlePress(&camera.color_iters, d); break;
@@ -759,8 +782,13 @@ void updateControllerX(Controller c, int d) {
     case CTL_GLOW: m_mul(&camera.dist_to_color, d); break;
     case CTL_CAM: m_rotateX(d); break;
     case CTL_TIME: m_mulSlow(&camera.speed, d); break;
-    case CTL_3D: m_mulSlow(&camera.speed, d); break;
+    case CTL_3D: alt?m_progressiveAdd(&camera.toein, d*500)
+                    :m_mulSlow(&camera.speed, d);
+                 break;
   }
+  // Enforce sane bounds.
+  if (camera.toein < 0) camera.toein = 0;
+  if (camera.toein > 45) camera.toein = 45;
 }
 
 // Change the active controller with a keypress.
@@ -828,31 +856,6 @@ unsigned int getBGRpixel(int x, int y) {
       img[1] * 256 +
       img[2];
   return val;
-}
-
-// Read out Z-buffer around the center of the view.
-float distanceToSurface() {
-#ifdef TRY_DISTANCE_TO_SURFACE
-  const int SIZE = 1;
-  float z[SIZE*SIZE];
-  int x = config.width / 2 - SIZE / 2;
-  int y = config.height / 2 - SIZE / 2;
-  glReadPixels(viewportOffset[0] + x, viewportOffset[1] + config.height - 1 - y, SIZE, SIZE,
-               GL_DEPTH_COMPONENT, GL_FLOAT, z);
-  float avg = 0;
-  for (size_t i = 0; i < lengthof(z); ++i) {
-    avg += z[i];
-  }
-  float v = avg / lengthof(z);
-
-  // Convert zbuffer [0,1] value v back into actual dist.
-  const float a = zFar / (zFar - zNear);
-  const float b = zFar * zNear / (zNear - zFar);
-
-  return b / (v - a);
-#else
-  return 100.0f;
-#endif
 }
 
 string glsl_source;
@@ -1275,6 +1278,8 @@ int main(int argc, char **argv) {
       stereoMode = ST_INTERLACED;
     } else if (!strcmp(argv[argc-1], "--xeyed")) {
       stereoMode = ST_XEYED;
+    } else if (!strcmp(argv[argc-1], "--sidebyside")) {
+      stereoMode = ST_SIDEBYSIDE;
     } else if (!strcmp(argv[argc-1], "--render")) {
       rendering = true;
     } else if (!strcmp(argv[argc-1], "--time")) {
@@ -1461,6 +1466,16 @@ int main(int argc, char **argv) {
       }
       glEnd();
 
+#if 0
+      // draw light 1 path
+      glColor4f(.1,.9,.9,1);
+      glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // light
+      for (size_t i = 0; i < splines.size(); ++i) {
+        glVertex3fv(splines[i].par[19]);
+      }
+      glEnd();
+#endif
+
       glLineWidth(13);
       for (size_t i = 0; i < keyframes.size(); ++i) {
         glColor4f(0,0,1 - (i/256.0),1);  // Encode keyframe # in color.
@@ -1530,8 +1545,6 @@ int main(int argc, char **argv) {
     }
 
     SDL_GL_SwapBuffers();
-
-    float dist = distanceToSurface();
 
     if (rendering && !splines.empty()) {
       // If we're playing a sequence back, save every frame to disk.
@@ -1641,8 +1654,12 @@ int main(int argc, char **argv) {
          dragging = false;
       } break;
 
-      case SDL_KEYDOWN: switch (event.key.keysym.sym) {
-       case SDLK_ESCAPE: {
+      case SDL_KEYDOWN: {
+      bool hasAlt = event.key.keysym.mod & (KMOD_LALT|KMOD_RALT);
+      bool hasCtrl = event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL);
+
+      switch (event.key.keysym.sym) {
+      case SDLK_ESCAPE: {
          if (grabbedInput && !config.fullscreen) {
            grabbedInput = 0;
            SDL_ShowCursor(SDL_ENABLE);
@@ -1690,7 +1707,7 @@ int main(int argc, char **argv) {
         // Drop last keyframe, reset camera to previous keyframe.
         splines.clear();
         if (!keyframes.empty()) {
-          if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
+          if (hasCtrl) {
             // delete current keyframe
             if (keyframe < keyframes.size()) {
               keyframes.erase(keyframes.begin() + keyframe);
@@ -1712,11 +1729,11 @@ int main(int argc, char **argv) {
       case SDLK_INSERT: {  // Add keyframe.
         splines.clear();
         size_t index = keyframes.size();
-        if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
+        if (hasCtrl) {
           // Replace currently selected keyframe.
           index = keyframe;
         }
-        if (!(event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL))) {
+        if (!hasCtrl) {
           // Need an estimate for delta_time for this new frame.
           suggestDeltaTime(camera, keyframes);
           keyframes.push_back(camera);  // Add keyframe at end.
@@ -1754,7 +1771,7 @@ int main(int argc, char **argv) {
               if (splines[i].isKey()) ++nkeys;
            keyframe = nkeys;
         }
-        if (!(event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL))) ++keyframe;
+        if (!hasCtrl) ++keyframe;
         if (keyframe >= keyframes.size()) keyframe = 0;
 
         if (keyframe < keyframes.size() && splines.empty()) {
@@ -1770,7 +1787,7 @@ int main(int argc, char **argv) {
 
         if (keyframes.empty()) camera = config;  // back to start
 
-        if (event.key.keysym.mod & (KMOD_LCTRL|KMOD_RCTRL)) {
+        if (hasCtrl) {
           // Start playing: spline and start at keyframe.
           if (!keyframes.empty()) {
             CatmullRom(keyframes, &splines, config.loop);
@@ -1800,20 +1817,11 @@ int main(int argc, char **argv) {
         splines.clear();
       } break;
 
-      case SDLK_LSHIFT: {
-        // Change movement speed.
-        if (camera.speed < 1) camera.speed *= 1.1;
-      } break;
-
-      case SDLK_LALT: {
-        if (camera.speed > camera.min_dist) camera.speed *= .9;
-      } break;
-
       // Resolve controller value changes that happened during rendering.
-      case SDLK_LEFT:  ctlXChanged = 1; updateControllerX(ctl, -(consecutiveChanges=1)); break;
-      case SDLK_RIGHT: ctlXChanged = 1; updateControllerX(ctl,  (consecutiveChanges=1)); break;
-      case SDLK_DOWN:  ctlYChanged = 1; updateControllerY(ctl, -(consecutiveChanges=1)); break;
-      case SDLK_UP:    ctlYChanged = 1; updateControllerY(ctl,  (consecutiveChanges=1)); break;
+      case SDLK_LEFT:  ctlXChanged = 1; updateControllerX(ctl, -(consecutiveChanges=1), hasAlt); break;
+      case SDLK_RIGHT: ctlXChanged = 1; updateControllerX(ctl,  (consecutiveChanges=1), hasAlt); break;
+      case SDLK_DOWN:  ctlYChanged = 1; updateControllerY(ctl, -(consecutiveChanges=1), hasAlt); break;
+      case SDLK_UP:    ctlYChanged = 1; updateControllerY(ctl,  (consecutiveChanges=1), hasAlt); break;
 
         // Current keyframe manouvering in screenspace.
         case SDLK_KP4: {
@@ -1859,7 +1867,7 @@ int main(int argc, char **argv) {
           changeController(event.key.keysym.sym, &ctl);
           if (ctl != oldCtl) { consecutiveChanges = 0; }
         } break;
-      }
+      }}
       break;
      }
     }
@@ -1873,6 +1881,9 @@ int main(int argc, char **argv) {
     int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
     int mouse_button_right = mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
 
+    bool hasAlt = keystate[SDLK_RALT] || keystate[SDLK_LALT];
+    bool hasCtrl = keystate[SDLK_RCTRL] || keystate[SDLK_LCTRL];
+
     // Continue after calling SDL_GetRelativeMouseState() so view direction
     // does not jump after closing AntTweakBar.
     if (!grabbedInput) continue;
@@ -1881,6 +1892,7 @@ int main(int argc, char **argv) {
     (void)mouse_button_left;
     (void)mouse_button_right;
 
+    float dist = 100.0;  // TODO: distance to surface?
     if (keystate[SDLK_w]) camera.move(0, 0, min(camera.speed , 0.9f * dist));  //forward
     if (keystate[SDLK_s]) camera.move(0, 0, -camera.speed);  //back
 
@@ -1900,12 +1912,12 @@ int main(int argc, char **argv) {
 
     // Change the value of the active controller.
     if (!ctlXChanged) {
-      if (keystate[SDLK_LEFT])  { ctlXChanged = 1; updateControllerX(ctl, -++consecutiveChanges); }
-      if (keystate[SDLK_RIGHT]) { ctlXChanged = 1; updateControllerX(ctl,  ++consecutiveChanges); }
+      if (keystate[SDLK_LEFT])  { ctlXChanged = 1; updateControllerX(ctl, -++consecutiveChanges, hasAlt); }
+      if (keystate[SDLK_RIGHT]) { ctlXChanged = 1; updateControllerX(ctl,  ++consecutiveChanges, hasAlt); }
     }
     if (!ctlYChanged) {
-      if (keystate[SDLK_DOWN])  { ctlYChanged = 1; updateControllerY(ctl, -++consecutiveChanges); }
-      if (keystate[SDLK_UP])    { ctlYChanged = 1; updateControllerY(ctl,  ++consecutiveChanges); }
+      if (keystate[SDLK_DOWN])  { ctlYChanged = 1; updateControllerY(ctl, -++consecutiveChanges, hasAlt); }
+      if (keystate[SDLK_UP])    { ctlYChanged = 1; updateControllerY(ctl,  ++consecutiveChanges, hasAlt); }
     }
 
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
