@@ -7,14 +7,14 @@
 
 #define SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MINRAD2 par[0].x  // {min=0 max=5 step=.001}
-#define ZOOMF par[1].x  // {min=0.00000 max=.01 step=.00001}
 
-#define DIST_MULTIPLIER 0.95
-#define MAX_DIST 4.0
+#define DIST_MULTIPLIER 0.91
+#define MAX_DIST 5.0
 
 // Camera position and direction.
 varying vec3 eye, dir;
 varying float zoom;
+uniform float xres;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -70,30 +70,34 @@ float d(vec3 pos) {
 
 // Compute the color at `pos`.
 vec3 color(vec3 pos) {
-  vec3 p = pos, p0 = p;
+  vec4 p = vec4(pos,1.0), p0 = p;
   float trap = 1.0;
+//  float m = 0.0;
 
   for (int i=0; i<color_iters; i++) {
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale.xyz + P0.xyz;
+    p = p*scale + P0;
     trap = min(trap, r2);
+//    m = max(m, r2);
   }
   // c.x: log final distance (fractional iteration count)
   // c.y: spherical orbit trap at (0,0,0)
-  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
+//  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
+//  vec2 c = clamp(vec2( sqrt(dot(p,p))-1, sqrt(trap) ), 0.0, 1.0);
+  vec2 c = clamp(vec2( 0.33*log(dot(p.xyz,p.xyz))-1.0, sqrt(trap) ), 0.0, 1.0);
 
   return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
 }
 
 
-//float normal_eps = 0.00001;
+float normal_eps = 0.00001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
-  float normal_eps = max(d_pos * .25, 0.00001);
+  //float normal_eps = d_pos;
   vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
   return normalize(vec3(
   // 2-tap forward differences, error = O(eps)
@@ -128,23 +132,24 @@ vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
   return dif*diffuseColor + spe*specularColor;
 }
 
-
-// Ambient occlusion approximation.
-float ambient_occlusion(vec3 p, vec3 n) {
-  float ao = 1.0, w = ao_strength/ao_eps;
-  float dist = 2.0 * ao_eps;
+// FAKE Ambient occlusion approximation.
+// uses current distance estimate as first dist. the size of AO is independent from distance from eye
+float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side, float m_dist) {
+  float ao_ed=DistAtp*ao_eps/m_dist;//Dividing by min_dist makes the AO effect independent from changing min_dist
+  float ao = 1.0, w = ao_strength/ao_ed;//ps;
+  float dist = 2.0 * ao_ed;//ps;
 
   for (int i=0; i<5; i++) {
-    float D = d(p + n*dist);
+    float D = side * d(p + n*dist);
     ao -= (dist-D) * w;
     w *= 0.5;
-    dist = dist*2.0 - ao_eps;  // 2,3,5,9,17
+    dist = dist*2.0 - ao_ed;//ps;  // 2,3,5,9,17
   }
   return clamp(ao, 0.0, 1.0);
 }
 
-
-//#define OVERSTEP
+// ytalinflusa's noise [0..1>
+float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
 void main() {
   // Interlaced stereoscopic eye fiddling
@@ -153,22 +158,22 @@ void main() {
       vec3(gl_ModelViewMatrix[0]);
 
   vec3 p = eye_in, dp = normalize(dir);
-  float m_zoom = zoom * clamp(ZOOMF, .000001, .01);
+  float m_zoom = zoom * .5 / xres;
+  float noise = pnoise(gl_FragCoord.xy);
 
-  float totalD = 0.0, D = 3.4e38;
+  float D = d(p);
+  float side = sign(D);
+  float totalD = side * D * noise;  // Randomize first step.
 
   // Intersect the view ray with the Mandelbox using raymarching.
   float m_dist = min_dist;
   int steps;
   for (steps=0; steps<max_steps; steps++) {
-    D = d(p + totalD * dp);
-
-    if (D < m_dist || D > MAX_DIST) break;
-
-    // Adjust m_dist per totalD for dynamic level of detail
-    m_dist = max(m_dist, (totalD + D) * m_zoom);
-
+    D = (side * d(p + totalD * dp));
+    if (D < m_dist) break;
     totalD += D;
+    if (totalD > MAX_DIST) break;
+    m_dist = max(min_dist, m_zoom * totalD);
   }
 
   p += totalD * dp;
@@ -178,10 +183,10 @@ void main() {
 
   // We've got a hit or we're not sure.
   if (D < MAX_DIST) {
-    vec3 n = normal(p, D);
+    vec3 n = normal(p, abs(D));
     col = color(p);
     col = blinn_phong(n, -dp, normalize(eye_in+vec3(0,1,0)+dp), col);
-    col = mix(aoColor, col, ambient_occlusion(p, n));
+    col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
@@ -191,7 +196,7 @@ void main() {
   }
 
   // Glow is based on the number of steps.
-  col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
+  col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
 
   float zFar = 5.0;
   float zNear = 0.0001;
