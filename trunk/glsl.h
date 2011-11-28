@@ -61,6 +61,7 @@ class vec4 {
   vec4(const vec3& v3, float ww);
   vec4(float v);
   vec3 xyz() const;
+  vec2 xy() const;
   vec4& operator=(const vec4& a);
   vec4& operator/=(const float k);
   vec4& operator*=(const float k);
@@ -106,6 +107,7 @@ vec4::vec4(float xx, float yy, float zz, float ww) : x(xx), y(yy), z(zz), w(ww) 
 vec4::vec4(const vec3& v3, float ww) { x = v3.x; y = v3.y; z = v3.z; w = ww; }
 vec4::vec4(float v) : x(v), y(v), z(v), w(v) {}
 vec3 vec4::xyz() const { return vec3(x,y,z); }
+vec2 vec4::xy() const { return vec2(x,y); }
 vec4& vec4::operator=(const vec4& a) { x = a.x; y = a.y; z = a.z; w = a.w; return *this; }
 vec4& vec4::operator/=(const float k) { x/= k; y/= k; z/= k; w/= k; return *this; }
 vec4& vec4::operator*=(const float k) { x*= k; y*= k; z*= k; w*= k; return *this; }

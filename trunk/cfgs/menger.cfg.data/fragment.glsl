@@ -100,6 +100,8 @@ uniform int nrays;        // {min=1 max=10} # of ray bounces.
 #define PK_CMix par[7].x
 #define PK_DEoffset par[0].x
 
+#define SPHERE_SZ par[4].z // {min=0 max=5 step=.01}
+
 #define CYL_Vector par[17]
 
 #define L1_Vector par[19]
@@ -217,21 +219,51 @@ float de_cylinder(vec3 pos) {
 }
 DECLARE_DE(de_cylinder)
 
+// DE for sphere
+float de_sphere(vec3 pos) {
+  return length(pos) - SPHERE_SZ;
+}
+DECLARE_DE(de_sphere)
+
 float de_combi(vec3 z0) {
   // Use min() for union, max() for intersection of shapes.
   // max(-a, b) for subtraction.
   //return min(max(de_ssponge(z0),de_mandelbox(z0)), de_menger(z0));
   return max(-de_cylinder(z0), de_mandelbox(z0));
+  //return min(de_sphere(z0), de_mandelbox(z0));
 }
 DECLARE_DE(de_combi)
+
+// Compute the color at `pos`.
+vec3 c_mandelbox(vec3 pos) {
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
+  vec3 p = pos, p0 = p;
+  float trap = 1.0;
+
+  for (int i=0; i<color_iters; i++) {
+    p = clamp(p, -1.0, 1.0) * 2.0 - p;
+    float r2 = dot(p, p);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + p0;
+    trap = min(trap, r2);
+  }
+  // c.x: log final distance (fractional iteration count)
+  // c.y: spherical orbit trap at (0,0,0)
+  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
+  // return texture2DLod(bg_texture, c, 0.0).xyz;
+  return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
+}
+DECLARE_COLORING(c_mandelbox)
 
 const float normal_eps = 0.00001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
-  vec2 Eps = vec2(0, max(d_pos, normal_eps));
+//  vec2 Eps = vec2(0, max(d_pos, normal_eps));
 //  vec2 Eps = vec2(0, d_pos);
+  vec2 Eps = vec2(0, normal_eps);
   return normalize(vec3(
   // 3-tap central differences, error = O(eps^2)
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
@@ -242,11 +274,11 @@ vec3 normal(vec3 pos, float d_pos) {
 
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
 // `normal`, `view` and `light` should be normalized.
-vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
+vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor, vec3 specular) {
   vec3 halfLV = normalize(light + view);
   float spe = pow(max( dot(normal, halfLV), 0.0 ), float(32.0));
   float dif = dot(normal, light) * 0.5 + 0.75;
-  return diffuseColor*dif + specularColor*spe;
+  return diffuseColor*dif + specular*spe;
 }
 
 // Mix reflected ray contribution.
@@ -266,13 +298,13 @@ vec3 mix_reflection(vec3 normal, vec3 view, vec3 baseColor, vec3 reflectionColor
 
 // Ambient occlusion approximation.
 float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist, float side) {
-  float ao_ed = totalD*ao_eps/m_dist;
+  float ao_ed = ao_eps; //totalD*ao_eps/m_dist;
   float ao = 1.0, w = ao_strength/ao_ed;
   float dist = 2.0 * ao_ed;
 
   for (int i=0; i<5; i++) {
     float D = side * d(p + n*dist);
-    ao -= (dist-D) * w;
+    ao -= (dist-abs(D)) * w;
     w *= 0.5;
     dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
@@ -310,36 +342,15 @@ vec3 background_color(vec3 vp) { return backgroundColor; }
 int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dist), float m_zoom) {
   int steps;
   for (steps = 0; steps < max_steps; ++steps) {
-    float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
+   // float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
+   float D = side * d(p + dp * totalD);
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
-    m_dist = max(min_dist, m_zoom * totalD);
+    m_dist = m_zoom * totalD;
   }
   return steps;
 }
-
-// Compute the color at `pos`.
-vec3 c_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
-  vec3 p = pos, p0 = p;
-  float trap = 1.0;
-
-  for (int i=0; i<color_iters; i++) {
-    p = clamp(p, -1.0, 1.0) * 2.0 - p;
-    float r2 = dot(p, p);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + p0;
-    trap = min(trap, r2);
-  }
-  // c.x: log final distance (fractional iteration count)
-  // c.y: spherical orbit trap at (0,0,0)
-  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
-  // return texture2DLod(bg_texture, c, 0.0).xyz;
-  return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
-}
-DECLARE_COLORING(c_mandelbox)
 
 // Trace from point p back to light(s). Return received direct light.
 vec3 shade(vec3 p, vec3 l1, float side, float m_zoom) {
@@ -376,29 +387,44 @@ vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
 // Get base color at p, plus Blinn_phing and ambient occulusion.
 vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, float m_zoom) {
   vec3 col = c(p);
-  col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col);
+  col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col,
+	//mix(specularColor, col, pow(abs((m_dist-min_dist))/(m_dist+min_dist), float(2.5))));
+     specularColor);
   col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist, side));
   col += shade(p, L1_Vector, side, m_zoom);
   return col;
 }
 
-void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-
-#ifndef _FAKE_GLSL_
-  // TODO: add gl_FragCoord.xy and gl_ModelViewMatrix to fake glsl
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 20x speed.
+void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
 #endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 20.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
 
-  vec3 p = eye_in, dp = normalize(dir);
-  float m_zoom = /*length(dir) * */ zoom * .25 / xres;  // screen error at dist 1.
+// ytalinflusa's noise [0..1>
+float pnoise(vec2 pt){ return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
+void main() {
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+
+  float m_zoom = zoom * .5 / xres;  // screen error at dist 1.
+  float noise = pnoise(gl_FragCoord.xy);
+
+  vec3 p = eye_in;
   float totalD = d(p);
   float side = sign(totalD);
-  totalD *= side * .5;  // start with conservative step.
-  float m_dist = max(min_dist, m_zoom * totalD);
+  totalD *= side * noise;  // Randomize first step.
+  float m_dist = m_zoom * totalD;
 
   int steps = 0;  // number of marching steps we've taken for this ray.
   float colFactor = SHINE;
@@ -411,7 +437,7 @@ void main() {
     p += dp * totalD;
     n = normal(p, m_dist * .5);
     rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
-    rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
+    rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
   } else {
     rayCol = background_color(dp);
   }
@@ -419,27 +445,31 @@ void main() {
   float firstD = totalD;
   vec3 finalCol = rayCol;
 
+// uncomment to have only sphere be reflective.
+//  float D = (side * de_sphere(p) - totalD * m_dist) / (1.0 + m_dist);
+//  if (D < m_dist)
+
   // March reflected ray a couple of times.
   for (int ray = 1; ray < nrays &&
                     totalD < MAX_DIST &&
                     colFactor > 0.0; ++ray) {
     dp = reflect(dp, n);  // reflect view direction
-    p += dp * (-totalD + 2.0 * m_dist);  // reproject eye
+    p += dp * (-totalD + 1.1 * m_dist);  // reproject eye
 
-	float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
+    float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
     steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
 
-	vec4 rlight = lightBulb(p + dp * totalD, dp, totalD - oldTotalD);
+    vec4 rlight = lightBulb(p + dp * totalD, dp, totalD - oldTotalD);
     if (totalD < MAX_DIST) {
       p += dp * totalD;
       n = normal(p, m_dist * .5);
       rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
-      rayCol = mix(rayCol, glowColor, float(steps)/float(max_steps) * glow_strength);
+      rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
     } else {
       rayCol = background_color(dp);
     }
     finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
-	finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
+    finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
     colFactor *= SHINE * SHINE;  // reflection drop-off.
   }
 

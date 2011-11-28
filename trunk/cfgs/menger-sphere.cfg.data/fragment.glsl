@@ -179,13 +179,26 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side) {
   return clamp(ao, 0.0, 1.0);
 }
 
-void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 15x speed.
+void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
+#endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 15.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
 
-  vec3 p = eye_in, dp = normalize(dir);
+void main() {
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 1000.0, extraD = 0.0, lastD;
   D = d(p + totalD * dp);

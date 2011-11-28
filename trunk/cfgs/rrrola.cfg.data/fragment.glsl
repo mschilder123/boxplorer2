@@ -2,13 +2,31 @@
 // Original formula by Tglad
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
 
+#ifndef _FAKE_GLSL_
+
+#define DECLARE_DE(x)
+#define DECLARE_COLORING(x)
+#define INOUT(a,b) inout a b
+
+// distance estimator func
+#ifndef d
+#define d de_mandelbox // PKlein,combi,menger,mandelbox,ssponge
+#endif
+
+// surface coloring func
+#ifndef c
+#define c c_mandelbox  // PKlein,menger
+#endif
+
+#endif  // _FAKE_GLSL_
+
 #define P0 p0                    // standard Mandelbox
 //#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
 
-#define SCALE par[0].y  // {min=-3 max=3 step=.001}
-#define MINRAD2 par[0].x  // {min=0 max=5 step=.001}
+#define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
+#define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
 
-#define DIST_MULTIPLIER 0.91
+#define DIST_MULTIPLIER par[8].z  // {min=.01 max=1.0 step=.01}
 #define MAX_DIST 5.0
 
 // Camera position and direction.
@@ -41,87 +59,54 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
-// precomputed constants
-float minRad2 = clamp(MINRAD2, 1.0e-9, 1.0);
-vec4 scale = vec4(SCALE, SCALE, SCALE, abs(SCALE)) / minRad2;
-float absScalem1 = abs(SCALE - 1.0);
-float AbsScaleRaisedTo1mIters = pow(abs(SCALE), float(1-iters));
-
-// Compute the distance from `pos` to the Mandelbox.
-float d(vec3 pos) {
-  vec4 p = vec4(pos,1), p0 = p;  // p.w is the distance estimate
-
+float de_mandelbox(vec3 pos) {
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  vec4 scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
-    // box folding: if (p>1) p = 2-p; else if (p<-1) p = -2-p;
-//    p.xyz = abs(1.0+p.xyz) - p.xyz - abs(1.0-p.xyz);  // add;add;abs.add;abs.add (130.4%)
-//    p.xyz = clamp(p.xyz*0.5+0.5, 0.0, 1.0) * 4.0 - 2.0 - p.xyz;  // mad.sat;mad;add (102.3%)
-    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;  // min;max;mad
-
-    // sphere folding: if (r2 < minRad2) p /= minRad2; else if (r2 < 1.0) p /= r2;
-    float r2 = dot(p.xyz, p.xyz);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);  // dp3,div,max.sat,mul
-
-    // scale, translate
-    p = p*scale + P0;
-  }
-  return ((length(p.xyz) - absScalem1) / p.w - AbsScaleRaisedTo1mIters) * DIST_MULTIPLIER;
-}
-
-
-// Compute the color at `pos`.
-vec3 color(vec3 pos) {
-  vec4 p = vec4(pos,1.0), p0 = p;
-  float trap = 1.0;
-//  float m = 0.0;
-
-  for (int i=0; i<color_iters; i++) {
-    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
+    p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + P0;
+    p = p*scale + p0;
+  }
+  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
+           - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
+}
+DECLARE_DE(de_mandelbox)
+
+// Compute the color at `pos`.
+vec3 c_mandelbox(vec3 pos) {
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
+  vec3 p = pos, p0 = p;
+  float trap = 1.0;
+
+  for (int i=0; i<color_iters; i++) {
+    p = clamp(p, -1.0, 1.0) * 2.0 - p;
+    float r2 = dot(p, p);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + p0;
     trap = min(trap, r2);
-//    m = max(m, r2);
   }
   // c.x: log final distance (fractional iteration count)
   // c.y: spherical orbit trap at (0,0,0)
-//  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
-//  vec2 c = clamp(vec2( sqrt(dot(p,p))-1, sqrt(trap) ), 0.0, 1.0);
-  vec2 c = clamp(vec2( 0.33*log(dot(p.xyz,p.xyz))-1.0, sqrt(trap) ), 0.0, 1.0);
-
+  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
   return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
 }
+DECLARE_COLORING(c_mandelbox)
 
-
-float normal_eps = 0.00001;
+float normal_eps = 0.000001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
-  //float normal_eps = d_pos;
-  vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
+  vec2 Eps = vec2(0, normal_eps);
   return normalize(vec3(
-  // 2-tap forward differences, error = O(eps)
-//    -d_pos+d(pos+Eps.yxx),
-//    -d_pos+d(pos+Eps.xyx),
-//    -d_pos+d(pos+Eps.xxy)
-
-  // 3-tap central differences, error = O(eps^2)
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
     -d(pos-Eps.xyx)+d(pos+Eps.xyx),
     -d(pos-Eps.xxy)+d(pos+Eps.xxy)
-
-  // 4-tap forward differences, error = O(eps^3)
-//    -2.0*d(pos-Eps.yxx)-3.0*d_pos+6.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    -2.0*d(pos-Eps.xyx)-3.0*d_pos+6.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    -2.0*d(pos-Eps.xxy)-3.0*d_pos+6.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
-
-  // 5-tap central differences, error = O(eps^4)
-//    d(pos-Eps.zxx)-8.0*d(pos-Eps.yxx)+8.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    d(pos-Eps.xzx)-8.0*d(pos-Eps.xyx)+8.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    d(pos-Eps.xxz)-8.0*d(pos-Eps.xxy)+8.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
   ));
 }
-
 
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
 // `normal`, `view` and `light` should be normalized.
@@ -135,15 +120,15 @@ vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor) {
 // FAKE Ambient occlusion approximation.
 // uses current distance estimate as first dist. the size of AO is independent from distance from eye
 float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side, float m_dist) {
-  float ao_ed=DistAtp*ao_eps/m_dist;//Dividing by min_dist makes the AO effect independent from changing min_dist
-  float ao = 1.0, w = ao_strength/ao_ed;//ps;
-  float dist = 2.0 * ao_ed;//ps;
+  float ao_ed=ao_eps;
+  float ao = 1.0, w = ao_strength/ao_ed;
+  float dist = 2.0 * ao_ed;
 
   for (int i=0; i<5; i++) {
     float D = side * d(p + n*dist);
-    ao -= (dist-D) * w;
+    ao -= (dist-abs(D)) * w;
     w *= 0.5;
-    dist = dist*2.0 - ao_ed;//ps;  // 2,3,5,9,17
+    dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
   return clamp(ao, 0.0, 1.0);
 }
@@ -151,29 +136,43 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side, float m_dist)
 // ytalinflusa's noise [0..1>
 float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
-void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 20x speed.
+void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
+#endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 20.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
 
-  vec3 p = eye_in, dp = normalize(dir);
-  float m_zoom = zoom * .5 / xres;
+void main() {
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+
+  float m_zoom = zoom * 0.5 / xres;
+
   float noise = pnoise(gl_FragCoord.xy);
 
+  vec3 p = eye_in;
   float D = d(p);
   float side = sign(D);
   float totalD = side * D * noise;  // Randomize first step.
 
   // Intersect the view ray with the Mandelbox using raymarching.
-  float m_dist = min_dist;
+  float m_dist = m_zoom * totalD;
   int steps;
   for (steps=0; steps<max_steps; steps++) {
     D = (side * d(p + totalD * dp));
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
-    m_dist = max(min_dist, m_zoom * totalD);
+    m_dist =  m_zoom * totalD;
   }
 
   p += totalD * dp;
@@ -182,9 +181,9 @@ void main() {
   vec3 col = backgroundColor;
 
   // We've got a hit or we're not sure.
-  if (D < MAX_DIST) {
-    vec3 n = normal(p, abs(D));
-    col = color(p);
+  if (totalD < MAX_DIST) {
+    vec3 n = normal(p, m_dist);
+    col = c(p);
     col = blinn_phong(n, -dp, normalize(eye_in+vec3(0,1,0)+dp), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
 
