@@ -1378,7 +1378,7 @@ int main(int argc, char **argv) {
   // Check availability of DE
   if (!de_func_name.empty())
     if (DE_funcs.find(de_func_name) == DE_funcs.end()) {
-      printf(__FUNCTION__ ": unknown DE %s\n", de_func_name);
+      printf(__FUNCTION__ ": unknown DE %s\n", de_func_name.c_str());
       de_func_name.clear();
     }
 
@@ -1931,6 +1931,7 @@ int main(int argc, char **argv) {
 
     bool hasAlt = keystate[SDLK_RALT] || keystate[SDLK_LALT];
     bool hasCtrl = keystate[SDLK_RCTRL] || keystate[SDLK_LCTRL];
+    (void)hasCtrl;
 
     // Continue after calling SDL_GetRelativeMouseState() so view direction
     // does not jump after closing AntTweakBar.
