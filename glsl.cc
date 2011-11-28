@@ -214,6 +214,10 @@ int vertex_main(int argc, char* argv[]) {
       eye = pos;
       zoom = tan(radians(fov_x * .5));
 
+      // Lower left is (0,0) for gl_FragCoord.
+      gl_FragCoord.x = scr_x;
+      gl_FragCoord.y = YRES - 1 - scr_y;
+
       GLSL::main();  // Call the fragment shader code, compiled as C++
 
       tga.set(scr_x, scr_y, gl_FragColor.xyz);
