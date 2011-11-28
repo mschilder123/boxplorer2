@@ -37,6 +37,7 @@
 
 #include <vector>
 #include <string>
+#include <map>
 
 using namespace std;
 
@@ -65,7 +66,45 @@ using namespace std;
 #define PI          3.14159265358979324
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), exit(-1), 1 )
 #define lengthof(x) ( sizeof(x)/sizeof((x)[0]) )
-#define sign(x)     ( (x)<0 ? -1 : 1 )
+//#define sign(x)     ( (x)<0 ? -1 : 1 )
+
+#include "glsl.h"
+
+// Hackery to get the list of DE and COLORING funcs from the glsl.
+map<string, float (*)(GLSL::vec3)> DE_funcs;
+map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
+
+class DE_initializer {
+ public:
+  DE_initializer(string name, float (*func)(GLSL::vec3)) {
+    DE_funcs[name] = func;
+  }
+};
+#define DECLARE_DE(a) DE_initializer _init##a(#a, &a);
+#define DECLARE_COLORING(a)  // not interested in color funcs here
+
+string de_func_name;
+
+namespace GLSL {
+
+// 'globals' capturing the fragment shader output or providing context.
+float gl_FragDepth;
+vec4 gl_FragColor;
+vec4 gl_FragCoord;
+
+// In the c++ version, these are func ptrs, not straight #defines.
+// We assign them based on values in .cfg
+float (*d)(vec3);
+vec3 (*c)(vec3);
+
+// Compile the fragment shader right here.
+// This defines a bunch more 'globals' and functions.
+#define ST_NONE
+#include "cfgs/menger.cfg.data/fragment.glsl"
+#undef ST_NONE
+};
+
+#define sign(a) GLSL::sign(a)
 
 #define zNear 0.0001f
 #define zFar  5.0f
@@ -267,8 +306,7 @@ float getFPS(void) {
   PROCESS(float, dof_offset, "dof_offset", true) \
   PROCESS(int, enable_dof, "enable_dof", false) \
   PROCESS(int, no_spline, "no_spline", false) \
-  PROCESS(float, asymmetry, "asymmetry", true) \
-  PROCESS(float, toein, "toein", true) \
+  PROCESS(float, focus, "focus", true) \
   PROCESS(int, nrays, "nrays", true)
 
 #define NUMPARS 20
@@ -405,6 +443,10 @@ class KeyFrame {
               string define = "#define " + a + " " + s + "\n";
               printf(__FUNCTION__ " : %s", define.c_str());
               defines->append(define);
+              if (!a.compare("d")) {
+                de_func_name.assign(s);
+                printf(__FUNCTION__" : de_func %s\n", de_func_name.c_str());
+              }
             }
           }
         }
@@ -522,7 +564,7 @@ class KeyFrame {
      glSetUniformf(x_scale); glSetUniformf(x_offset);
      glSetUniformf(y_scale); glSetUniformf(y_offset);
      glSetUniformf(speed); glSetUniformi(nrays);
-     glSetUniformf(time);
+     glSetUniformf(time); glSetUniformf(focus);
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
      glSetUniformv(par);
@@ -533,62 +575,38 @@ class KeyFrame {
    }
 
    void render(enum StereoMode stereo) {
-     float p[3] = { pos()[0], pos()[1], pos()[2] };
      switch(stereo) {
-       case ST_OVERUNDER:
-         move(speed, 0, 0);  // step right
+       case ST_OVERUNDER: {  // left / right
          activate();
-         setUniforms(1.0-asymmetry/2, -asymmetry/2, 2.0, 1.0);
+         setUniforms(1.0, 0.0, 2.0, 1.0, +speed);
          glRects(-1,-1,1,0);  // draw bottom half of screen
-         pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];  // restore pos
-         move(-speed, 0, 0);  // step left
          activate();
-         setUniforms(1.0-asymmetry/2, asymmetry/2, 2.0, -1.0);
+         setUniforms(1.0, 0.0, 2.0, -1.0, -speed);
          glRects(-1,0,1,1);  // draw top half of screen
-         pos()[0] = p[0]; pos()[1] = p[1]; pos()[2] = p[2];  // restore pos
-         break;
+         } break;
        case ST_XEYED: {  // right | left
-         float ov[16]; memcpy(ov, v, sizeof ov);  // save view
-         move(speed, 0, 0);  // step right
-         rotate(-toein, 0, 1, 0);
          activate();
-         setUniforms(2.0*(1.0-asymmetry/2), 1.0-asymmetry, 1.0, 0.0);
+         setUniforms(2.0, +1.0, 1.0, 0.0, +speed);
          glRectf(-1,-1,0,1);  // draw left half of screen
-
-         memcpy(v, ov, sizeof v);  // restore view
-         move(-speed, 0, 0);  // step left
-         rotate(+toein, 0, 1, 0);
          activate();
-         setUniforms(2.0*(1.0-asymmetry/2), -1.0+asymmetry, 1.0, 0.0);
+         setUniforms(2.0, -1.0, 1.0, 0.0, -speed);
          glRectf(0,-1,1,1);  // draw right half of screen
-
-         memcpy(v, ov, sizeof v);  // restore view
          } break;
        case ST_SIDEBYSIDE: {  // left | right
-         float ov[16]; memcpy(ov, v, sizeof ov);  // save view
-         move(-speed, 0, 0);  // step left
-         rotate(+toein, 0, 1, 0);
          activate();
-         setUniforms(2.0*(1.0-asymmetry/2), 1.0, 1.0, 0.0);
+         setUniforms(2.0, +1.0, 1.0, 0.0, -speed);
          glRectf(-1,-1,0,1);  // draw left half of screen
-
-         memcpy(v, ov, sizeof v);  // restore view
-         move(speed, 0, 0);  // step right
-         rotate(-toein, 0, 1, 0);
          activate();
-         setUniforms(2.0*(1.0-asymmetry/2), -1.0, 1.0, 0.0);
+         setUniforms(2.0, -1.0, 1.0, 0.0, +speed);
          glRectf(0,-1,1,1);  // draw right half of screen
-         
-         memcpy(v, ov, sizeof v);  // restore view
          } break;
        case ST_NONE:
          activate();
-         setUniforms(1.0, 0.0, 1.0, 0.0);
+         setUniforms(1.0, 0.0, 1.0, 0.0, speed);
          glRects(-1,-1,1,1);  // draw entire screen
          break;
        case ST_INTERLACED:
          activate();
-         //TODO: add asymmetric frustum to interlaced rendering.
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
          glRects(-1,-1,1,1);  // draw entire screen
          break;
@@ -745,7 +763,7 @@ char* printController(char* s, Controller c) {
       sprintf(s, "Speed %f DeltaT %.3f", camera.speed, camera.delta_time);
     } break;
     case CTL_3D: {
-      sprintf(s, "Sep %f Asym %.3f X %.3f", camera.speed, camera.asymmetry, camera.toein);
+      sprintf(s, "Sep %f Foc %.3f", camera.speed, camera.focus);
     } break;
   }
   return s;
@@ -763,11 +781,10 @@ void updateControllerY(Controller c, int d, bool alt) {
     case CTL_GLOW: m_progressiveAdd(&camera.glow_strength, d); break;
     case CTL_CAM: m_rotateY(d); break;
     case CTL_TIME: m_progressiveAdd(&camera.delta_time, d); break;
-    case CTL_3D: m_progressiveAdd(&camera.asymmetry, d); break;
+    case CTL_3D: m_progressiveAdd(&camera.focus, d); break;
   }
   // Enforce sane bounds.
   if (camera.delta_time < 0) camera.delta_time = 0;
-  if (camera.asymmetry < 0) camera.asymmetry = 0;
 }
 
 // Update controller.x by the signed count of consecutive changes.
@@ -782,13 +799,8 @@ void updateControllerX(Controller c, int d, bool alt) {
     case CTL_GLOW: m_mul(&camera.dist_to_color, d); break;
     case CTL_CAM: m_rotateX(d); break;
     case CTL_TIME: m_mulSlow(&camera.speed, d); break;
-    case CTL_3D: alt?m_progressiveAdd(&camera.toein, d*500)
-                    :m_mulSlow(&camera.speed, d);
-                 break;
+    case CTL_3D: m_mulSlow(&camera.speed, d); break;
   }
-  // Enforce sane bounds.
-  if (camera.toein < 0) camera.toein = 0;
-  if (camera.toein > 45) camera.toein = 45;
 }
 
 // Change the active controller with a keypress.
@@ -1173,16 +1185,16 @@ void initTwParDefines() {
       attr.assign(line, attr_start + 1, attr_end - (attr_start + 1));
 
     int index;
-    char xyz = 'x';
+    char _xyz = 'x';
     if (sscanf(line.c_str() + parStart + 5, "%d].%c",
-               &index, &xyz) < 1) continue;
+               &index, &_xyz) < 1) continue;
     if (index < 0 || index > (int)lengthof(camera.par)) continue;
-    if (xyz < 'x' || xyz > 'z') continue;
+    if (_xyz < 'x' || _xyz > 'z') continue;
 
     printf("parameter %s par[%d].%c {%s}\n",
-           varName.c_str(), index, xyz, attr.c_str());
+           varName.c_str(), index, _xyz, attr.c_str());
 
-    float* address = &camera.par[index][xyz-'x'];
+    float* address = &camera.par[index][_xyz-'x'];
 
     if (varName.find("Color") != string::npos) {
       TwAddVarRW(bar, varName.c_str(), TW_TYPE_COLOR3F, address, "");
@@ -1276,6 +1288,7 @@ int main(int argc, char **argv) {
       stereoMode = ST_OVERUNDER;
     } else if (!strcmp(argv[argc-1], "--interlaced")) {
       stereoMode = ST_INTERLACED;
+      defines.append("#define ST_INTERLACED\n");
     } else if (!strcmp(argv[argc-1], "--xeyed")) {
       stereoMode = ST_XEYED;
     } else if (!strcmp(argv[argc-1], "--sidebyside")) {
@@ -1300,6 +1313,8 @@ int main(int argc, char **argv) {
     --argc;
   }
 
+  if (stereoMode == ST_NONE) defines.append("#define ST_NONE\n");
+
   const char* configFile = (argc>=2 ? argv[1] : DEFAULT_CONFIG_FILE);
 
   // Load configuration.
@@ -1312,6 +1327,7 @@ int main(int argc, char **argv) {
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
+  if (stereoMode == ST_INTERLACED) config.enable_dof = 0;  // mipmapping does not work for interlaced.
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
   if (stereoMode == ST_XEYED) config.width *= 2;
@@ -1356,6 +1372,15 @@ int main(int argc, char **argv) {
     // Rendering a sequence to disk. Spline the keyframes.
     CatmullRom(keyframes, &splines, config.loop);
   }
+
+  float last_dist = 0;
+
+  // Check availability of DE
+  if (!de_func_name.empty())
+    if (DE_funcs.find(de_func_name) == DE_funcs.end()) {
+      printf(__FUNCTION__ ": unknown DE %s\n", de_func_name);
+      de_func_name.clear();
+    }
 
   while (!done) {
     int ctlXChanged = 0, ctlYChanged = 0;
@@ -1556,6 +1581,23 @@ int main(int argc, char **argv) {
 
     updateFPS();
 
+    if (!de_func_name.empty()) {
+      // Get a DE.
+      // Setup just the vars needed for DE. For now, iters and par[0..10]
+      // TODO: make de() method of camera?
+      GLSL::iters = camera.iters;
+      for (int i = 0; i < 10; ++i) {
+        GLSL::par[i] = GLSL::vec3(camera.par[i][0], camera.par[i][1], camera.par[i][2]);
+      }
+      float dist =
+        GLSL::abs(DE_funcs[de_func_name](GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
+      if (dist != last_dist) {
+        printf("de=%f\n", dist);
+        camera.speed = GLSL::clamp(dist/10.0,0.000001,1.0);
+      }
+      last_dist = dist;
+    }
+ 
     // Show position and fps in the caption.
     char caption[2048], controllerStr[256];
     sprintf(caption, "%s %.2ffps %5lu [%.3f %.3f %.3f] %dms",
@@ -1600,15 +1642,11 @@ int main(int argc, char **argv) {
             SDL_WM_GrabInput(SDL_GRAB_OFF);
             ignoreNextMouseUp = true;
             break;
-          case 4:  // mouse wheel up, increase speed at keyframe
-            if (keyframe < keyframes.size()) {
-              keyframes[keyframe].speed *= 1.1;
-             }
+          case 4:  // mouse wheel up, modify eye distance
+             camera.speed *= 1.1;
             break;
           case 5:  // mouse wheel down, decrease speed at keyframe
-            if (keyframe < keyframes.size()) {
-              keyframes[keyframe].speed *= .9;
-             }
+            camera.speed *= 0.9;
             break;
         }
       } break;
@@ -1669,7 +1707,17 @@ int main(int argc, char **argv) {
 
       // Switch fullscreen mode (loses the whole OpenGL context in Windows).
       case SDLK_RETURN: case SDLK_KP_ENTER: {
-        config.fullscreen ^= 1; grabbedInput = 1; initGraphics(); initTwBar();
+        config.fullscreen ^= 1; grabbedInput = 1;
+        if (config.fullscreen) {
+          if (stereoMode == ST_INTERLACED) {
+            // Zalman
+            config.height = 1080; config.width = 1920;
+          } else if (stereoMode == ST_SIDEBYSIDE || stereoMode == ST_OVERUNDER) {
+            // HMZ-T1
+            config.height = 720; config.width = 1280;
+          }
+        }
+        initGraphics(); initTwBar();
       } break;
 
       // Save config and screenshot (filename = current time).

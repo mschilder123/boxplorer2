@@ -23,6 +23,8 @@ using namespace std;
 #include "glsl.h"
 #include "TGA.h"
 
+#define ST_NONE  // no stereocopy here
+
 // Hackery to get the list of DE and COLORING funcs from the glsl.
 map<string, float (*)(GLSL::vec3)> DE_funcs;
 map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
@@ -47,6 +49,7 @@ namespace GLSL {
 // 'globals' capturing the fragment shader output.
 float gl_FragDepth;
 vec4 gl_FragColor;
+vec4 gl_FragCoord;
 
 // In the c++ version, these are func ptrs, not straight #defines.
 // We assign them based on values in .cfg
