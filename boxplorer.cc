@@ -1950,8 +1950,8 @@ int main(int argc, char **argv) {
 
     // Mouse look.
     if (grabbedInput && (mouse_dx != 0 || mouse_dy != 0)) {
-      m_rotateX2(camera.mouse_rot_speed * mouse_dx);
-      m_rotateY2(camera.mouse_rot_speed * mouse_dy);
+      m_rotateX2(camera.mouse_rot_speed * mouse_dx * camera.fov_x / 90.0);
+      m_rotateY2(camera.mouse_rot_speed * mouse_dy * camera.fov_y / 75.0);
     }
     if (keystate[SDLK_q]) m_rotateZ2(camera.keyb_rot_speed);
     if (keystate[SDLK_e]) m_rotateZ2(-camera.keyb_rot_speed);
