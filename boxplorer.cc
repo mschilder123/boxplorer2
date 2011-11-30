@@ -781,7 +781,7 @@ void updateControllerY(Controller c, int d, bool alt) {
     case CTL_GLOW: m_progressiveAdd(&camera.glow_strength, d); break;
     case CTL_CAM: m_rotateY(d); break;
     case CTL_TIME: m_progressiveAdd(&camera.delta_time, d); break;
-    case CTL_3D: m_progressiveAdd(&camera.focus, d); break;
+    case CTL_3D: m_progressiveAdd(&camera.focus, d * 100); break;
   }
   // Enforce sane bounds.
   if (camera.delta_time < 0) camera.delta_time = 0;
@@ -1373,7 +1373,7 @@ int main(int argc, char **argv) {
     CatmullRom(keyframes, &splines, config.loop);
   }
 
-  float last_dist = 0;
+  float last_de = 0;
 
   // Check availability of DE
   if (!de_func_name.empty())
@@ -1435,6 +1435,23 @@ int main(int argc, char **argv) {
     if (config.enable_dof && camera.dof_scale > .0001) {
       // If we have some DoF to render, render to texture.
       glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    }
+
+    if (!de_func_name.empty()) {
+      // Get a DE.
+      // Setup just the vars needed for DE. For now, iters and par[0..10]
+      // TODO: make de() method of camera?
+      GLSL::iters = camera.iters;
+      for (int i = 0; i < 10; ++i) {
+        GLSL::par[i] = GLSL::vec3(camera.par[i][0], camera.par[i][1], camera.par[i][2]);
+      }
+      float de =
+        GLSL::abs(DE_funcs[de_func_name](GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
+      if (de != last_de) {
+        printf("de=%f\n", de);
+        camera.speed = GLSL::clamp(de/10.0,0.000001,1.0);
+      }
+      last_de = de;
     }
 
     if (!rendering) {
@@ -1581,23 +1598,6 @@ int main(int argc, char **argv) {
 
     updateFPS();
 
-    if (!de_func_name.empty()) {
-      // Get a DE.
-      // Setup just the vars needed for DE. For now, iters and par[0..10]
-      // TODO: make de() method of camera?
-      GLSL::iters = camera.iters;
-      for (int i = 0; i < 10; ++i) {
-        GLSL::par[i] = GLSL::vec3(camera.par[i][0], camera.par[i][1], camera.par[i][2]);
-      }
-      float dist =
-        GLSL::abs(DE_funcs[de_func_name](GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
-      if (dist != last_dist) {
-        printf("de=%f\n", dist);
-        camera.speed = GLSL::clamp(dist/10.0,0.000001,1.0);
-      }
-      last_dist = dist;
-    }
- 
     // Show position and fps in the caption.
     char caption[2048], controllerStr[256];
     sprintf(caption, "%s %.2ffps %5lu [%.3f %.3f %.3f] %dms",
@@ -1642,10 +1642,10 @@ int main(int argc, char **argv) {
             SDL_WM_GrabInput(SDL_GRAB_OFF);
             ignoreNextMouseUp = true;
             break;
-          case 4:  // mouse wheel up, modify eye distance
+          case 4:  // mouse wheel up, increase eye distance
              camera.speed *= 1.1;
             break;
-          case 5:  // mouse wheel down, decrease speed at keyframe
+          case 5:  // mouse wheel down, decrease eye distance
             camera.speed *= 0.9;
             break;
         }
@@ -1941,8 +1941,7 @@ int main(int argc, char **argv) {
     (void)mouse_button_left;
     (void)mouse_button_right;
 
-    float dist = 100.0;  // TODO: distance to surface?
-    if (keystate[SDLK_w]) camera.move(0, 0, min(camera.speed , 0.9f * dist));  //forward
+    if (keystate[SDLK_w]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDLK_s]) camera.move(0, 0, -camera.speed);  //back
 
     if (keystate[SDLK_a]) camera.move(-camera.speed, 0, 0);  //left
@@ -1956,7 +1955,7 @@ int main(int argc, char **argv) {
     if (keystate[SDLK_q]) m_rotateZ2(camera.keyb_rot_speed);
     if (keystate[SDLK_e]) m_rotateZ2(-camera.keyb_rot_speed);
 
-   if (keystate[SDLK_z]){ if (camera.speed > camera.min_dist) camera.speed -= camera.speed/10; printf("speed %f\n", camera.speed);}
+   if (keystate[SDLK_z]){ if (camera.speed > 0.000001) camera.speed -= camera.speed/10; printf("speed %f\n", camera.speed);}
    if (keystate[SDLK_c]){ if (camera.speed < 1.0) camera.speed += camera.speed/10; printf("speed %f\n", camera.speed);}
 
     // Change the value of the active controller.
