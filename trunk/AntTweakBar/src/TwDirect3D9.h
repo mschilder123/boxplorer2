@@ -6,8 +6,7 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  notes:      Private header
-//              TAB=4
+//  note:       Private header
 //
 //  ---------------------------------------------------------------------------
 
@@ -16,7 +15,6 @@
 #define ANT_TW_DIRECT3D9_INCLUDED
 
 #include "TwGraph.h"
-
 
 //  ---------------------------------------------------------------------------
 
@@ -42,6 +40,7 @@ public:
 
     virtual void                ChangeViewport(int _X0, int _Y0, int _Width, int _Height, int _OffsetX, int _OffsetY);
     virtual void                RestoreViewport();
+    virtual void                SetScissor(int _X0, int _Y0, int _Width, int _Height);
 
 protected:
     struct IDirect3DDevice9 *   m_D3DDev;

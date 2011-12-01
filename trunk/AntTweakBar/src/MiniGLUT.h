@@ -101,11 +101,16 @@ extern "C" {
 GLUT_API void GLUT_CALL glutInit(int *argcp, char **argv);
 GLUT_API void GLUT_CALL glutInitDisplayMode(unsigned int mode);
 GLUT_API int  GLUT_CALL glutCreateWindow(const char *title);
+GLUT_API int  GLUT_CALL glutGetWindow(void);
+GLUT_API void GLUT_CALL glutSetWindow(int win);
+GLUT_API int  GLUT_CALL glutCreateSubWindow(int win, int x, int y, int width, int height);
 GLUT_API int  GLUT_CALL glutGet(GLenum type);
 GLUT_API void GLUT_CALL glutSwapBuffers();
 GLUT_API void GLUT_CALL glutPostRedisplay();
 GLUT_API void GLUT_CALL glutInitWindowPosition(int x, int y);
 GLUT_API void GLUT_CALL glutInitWindowSize(int width, int height);
+GLUT_API void GLUT_CALL glutPositionWindow(int x, int y);
+GLUT_API void GLUT_CALL glutReshapeWindow(int width, int height);
 GLUT_API void GLUT_CALL glutMainLoop();
 GLUT_API int  GLUT_CALL glutCreateMenu(void (GLUT_CALLBACK *func)(int));
 GLUT_API void GLUT_CALL glutDisplayFunc(void (GLUT_CALLBACK *func)(void));

@@ -3,18 +3,19 @@
 SO_EXT		= .dylib
 
 #---- Release
-CXXCFG   	= -O3
-LFLAGS		= 
+CXXCFG   	= -O3 -arch i386 -arch x86_64
+LFLAGS		= -arch i386 -arch x86_64
 OUT_DIR		= ../lib
 #---- Debug
-#CXXCFG   	= -g -D_DEBUG
-#LFLAGS		= 
+#CXXCFG   	= -g -D_DEBUG -arch i386 -arch x86_64
+#LFLAGS		= -arch i386 -arch x86_64
 #OUT_DIR	= ../lib/debug
 
-BASE		= /Developer/SDKs/MacOSX10.5.sdk/System/Library/Frameworks
+#BASE		= /Developer/SDKs/MacOSX10.5.sdk/System/Library/Frameworks
 CXX      	= gcc
-CXXFLAGS 	= $(CXXCFG) $(MINGWFLAGS) -Wall -fPIC -fno-strict-aliasing -D_MACOSX -ObjC++  -D__PLACEMENT_NEW_INLINE
-INCPATH  	= -I../include -I/usr/local/include -I/usr/X11R6/include -I/usr/include -I$(BASE)/OpenGL.framework/Headers/ -I$(BASE)/GLUT.framework/Headers/ -I$(BASE)/AppKit.framework/Headers/
+CXXFLAGS 	= $(CXXCFG) -Wall -fPIC -fno-strict-aliasing -D_MACOSX -ObjC++  -D__PLACEMENT_NEW_INLINE
+INCPATH  	= -I../include -I/usr/local/include -I/usr/X11R6/include -I/usr/include
+#-I$(BASE)/OpenGL.framework/Headers/ -I$(BASE)/GLUT.framework/Headers/ -I$(BASE)/AppKit.framework/Headers/
 LINK     	= gcc
 #LIBS     	= -L/usr/X11R6/lib -L. -lglfw -lGL -lGLU -lX11 -lXxf86vm -lXext -lpthread -lm
 #LIBS     	= -L/usr/X11R6/lib -lGL -lX11 -lXxf86vm -lXext -lpthread -lm
@@ -40,7 +41,7 @@ NO_STDERR	= 2> /dev/null
 TARGET 	    = AntTweakBar
 
 # source files without extension:
-SRC_FILES	= TwColors.cpp TwFonts.cpp TwOpenGL.cpp TwBar.cpp TwMgr.cpp TwPrecomp.cpp LoadOGL.cpp TwEventGLFW.c TwEventGLUT.c TwEventSDL.c
+SRC_FILES	= TwColors.cpp TwFonts.cpp TwOpenGL.cpp TwBar.cpp TwMgr.cpp TwPrecomp.cpp LoadOGL.cpp TwEventGLFW.c TwEventGLUT.c TwEventSDL.c TwEventSDL12.c TwEventSDL13.c TwEventSFML.cpp
 
 # build object list from source files
 OBJS_1 		= $(SRC_FILES:.c=.o)
@@ -88,6 +89,8 @@ TwBar.o:       TwPrecomp.h ../include/AntTweakBar.h TwBar.h TwMgr.h TwColors.h T
 TwMgr.o:       TwPrecomp.h ../include/AntTweakBar.h TwMgr.h TwColors.h TwFonts.h TwGraph.h AntPerfTimer.h TwBar.h TwOpenGL.h res/TwXCursors.h
 TwPrecomp.o:   TwPrecomp.h
 LoadOGL.o:     TwPrecomp.h LoadOGL.h
-TwEventGLFW.o: ../include/AntTweakBar.h 
-TwEventGLUT.o: ../include/AntTweakBar.h
+TwEventGLFW.o: ../include/AntTweakBar.h MiniGLFW.h
+TwEventGLUT.o: ../include/AntTweakBar.h MiniGLUT.h
 TwEventSDL.o:  ../include/AntTweakBar.h
+TwEventSDL12.o:  ../include/AntTweakBar.h MiniSDL12.h
+TwEventSDL13.o:  ../include/AntTweakBar.h MiniSDL13.h

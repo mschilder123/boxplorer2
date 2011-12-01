@@ -1,7 +1,7 @@
 //  ---------------------------------------------------------------------------
 //
-//  @file       TwDirect3D10.h
-//  @brief      Direct3D10 graph functions
+//  @file       TwDirect3D11.h
+//  @brief      Direct3D11 graphic functions
 //  @author     Philippe Decaudin - http://www.antisphere.com
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
@@ -11,14 +11,14 @@
 //  ---------------------------------------------------------------------------
 
 
-#if !defined ANT_TW_DIRECT3D10_INCLUDED
-#define ANT_TW_DIRECT3D10_INCLUDED
+#if !defined ANT_TW_DIRECT3D11_INCLUDED
+#define ANT_TW_DIRECT3D11_INCLUDED
 
 #include "TwGraph.h"
 
 //  ---------------------------------------------------------------------------
 
-class CTwGraphDirect3D10 : public ITwGraph
+class CTwGraphDirect3D11 : public ITwGraph
 {
 public:
     virtual int                 Init();
@@ -43,11 +43,13 @@ public:
     virtual void                SetScissor(int _X0, int _Y0, int _Width, int _Height);
 
 protected:
-    struct ID3D10Device *       m_D3DDev;
+    struct ID3D11Device *       m_D3DDev;
+    struct ID3D11DeviceContext *m_D3DDevImmContext;
     unsigned int                m_D3DDevInitialRefCount;
     bool                        m_Drawing;
     const CTexFont *            m_FontTex;
-    struct ID3D10ShaderResourceView *m_FontD3DTexRV;
+    struct ID3D11Texture2D *    m_FontD3DTex;
+    struct ID3D11ShaderResourceView *m_FontD3DTexRV;
     int                         m_WndWidth;
     int                         m_WndHeight;
     int                         m_OffsetX;
@@ -66,11 +68,16 @@ protected:
         color32                 m_Color;
         float                   m_UV[2];
     };
+    struct CConstants
+    {
+        float                   m_Offset[4];
+        float                   m_CstColor[4];
+    };
 
     struct CTextObj
     {
-        struct ID3D10Buffer *   m_TextVertexBuffer;
-        struct ID3D10Buffer *   m_BgVertexBuffer;
+        struct ID3D11Buffer *   m_TextVertexBuffer;
+        struct ID3D11Buffer *   m_BgVertexBuffer;
         int                     m_NbTextVerts;
         int                     m_NbBgVerts;
         int                     m_TextVertexBufferSize;
@@ -79,30 +86,32 @@ protected:
         bool                    m_LineBgColors;
     };
 
-    struct CState10 *               m_State;
-    struct ID3D10DepthStencilState *m_DepthStencilState;
-    struct ID3D10BlendState *       m_BlendState;
-    struct ID3D10RasterizerState *  m_RasterState;
-    struct ID3D10RasterizerState *  m_RasterStateAntialiased;
-    struct ID3D10RasterizerState *  m_RasterStateCullCW;
-    struct ID3D10RasterizerState *  m_RasterStateCullCCW;
-    struct ID3D10Effect *           m_Effect;
-    struct ID3D10EffectTechnique*   m_LineRectTech;
-    struct ID3D10EffectTechnique*   m_LineRectCstColorTech;
-    struct ID3D10InputLayout *      m_LineRectVertexLayout;
-    struct ID3D10Buffer *           m_LineVertexBuffer;
-    struct ID3D10Buffer *           m_RectVertexBuffer;
-    struct ID3D10Buffer *           m_TrianglesVertexBuffer;
+    struct CState11 *               m_State;
+    struct ID3D11DepthStencilState *m_DepthStencilState;
+    struct ID3D11BlendState *       m_BlendState;
+    struct ID3D11RasterizerState *  m_RasterState;
+    struct ID3D11RasterizerState *  m_RasterStateAntialiased;
+    struct ID3D11RasterizerState *  m_RasterStateMultisample;
+    struct ID3D11RasterizerState *  m_RasterStateCullCW;
+    struct ID3D11RasterizerState *  m_RasterStateCullCCW;
+
+    struct ID3D11VertexShader *     m_LineRectVS;
+    struct ID3D11VertexShader *     m_LineRectCstColorVS;
+    struct ID3D11PixelShader *      m_LineRectPS;
+    struct ID3D11InputLayout *      m_LineRectVertexLayout;
+    struct ID3D11VertexShader *     m_TextVS;
+    struct ID3D11VertexShader *     m_TextCstColorVS;
+    struct ID3D11PixelShader *      m_TextPS;
+    struct ID3D11InputLayout *      m_TextVertexLayout;
+    struct ID3D11Buffer *           m_LineVertexBuffer;
+    struct ID3D11Buffer *           m_RectVertexBuffer;
+    struct ID3D11Buffer *           m_TrianglesVertexBuffer;
     int                             m_TrianglesVertexBufferCount;
-    struct ID3D10EffectTechnique*   m_TextTech;
-    struct ID3D10EffectTechnique*   m_TextCstColorTech;
-    struct ID3D10InputLayout *      m_TextVertexLayout;
-    struct ID3D10EffectShaderResourceVariable *m_FontD3DResVar;
-    struct ID3D10EffectVectorVariable *m_OffsetVar;
-    struct ID3D10EffectVectorVariable *m_CstColorVar;
+    struct ID3D11Buffer *           m_ConstantBuffer;
+    struct ID3D11SamplerState *     m_SamplerState;
 };
 
 //  ---------------------------------------------------------------------------
 
 
-#endif // !defined ANT_TW_DIRECT3D10_INCLUDED
+#endif // !defined ANT_TW_DIRECT3D11_INCLUDED

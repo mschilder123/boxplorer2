@@ -6,8 +6,7 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  notes:      Private header
-//              TAB=4
+//  note:       Private header
 //
 //  ---------------------------------------------------------------------------
 
