@@ -10,8 +10,6 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  note:       TAB=4
-//
 //  ---------------------------------------------------------------------------
 
 
@@ -33,6 +31,7 @@ int TW_GLUT_CALL TwEventMouseButtonGLUT(int glutButton, int glutState, int mouse
 {
     TwMouseAction action = (glutState==GLUT_DOWN) ? TW_MOUSE_PRESSED : TW_MOUSE_RELEASED;
 
+    TwMouseMotion(mouseX, mouseY);
     switch( glutButton )
     {
     case GLUT_LEFT_BUTTON:

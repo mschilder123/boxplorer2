@@ -6,11 +6,8 @@
 //              from GLFW event callbacks to AntTweakBar
 //  
 //  @author     Philippe Decaudin - http://www.antisphere.com
-//  @date       2006/05/10
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
-//
-//  note:       TAB=4
 //
 //  ---------------------------------------------------------------------------
 
@@ -188,7 +185,28 @@ int TW_CALL TwEventCharGLFW(int glfwChar, int glfwAction)
 {
     if( glfwAction==GLFW_PRESS && (glfwChar & 0xff00)==0 )
         return TwKeyPressed(glfwChar, g_KMod);
-    else
-        return 0;
+
+    return 0;
 }
 
+// functions with __cdecl calling convension
+TW_API int TW_CDECL_CALL TwEventMouseButtonGLFWcdecl(int glfwButton, int glfwAction)
+{
+    return TwEventMouseButtonGLFW(glfwButton, glfwAction);
+}
+TW_API int TW_CDECL_CALL TwEventKeyGLFWcdecl(int glfwKey, int glfwAction)
+{
+    return TwEventKeyGLFW(glfwKey, glfwAction);
+}
+TW_API int TW_CDECL_CALL TwEventCharGLFWcdecl(int glfwChar, int glfwAction)
+{
+    return TwEventCharGLFW(glfwChar, glfwAction);
+}
+TW_API int TW_CDECL_CALL TwEventMousePosGLFWcdecl(int mouseX, int mouseY)
+{
+    return TwMouseMotion(mouseX, mouseY);
+}
+TW_API int TW_CDECL_CALL TwEventMouseWheelGLFWcdecl(int wheelPos)
+{
+    return TwMouseWheel(wheelPos);
+}

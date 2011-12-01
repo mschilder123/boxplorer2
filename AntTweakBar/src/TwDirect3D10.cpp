@@ -5,8 +5,6 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  note:       TAB=4
-//
 //  ---------------------------------------------------------------------------
 
 
@@ -16,17 +14,18 @@
 #include "TwColors.h"
 
 #include "d3d10vs2003.h" // Workaround to include D3D10.h with VS2003
+#define D3D10_IGNORE_SDK_LAYERS // d3d10sdklayers.h may not exist
 #include <d3d10.h>
 
 
 using namespace std;
 
 const char *g_ErrCantLoadD3D10   = "Cannot load Direct3D10 library dynamically";
-const char *g_ErrCompileFX       = "Direct3D10 effect compilation failed";
-const char *g_ErrCreateFX        = "Direct3D10 effect creation failed";
-const char *g_ErrTechNotFound    = "Cannot find Direct3D10 technique effect";
-const char *g_ErrCreateLayout    = "Direct3D10 vertex layout creation failed";
-const char *g_ErrCreateBuffer    = "Direct3D10 vertex buffer creation failed";
+const char *g_ErrCompileFX10     = "Direct3D10 effect compilation failed";
+const char *g_ErrCreateFX10      = "Direct3D10 effect creation failed";
+const char *g_ErrTechNotFound10  = "Cannot find Direct3D10 technique effect";
+const char *g_ErrCreateLayout10  = "Direct3D10 vertex layout creation failed";
+const char *g_ErrCreateBuffer10  = "Direct3D10 vertex buffer creation failed";
 
 //  ---------------------------------------------------------------------------
 
@@ -40,6 +39,9 @@ D3D10CompileEffectFromMemoryProc _D3D10CompileEffectFromMemory = NULL;
 D3D10CreateEffectFromMemoryProc _D3D10CreateEffectFromMemory = NULL;
 D3D10StateBlockMaskEnableAllProc _D3D10StateBlockMaskEnableAll = NULL;
 D3D10CreateStateBlockProc _D3D10CreateStateBlock = NULL;
+
+const RECT FullRect = {0, 0, 16000, 16000};
+static bool RectIsFull(const RECT& r) { return r.left==FullRect.left && r.right==FullRect.right && r.top==FullRect.top && r.bottom==FullRect.bottom; }
 
 static int LoadDirect3D10()
 {
@@ -288,7 +290,7 @@ int CTwGraphDirect3D10::Init()
     // Compile shaders
     DWORD shaderFlags = D3D10_SHADER_ENABLE_STRICTNESS;
     #if defined( DEBUG ) || defined( _DEBUG )
-        shaderFlags |= D3D10_SHADER_DEBUG;
+        // shaderFlags |= D3D10_SHADER_DEBUG; // no more supported
     #endif
     ID3D10Blob *compiledFX = NULL;
     ID3D10Blob *errors = NULL;
@@ -297,7 +299,7 @@ int CTwGraphDirect3D10::Init()
     {
         const size_t ERR_MSG_MAX_LEN = 4096;
         static char s_ErrorMsg[ERR_MSG_MAX_LEN]; // must be static to be sent to SetLastError
-        strncpy(s_ErrorMsg, g_ErrCompileFX, ERR_MSG_MAX_LEN-1);
+        strncpy(s_ErrorMsg, g_ErrCompileFX10, ERR_MSG_MAX_LEN-1);
         size_t errOffset = strlen(s_ErrorMsg);
         size_t errLen = 0;
         if( errors!=NULL )
@@ -318,7 +320,7 @@ int CTwGraphDirect3D10::Init()
     compiledFX->Release();
     if( FAILED(hr) )
     {
-        g_TwMgr->SetLastError(g_ErrCreateFX);
+        g_TwMgr->SetLastError(g_ErrCreateFX10);
         Shut();
         return 0;
     }
@@ -330,7 +332,7 @@ int CTwGraphDirect3D10::Init()
     m_TextCstColorTech = m_Effect->GetTechniqueByName("TextCstColor");
     if( m_LineRectTech==NULL || m_TextTech==NULL || m_LineRectCstColorTech==NULL || m_TextCstColorTech==NULL )
     {
-        g_TwMgr->SetLastError(g_ErrTechNotFound);
+        g_TwMgr->SetLastError(g_ErrTechNotFound10);
         Shut();
         return 0;
     }
@@ -347,7 +349,7 @@ int CTwGraphDirect3D10::Init()
         hr = m_D3DDev->CreateInputLayout(lineRectLayout, sizeof(lineRectLayout)/sizeof(lineRectLayout[0]), passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &m_LineRectVertexLayout);
     if( FAILED(hr) )
     {
-        g_TwMgr->SetLastError(g_ErrCreateLayout);
+        g_TwMgr->SetLastError(g_ErrCreateLayout10);
         Shut();
         return 0;
     }
@@ -362,9 +364,9 @@ int CTwGraphDirect3D10::Init()
     hr = m_D3DDev->CreateBuffer(&bd, NULL, &m_LineVertexBuffer);
     if( FAILED(hr) )
     {
-        g_TwMgr->SetLastError(g_ErrCreateBuffer);
+        g_TwMgr->SetLastError(g_ErrCreateBuffer10);
         Shut();
-        return hr;
+        return 0;
     }
 
     // Create rect vertex buffer
@@ -372,9 +374,9 @@ int CTwGraphDirect3D10::Init()
     hr = m_D3DDev->CreateBuffer(&bd, NULL, &m_RectVertexBuffer);
     if( FAILED(hr) )
     {
-        g_TwMgr->SetLastError(g_ErrCreateBuffer);
+        g_TwMgr->SetLastError(g_ErrCreateBuffer10);
         Shut();
-        return hr;
+        return 0;
     }
 
     // Create input layout for text
@@ -389,7 +391,7 @@ int CTwGraphDirect3D10::Init()
         hr = m_D3DDev->CreateInputLayout(textLayout, sizeof(textLayout)/sizeof(textLayout[0]), passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &m_TextVertexLayout);
     if( FAILED(hr) )
     {
-        g_TwMgr->SetLastError(g_ErrCreateLayout);
+        g_TwMgr->SetLastError(g_ErrCreateLayout10);
         Shut();
         return 0;
     }
@@ -451,8 +453,9 @@ int CTwGraphDirect3D10::Init()
     rd.CullMode = D3D10_CULL_FRONT;
     m_D3DDev->CreateRasterizerState(&rd, &m_RasterStateCullCCW);
 
-    D3D10_RECT rect = {0, 0, 16000, 16000};
-    m_D3DDev->RSSetScissorRects(1, &rect);    
+    m_ViewportAndScissorRects[0] = FullRect;
+    m_ViewportAndScissorRects[1] = FullRect;
+    m_D3DDev->RSSetScissorRects(1, m_ViewportAndScissorRects);    
     
     // Get effect globals
     if( m_Effect->GetVariableByName("Font") )
@@ -1108,7 +1111,7 @@ void CTwGraphDirect3D10::DrawText(void *_TextObj, int _X, int _Y, color32 _Color
         // Set primitive topology
         m_D3DDev->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        // Render the bg rectangles
+        // Render text
         ID3D10EffectTechnique *tech;
         if( _Color!=0 || !textObj->m_LineColors ) // use a constant color
             tech = m_TextCstColorTech;
@@ -1141,12 +1144,14 @@ void CTwGraphDirect3D10::ChangeViewport(int _X0, int _Y0, int _Width, int _Heigh
         m_D3DDev->RSSetViewports(1, &vp);
         */
         
-        D3D10_RECT rect;
-        rect.left = _X0;
-        rect.right = _X0 + _Width - 1;
-        rect.top = _Y0;
-        rect.bottom = _Y0 + _Height - 1;
-        m_D3DDev->RSSetScissorRects(1, &rect);        
+        m_ViewportAndScissorRects[0].left = _X0;
+        m_ViewportAndScissorRects[0].right = _X0 + _Width - 1;
+        m_ViewportAndScissorRects[0].top = _Y0;
+        m_ViewportAndScissorRects[0].bottom = _Y0 + _Height - 1;
+        if( RectIsFull(m_ViewportAndScissorRects[1]) )
+            m_D3DDev->RSSetScissorRects(1, m_ViewportAndScissorRects); // viewport clipping only
+        else
+            m_D3DDev->RSSetScissorRects(2, m_ViewportAndScissorRects);
 
         m_OffsetX = _X0 + _OffsetX;
         m_OffsetY = _Y0 + _OffsetY;
@@ -1158,10 +1163,32 @@ void CTwGraphDirect3D10::ChangeViewport(int _X0, int _Y0, int _Width, int _Heigh
 void CTwGraphDirect3D10::RestoreViewport()
 {
     //m_D3DDev->RSSetViewports(1, static_cast<D3D10_VIEWPORT *>(m_ViewportInit));
-    D3D10_RECT rect = {0, 0, 16000, 16000};
-    m_D3DDev->RSSetScissorRects(1, &rect);
+    m_ViewportAndScissorRects[0] = FullRect;
+    m_D3DDev->RSSetScissorRects(1, m_ViewportAndScissorRects+1); // scissor only
         
     m_OffsetX = m_OffsetY = 0;
+}
+
+//  ---------------------------------------------------------------------------
+
+void CTwGraphDirect3D10::SetScissor(int _X0, int _Y0, int _Width, int _Height)
+{
+    if( _Width>0 && _Height>0 )
+    {
+        m_ViewportAndScissorRects[1].left = _X0 - 2;
+        m_ViewportAndScissorRects[1].right = _X0 + _Width - 3;
+        m_ViewportAndScissorRects[1].top = _Y0 - 1;
+        m_ViewportAndScissorRects[1].bottom = _Y0 + _Height - 1;
+        if( RectIsFull(m_ViewportAndScissorRects[0]) )
+            m_D3DDev->RSSetScissorRects(1, m_ViewportAndScissorRects+1); // no viewport clipping
+        else
+            m_D3DDev->RSSetScissorRects(2, m_ViewportAndScissorRects);
+    }
+    else
+    {
+        m_ViewportAndScissorRects[1] = FullRect;
+        m_D3DDev->RSSetScissorRects(1, m_ViewportAndScissorRects); // apply viewport clipping only
+    }
 }
 
 //  ---------------------------------------------------------------------------
@@ -1243,7 +1270,7 @@ void CTwGraphDirect3D10::DrawTriangles(int _NumTriangles, int *_Vertices, color3
         else if( _CullMode==CULL_CCW )
             m_D3DDev->RSSetState(m_RasterStateCullCCW);
 
-        // Render the rect
+        // Render the triangles
         D3D10_TECHNIQUE_DESC techDesc;
         m_LineRectTech->GetDesc(&techDesc);
         for(UINT p=0; p<techDesc.Passes; ++p)
@@ -1254,6 +1281,10 @@ void CTwGraphDirect3D10::DrawTriangles(int _NumTriangles, int *_Vertices, color3
 
         if( _CullMode==CULL_CW || _CullMode==CULL_CCW )
             m_D3DDev->RSSetState(m_RasterState); // restore default raster state
+
+        // Unset vertex buffer
+        ID3D10Buffer *vb = NULL;
+        m_D3DDev->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
     }
 }
 

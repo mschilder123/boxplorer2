@@ -1611,7 +1611,9 @@ int main(int argc, char **argv) {
     // Process events.
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-      if (grabbedInput || !TwEventSDL(&event)) switch (event.type) {
+      if (grabbedInput ||
+          !TwEventSDL(&event, SDL_MAJOR_VERSION, SDL_MINOR_VERSION))
+      switch (event.type) {
       case SDL_VIDEORESIZE: {
             config.width = event.resize.w;
             config.height = event.resize.h;

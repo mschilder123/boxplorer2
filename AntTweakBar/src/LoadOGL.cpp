@@ -5,8 +5,6 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  note:       TAB=4
-//
 //  ---------------------------------------------------------------------------
 
 
@@ -16,7 +14,7 @@
 
 //  ---------------------------------------------------------------------------
 
-#define ANT_NB_OGL_FUNC_MAX 512
+#define ANT_NB_OGL_FUNC_MAX 1024
 
 struct COGLFuncRec
 {

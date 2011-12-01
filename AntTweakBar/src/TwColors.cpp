@@ -5,8 +5,6 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  note:       TAB=4
-//
 //  ---------------------------------------------------------------------------
 
 

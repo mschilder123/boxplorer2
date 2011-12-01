@@ -1,25 +1,25 @@
 //  ---------------------------------------------------------------------------
 //
-//  @file       TwOpenGL.h
-//  @brief      OpenGL graph functions
+//  @file       TwOpenGLCore.h
+//  @brief      OpenGL Core graph functions
 //  @author     Philippe Decaudin - http://www.antisphere.com
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  notes:      Private header
-//              TAB=4
+//  notes:      Private header,
+//              Work In Progress, Disabled.
 //
 //  ---------------------------------------------------------------------------
 
 
-#if !defined ANT_TW_OPENGL_INCLUDED
-#define ANT_TW_OPENGL_INCLUDED
+#if !defined ANT_TW_OPENGL_CORE_INCLUDED
+#define ANT_TW_OPENGL_CORE_INCLUDED
 
 #include "TwGraph.h"
 
 //  ---------------------------------------------------------------------------
 
-class CTwGraphOpenGL : public ITwGraph
+class CTwGraphOpenGLCore : public ITwGraph
 {
 public:
     virtual int         Init();
@@ -41,32 +41,25 @@ public:
 
     virtual void        ChangeViewport(int _X0, int _Y0, int _Width, int _Height, int _OffsetX, int _OffsetY);
     virtual void        RestoreViewport();
-    virtual void        SetScissor(int _X0, int _Y0, int _Width, int _Height);
 
 protected:
     bool                m_Drawing;
     GLuint              m_FontTexID;
     const CTexFont *    m_FontTex;
+    
     GLfloat             m_PrevLineWidth;
-    GLint               m_PrevTexEnv;
-    GLint               m_PrevPolygonMode[2];
-    GLint               m_MaxClipPlanes;
     GLint               m_PrevTexture;
-    GLint               m_PrevArrayBufferARB;
-    GLint               m_PrevElementArrayBufferARB;
-    GLboolean           m_PrevVertexProgramARB;
-    GLboolean           m_PrevFragmentProgramARB;
-    GLuint              m_PrevProgramObjectARB;
+    GLint               m_PrevArrayBuffer;
+    GLint               m_PrevElementArrayBuffer;
+    GLboolean           m_PrevVertexProgram;
+    GLboolean           m_PrevFragmentProgram;
+    GLuint              m_PrevProgramObject;
     GLboolean           m_PrevTexture3D;
-    enum EMaxTextures   { MAX_TEXTURES = 128 };
-    GLboolean           m_PrevActiveTexture1D[MAX_TEXTURES];
-    GLboolean           m_PrevActiveTexture2D[MAX_TEXTURES];
-    GLboolean           m_PrevActiveTexture3D[MAX_TEXTURES];
-    GLboolean           m_PrevClientTexCoordArray[MAX_TEXTURES];
-    GLint               m_PrevActiveTextureARB;
-    GLint               m_PrevClientActiveTextureARB;
-    bool                m_SupportTexRect;
-    GLboolean           m_PrevTexRectARB;
+    GLboolean           m_PrevActiveTexture1D[32];
+    GLboolean           m_PrevActiveTexture2D[32];
+    GLboolean           m_PrevActiveTexture3D[32];
+    GLint               m_PrevActiveTexture;
+    GLboolean           m_PrevTexRect;
     GLint               m_PrevBlendEquation;
     GLint               m_PrevBlendEquationRGB;
     GLint               m_PrevBlendEquationAlpha;
@@ -75,9 +68,16 @@ protected:
     GLint               m_PrevBlendSrcAlpha;
     GLint               m_PrevBlendDstAlpha;
     GLint               m_ViewportInit[4];
-    GLfloat             m_ProjMatrixInit[16];
+    GLuint              m_LineRectVS;
+    GLuint              m_LineRectFS;
+    GLuint              m_LineRectProgram;
+    GLuint              m_LineRectVArray;
+    GLuint              m_LineRectBuffer;
+
     int                 m_WndWidth;
     int                 m_WndHeight;
+    int                 m_OffsetX;
+    int                 m_OffsetY;
 
     struct Vec2         { GLfloat x, y; Vec2(){} Vec2(GLfloat _X, GLfloat _Y):x(_X),y(_Y){} Vec2(int _X, int _Y):x(GLfloat(_X)),y(GLfloat(_Y)){} };
     struct CTextObj
@@ -93,4 +93,4 @@ protected:
 //  ---------------------------------------------------------------------------
 
 
-#endif // !defined ANT_TW_OPENGL_INCLUDED
+#endif // !defined ANT_TW_OPENGL_CORE_INCLUDED

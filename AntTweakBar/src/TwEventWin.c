@@ -10,8 +10,6 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  note:       TAB=4
-//
 //  ---------------------------------------------------------------------------
 
 #include <AntTweakBar.h>
@@ -27,12 +25,21 @@
 #define      WHEEL_DELTA 120
 #endif    // WHEEL_DELTA
 
+#ifdef _WIN64
+#define PARAM_INT __int64
+#else
+#define PARAM_INT int
+#endif
 
-//  TwEventWin returns zero if msg has not been handled, 
-//  and a non-zero value if it has been handled by the AntTweakBar library.
-int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned int _W64 wParam, int _W64 lParam)
+// TwEventWin returns zero if msg has not been handled, 
+// and a non-zero value if it has been handled by the AntTweakBar library.
+int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned PARAM_INT _W64 wParam, PARAM_INT _W64 lParam)
 {
     int handled = 0;
+    static unsigned PARAM_INT s_PrevKeyDown = 0;
+    static PARAM_INT s_PrevKeyDownMod = 0;
+    static int s_PrevKeyDownHandled = 0;
+
     switch( msg ) 
     {
     case WM_MOUSEMOVE:
@@ -40,6 +47,7 @@ int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned int _W64 wParam, in
         handled = TwMouseMotion((short)LOWORD(lParam), (short)HIWORD(lParam));
         break;
     case WM_LBUTTONDOWN:
+    case WM_LBUTTONDBLCLK:
         SetCapture(wnd);
         handled = TwMouseButton(TW_MOUSE_PRESSED, TW_MOUSE_LEFT);
         break;
@@ -48,6 +56,7 @@ int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned int _W64 wParam, in
         handled = TwMouseButton(TW_MOUSE_RELEASED, TW_MOUSE_LEFT);
         break;
     case WM_MBUTTONDOWN:
+    case WM_MBUTTONDBLCLK:
         SetCapture(wnd);
         handled = TwMouseButton(TW_MOUSE_PRESSED, TW_MOUSE_MIDDLE);
         break;
@@ -56,6 +65,7 @@ int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned int _W64 wParam, in
         handled = TwMouseButton(TW_MOUSE_RELEASED, TW_MOUSE_MIDDLE);
         break;
     case WM_RBUTTONDOWN:
+    case WM_RBUTTONDBLCLK:
         SetCapture(wnd);
         handled = TwMouseButton(TW_MOUSE_PRESSED, TW_MOUSE_RIGHT);
         break;
@@ -167,6 +177,46 @@ int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned int _W64 wParam, in
             }
             if( k!=0 )
                 handled = TwKeyPressed(k, kmod);
+            else
+            {
+                // if the key will be handled at next WM_CHAR report this event as handled
+                int key = (int)(wParam&0xff);
+                if( kmod&TW_KMOD_CTRL && key>0 && key<27 )
+                    key += 'a'-1;
+                if( key>0 && key<256 )
+                    handled = TwKeyTest(key, kmod);
+            }
+            s_PrevKeyDown = wParam;
+            s_PrevKeyDownMod = kmod;
+            s_PrevKeyDownHandled = handled;
+        }
+        break;
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        {
+            int kmod = 0;
+            if( GetAsyncKeyState(VK_SHIFT)<0 )
+                kmod |= TW_KMOD_SHIFT;
+            if( GetAsyncKeyState(VK_CONTROL)<0 )
+                kmod |= TW_KMOD_CTRL;
+            if( GetAsyncKeyState(VK_MENU)<0 )
+                kmod |= TW_KMOD_ALT;
+            // if the key has been handled at previous WM_KEYDOWN report this event as handled
+            if( s_PrevKeyDown==wParam && s_PrevKeyDownMod==kmod )
+                handled = s_PrevKeyDownHandled;
+            else 
+            {
+                // if the key would have been handled report this event as handled
+                int key = (int)(wParam&0xff);
+                if( kmod&TW_KMOD_CTRL && key>0 && key<27 )
+                    key += 'a'-1;
+                if( key>0 && key<256 )
+                    handled = TwKeyTest(key, kmod);
+            }
+            // reset previous keydown
+            s_PrevKeyDown = 0;
+            s_PrevKeyDownMod = 0;
+            s_PrevKeyDownHandled = 0;
         }
         break;
     case WM_MOUSEWHEEL:
@@ -182,6 +232,11 @@ int TW_CALL TwEventWin(void *wnd, unsigned int msg, unsigned int _W64 wParam, in
         // do not set 'handled', WM_SIZE may be also processed by the calling application
         break;
     }
+
+    if( handled )
+        // Event has been handled by AntTweakBar, so we invalidate the window 
+        // content to send a WM_PAINT which will redraw the tweak bar(s).
+        InvalidateRect(wnd, NULL, FALSE);
 
     return handled;
 }

@@ -5,8 +5,6 @@
 //  @license    This file is part of the AntTweakBar library.
 //              For conditions of distribution and use, see License.txt
 //
-//  note:       TAB=4
-//
 //  ---------------------------------------------------------------------------
 
 
@@ -15,9 +13,9 @@
 #include "TwMgr.h"
 
 #include <d3d9.h>
-#ifdef X_DEBUG
-    #include <dxerr9.h>
-    #pragma comment(lib, "dxerr9")
+#ifdef _DEBUG
+//  #include <dxerr9.h>
+//  #pragma comment(lib, "dxerr9")
 #endif // _DEBUG
 
 
@@ -572,6 +570,24 @@ void CTwGraphDirect3D9::RestoreViewport()
 {
     m_D3DDev->SetViewport(static_cast<D3DVIEWPORT9 *>(m_ViewportInit));
     m_OffsetX = m_OffsetY = 0;
+}
+
+//  ---------------------------------------------------------------------------
+
+void CTwGraphDirect3D9::SetScissor(int _X0, int _Y0, int _Width, int _Height)
+{
+    if( _Width>0 && _Height>0 )
+    {
+        RECT Rect;
+        Rect.left = _X0 - 1;
+        Rect.right = Rect.left + _Width - 1;
+        Rect.top = _Y0;
+        Rect.bottom = Rect.top + _Height;
+        m_D3DDev->SetScissorRect(&Rect);
+        m_D3DDev->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
+    }
+    else
+        m_D3DDev->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
 }
 
 //  ---------------------------------------------------------------------------
