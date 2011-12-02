@@ -4,7 +4,7 @@ CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -DTW_NO_LIB_PRAGMA -DTW_STATI
 
 LDFLAGS=-framework SDL -framework OpenGL -framework Cocoa
 
-TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o
 
 boxplorer: boxplorer.o Makefile.osx $(TW_OBJS)
 	g++ boxplorer.o SDLmain.m $(TW_OBJS) -o boxplorer $(LDFLAGS)
@@ -29,6 +29,12 @@ TwFonts.o: AntTweakBar/src/TwFonts.cpp
 	g++ -c $(CFLAGS) $<
 
 TwMgr.o: AntTweakBar/src/TwMgr.cpp
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL12.o: AntTweakBar/src/TwEventSDL12.c
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
 	g++ -c $(CFLAGS) $<
 
 TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
