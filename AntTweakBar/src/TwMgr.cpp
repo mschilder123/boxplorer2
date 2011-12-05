@@ -1722,6 +1722,7 @@ static int TwCreateGraph(ETwGraphAPI _GraphAPI)
         break;
     case TW_DIRECT3D11:
         #ifdef ANT_WINDOWS
+#ifdef ANT_3D11
             if( g_TwMgr->m_Device!=NULL )
                 g_TwMgr->m_Graph = new CTwGraphDirect3D11;
             else
@@ -1729,6 +1730,7 @@ static int TwCreateGraph(ETwGraphAPI _GraphAPI)
                 g_TwMgr->SetLastError(g_ErrBadDevice);
                 return 0;
             }
+#endif // ANT_3D11
         #endif // ANT_WINDOWS
         break;
     }

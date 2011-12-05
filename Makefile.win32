@@ -3,8 +3,10 @@ all: boxplorer.exe shadershrink.exe edit-cfg.exe glsl.exe
 CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
 LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
 
-TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwEventSDL.obj TwColors.obj TwOpenGL.obj \
-        TwPrecomp.obj LoadOGL.obj TwEventWin.obj TwDirect3D10.obj TwDirect3D9.obj
+TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
+        TwPrecomp.obj LoadOGL.obj TwEventWin.obj \
+	TwDirect3D10.obj TwDirect3D9.obj \
+	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj
 
 boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 $(TW_OBJS)
 	cl -c $(CFLAGS) boxplorer.cc
@@ -32,6 +34,12 @@ TwFonts.obj: AntTweakBar\src\TwFonts.cpp
 	cl -c $(CFLAGS) $**
 
 TwEventSDL.obj: AntTweakBar\src\TwEventSDL.c
+	cl -c $(CFLAGS) $**
+
+TwEventSDL12.obj: AntTweakBar\src\TwEventSDL12.c
+	cl -c $(CFLAGS) $**
+
+TwEventSDL13.obj: AntTweakBar\src\TwEventSDL13.c
 	cl -c $(CFLAGS) $**
 
 TwOpenGL.obj: AntTweakBar\src\TwOpenGL.cpp
