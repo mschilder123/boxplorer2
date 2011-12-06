@@ -16,9 +16,11 @@
 #include "TwOpenGL.h"
 //#include "TwOpenGLCore.h"
 #ifdef ANT_WINDOWS
+#ifdef ANT_DODX
 #   include "TwDirect3D9.h"
 #   include "TwDirect3D10.h"
 #   include "TwDirect3D11.h"
+#endif // ANT_DODX
 #   include "resource.h"
 #   ifdef _DEBUG
 #       include <crtdbg.h>
@@ -1698,6 +1700,7 @@ static int TwCreateGraph(ETwGraphAPI _GraphAPI)
         g_TwMgr->m_Graph = new CTwGraphOpenGLCore;
         break;
     */
+#ifdef ANT_DODX
     case TW_DIRECT3D9:
         #ifdef ANT_WINDOWS
             if( g_TwMgr->m_Device!=NULL )
@@ -1722,7 +1725,6 @@ static int TwCreateGraph(ETwGraphAPI _GraphAPI)
         break;
     case TW_DIRECT3D11:
         #ifdef ANT_WINDOWS
-#ifdef ANT_3D11
             if( g_TwMgr->m_Device!=NULL )
                 g_TwMgr->m_Graph = new CTwGraphDirect3D11;
             else
@@ -1730,9 +1732,9 @@ static int TwCreateGraph(ETwGraphAPI _GraphAPI)
                 g_TwMgr->SetLastError(g_ErrBadDevice);
                 return 0;
             }
-#endif // ANT_3D11
         #endif // ANT_WINDOWS
         break;
+#endif  // ANT_DODX
     }
 
     if( g_TwMgr->m_Graph==NULL )

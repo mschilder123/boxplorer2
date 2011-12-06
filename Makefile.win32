@@ -5,7 +5,6 @@ LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj TwEventWin.obj \
-	TwDirect3D10.obj TwDirect3D9.obj \
 	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj
 
 boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 $(TW_OBJS)
@@ -52,10 +51,4 @@ LoadOGL.obj: AntTweakBar\src\LoadOGL.cpp
 	cl -c $(CFLAGS) $**
 
 TwEventWin.obj: AntTweakBar\src\TwEventWin.c
-	cl -c $(CFLAGS) $**
-
-TwDirect3D10.obj: AntTweakBar\src\TwDirect3D10.cpp
-	cl -c $(CFLAGS) $**
-
-TwDirect3D9.obj: AntTweakBar\src\TwDirect3D9.cpp
 	cl -c $(CFLAGS) $**
