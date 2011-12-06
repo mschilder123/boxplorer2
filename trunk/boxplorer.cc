@@ -924,7 +924,9 @@ int setupShaders(void) {
   if (vs != default_vs) free((char*)vs);
   if (fs != default_fs) free((char*)fs);
 
-  if (glGetError()) die("setupShaders() fails");
+  GLint status;
+  glGetProgramiv(p, GL_LINK_STATUS, &status);
+  if (status != GL_TRUE) die("setupShaders() fails");
 
   return p>0?p:0;
 }
@@ -972,7 +974,9 @@ int setupShaders2(void) {
   if (vs != frame_default_vs) free((char*)vs);
   if (fs != frame_default_fs) free((char*)fs);
 
-  if (glGetError()) die("setupShaders() fails");
+  GLint status;
+  glGetProgramiv(p, GL_LINK_STATUS, &status);
+  if (status != GL_TRUE) die("setupShaders2() fails");
 
   return p>0?p:0;
 }
@@ -1282,6 +1286,7 @@ int main(int argc, char **argv) {
   bool configSpeed = false;
   bool fixedFov = false;
   int enableDof = 0;
+
   // Peel known options off the back..
   while (argc>1) {
     if (!strcmp(argv[argc-1], "--overunder")) {
@@ -1337,16 +1342,18 @@ int main(int argc, char **argv) {
   bool keyframesChanged = false;
   LoadKeyFrames(fixedFov);
   LoadBackground();
-
+ 
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
       die("SDL initialization failed: %s\n", SDL_GetError());
   atexit(SDL_Quit);
-
-  // Set up the video mode, OpenGL state, shaders and shader parameters.
+  
+   // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics();
   initTwBar();
   initFPS(FPS_FRAMES_TO_AVERAGE);
+
+  printf(__FUNCTION__ " : GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 
   // Main loop.
   Controller ctl = CTL_CAM;  // the default controller is camera rotation
