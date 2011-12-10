@@ -27,12 +27,16 @@ using namespace std;
 
 // Hackery to get the list of DE and COLORING funcs from the glsl.
 map<string, float (*)(GLSL::vec3)> DE_funcs;
+map<string, double (*)(GLSL::vec3)> DE64_funcs;
 map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
 
 class DE_initializer {
  public:
   DE_initializer(string name, float (*func)(GLSL::vec3)) {
     DE_funcs[name] = func;
+  }
+  DE_initializer(string name, double (*func)(GLSL::vec3)) {
+    DE64_funcs[name] = func;
   }
 };
 #define DECLARE_DE(a) DE_initializer _init##a(#a, &a);
@@ -215,8 +219,8 @@ int vertex_main(int argc, char* argv[]) {
       zoom = tan(radians(fov_x * .5));
 
       // Lower left is (0,0) for gl_FragCoord.
-      gl_FragCoord.x = scr_x;
-      gl_FragCoord.y = YRES - 1 - scr_y;
+      gl_FragCoord.x = 0.5 + scr_x;
+      gl_FragCoord.y = YRES - 0.5 - scr_y;
 
       GLSL::main();  // Call the fragment shader code, compiled as C++
 
