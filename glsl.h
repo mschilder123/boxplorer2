@@ -14,7 +14,10 @@ namespace GLSL {  // Wrap in namespace so we collide less w/ globals.
 #endif
 
 class vec2;
+class dvec2;
 class vec3;
+class dvec3;
+class dvec4;
 
 class vec2 {
 public:
@@ -54,11 +57,20 @@ class vec3 {
   float x; float y; float z;
 };
 
+class dvec3 {
+ public:
+  dvec3(double xx, double yy, double zz);
+  dvec3 operator*(const double k) const;
+  dvec3 operator-(const dvec3& b) const;
+  double x; double y; double z;
+};
+
 class vec4 {
  public:
   vec4();
   vec4(float xx, float yy, float zz, float ww);
   vec4(const vec3& v3, float ww);
+  vec4(const dvec3& v3, float ww);
   vec4(float v);
   vec3 xyz() const;
   vec2 xy() const;
@@ -72,11 +84,32 @@ class vec4 {
   float x; float y; float z; float w;
 };
 
+class dvec4 {
+ public:
+  dvec4();
+  dvec4(double xx, double yy, double zz, double ww);
+  dvec4(const vec3& v3, double ww);
+  dvec4(const dvec3& v3, double ww);
+  dvec4(double v);
+  dvec3 xyz() const;
+  dvec4& operator=(const vec4& a);
+  dvec4& operator=(const dvec4& a);
+  dvec4& operator/=(const double k);
+  dvec4& operator*=(const double k);
+  dvec4 operator*(const dvec4& b) const;
+  dvec4 operator+(const dvec4& b) const;
+  dvec4 operator/(const double k) const;
+  double dot(const dvec4& b) const;
+  double x; double y; double z; double w;
+};
+
+
 vec2::vec2(float a, float b) : x(a), y(b) {}
 vec3 vec2::xxy() const { return vec3(x,x,y); }
 vec3 vec2::xyx() const { return vec3(x,y,x); }
 vec3 vec2::yxx() const { return vec3(y,x,x); }
 vec2 vec2::operator-(const vec2& b) const { return vec2(x-b.x, y-b.y); }
+
 
 vec3::vec3() : x(0), y(0), z(0) {}
 vec3::vec3(float k) : x(k), y(k), z(k) {}
@@ -102,6 +135,12 @@ vec3 vec3::zxy() const { return vec3(z,x,y); }
 vec2 vec3::xy() const { return vec2(x,y); }
 vec2 vec3::xz() const { return vec2(x,z); }
 
+
+dvec3::dvec3(double xx, double yy, double zz) : x(xx), y(yy), z(zz) {}
+dvec3 dvec3::operator*(const double k) const { return dvec3(x*k, y*k, z*k); }
+dvec3 dvec3::operator-(const dvec3& b) const { return dvec3(x-b.x, y-b.y, z-b.z); }
+
+
 vec4::vec4() : x(0), y(0), z(0), w(0) {}
 vec4::vec4(float xx, float yy, float zz, float ww) : x(xx), y(yy), z(zz), w(ww) {}
 vec4::vec4(const vec3& v3, float ww) { x = v3.x; y = v3.y; z = v3.z; w = ww; }
@@ -116,20 +155,49 @@ vec4 vec4::operator+(const vec4& b) const { return vec4(x+b.x, y+b.y, z+b.z, w+b
 vec4 vec4::operator/(const float k) const { return vec4(x/k, y/k, z/k, w/k); }
 float vec4::dot(const vec4& b) const { return x*b.x + y*b.y + z*b.z + w*b.w; }
 
+
+dvec4::dvec4() : x(0), y(0), z(0), w(0) {}
+dvec4::dvec4(double xx, double yy, double zz, double ww) : x(xx), y(yy), z(zz), w(ww) {}
+dvec4::dvec4(const vec3& v3, double ww) { x = v3.x; y = v3.y; z = v3.z; w = ww; }
+dvec4::dvec4(const dvec3& v3, double ww) { x = v3.x; y = v3.y; z = v3.z; w = ww; }
+dvec4::dvec4(double v) : x(v), y(v), z(v), w(v) {}
+dvec3 dvec4::xyz() const { return dvec3(x,y,z); }
+dvec4& dvec4::operator=(const vec4& a) { x = a.x; y = a.y; z = a.z; w = a.w; return *this; }
+dvec4& dvec4::operator=(const dvec4& a) { x = a.x; y = a.y; z = a.z; w = a.w; return *this; }
+dvec4& dvec4::operator/=(const double k) { x/= k; y/= k; z/= k; w/= k; return *this; }
+dvec4& dvec4::operator*=(const double k) { x*= k; y*= k; z*= k; w*= k; return *this; }
+dvec4 dvec4::operator*(const dvec4& b) const { return dvec4(x*b.x, y*b.y, z*b.z, w*b.w); }
+dvec4 dvec4::operator+(const dvec4& b) const { return dvec4(x+b.x, y+b.y, z+b.z, w+b.w); }
+dvec4 dvec4::operator/(const double k) const { return dvec4(x/k, y/k, z/k, w/k); }
+double dvec4::dot(const dvec4& b) const { return x*b.x + y*b.y + z*b.z + w*b.w; }
+
+
 float mod(float a, float b) { return a - b*floor(a/b); }
 vec3 mod(const vec3& a, float b) { return vec3(mod(a.x, b), mod(a.y, b), mod(a.z, b)); }
-float max(float a, float b) { return a>b?a:b; }
-float min(float a, float b) { return a<b?a:b; }
+//float max(float a, float b) { return a>b?a:b; }
+double max(double a, double b) { return a>b?a:b; }
+//float min(float a, float b) { return a<b?a:b; }
+double min(double a, double b) { return a<b?a:b; }
+
+
 float dot(const vec3& a, const vec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+double dot(const dvec3& a, const dvec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 float dot(const vec2& a, const vec2& b) { return a.x*b.x + a.y*b.y; }
+
 vec3 cross(const vec3& a, const vec3& b) { return a.cross(b); }
 float length(const vec3& a) { return sqrt(dot(a, a)); }
+double length(const dvec3& a) { return sqrt(dot(a, a)); }
 float length(const vec2& a) { return sqrt(dot(a, a)); }
 float abs(float a) { return fabs(a); }
+double abs(double a) { return fabs(a); }
 vec3 abs(const vec3& a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 float clamp(float v, float l, float h) { if (v < l) return l; if (v > h) return h; return v; }
+double clamp(double v, double l, double h) { if (v < l) return l; if (v > h) return h; return v; }
 vec3 clamp(const vec3& v, float l, float h) {
   return vec3(clamp(v.x, l, h), clamp(v.y, l, h), clamp(v.z, l, h));
+}
+dvec3 clamp(const dvec3& v, double l, double h) {
+  return dvec3(clamp(v.x, l, h), clamp(v.y, l, h), clamp(v.z, l, h));
 }
 vec3 clamp(const vec3& v, const vec3& l, const vec3& h) {
   return vec3(clamp(v.x, l.x, h.x), clamp(v.y, l.y, h.y), clamp(v.z, l.z, h.z));

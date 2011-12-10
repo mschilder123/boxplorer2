@@ -184,7 +184,7 @@ vec3 c_menger(vec3 p) {
 DECLARE_COLORING(c_menger)
 
 float de_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9f, 1.0f);
   vec4 scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
   vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
@@ -197,6 +197,27 @@ float de_mandelbox(vec3 pos) {
            - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
+
+#ifdef _FAKE_GLSL_
+
+double de_mandelbox64(vec3 pos) {
+  double minRad2 = clamp(double(MB_MINRAD2), 1.0e-9, 1.0);
+  dvec4 scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  dvec4 p = dvec4(pos,1.0), p0 = p;  // p.w is the distance estimate
+  double ps = abs(MB_SCALE), psm = 1.0/ps;
+  for (int i=0; i<iters; i++) {
+    p = dvec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
+    double r2 = dot(p.xyz, p.xyz);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + p0;
+    ps *= psm;
+  }
+  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
+           - ps) * DIST_MULTIPLIER;
+}
+DECLARE_DE(de_mandelbox64)
+
+#endif  // _FAKE_GLSL_
 
 // Infinite construction menger sphere sponge.
 float de_ssponge(vec3 pos) {
@@ -236,7 +257,7 @@ DECLARE_DE(de_combi)
 
 // Compute the color at `pos`.
 vec3 c_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9f, 1.0f);
   vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
   vec3 p = pos, p0 = p;
   float trap = 1.0;
@@ -244,7 +265,7 @@ vec3 c_mandelbox(vec3 pos) {
   for (int i=0; i<color_iters; i++) {
     p = clamp(p, -1.0, 1.0) * 2.0 - p;
     float r2 = dot(p, p);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p *= clamp(float(max(minRad2/r2, minRad2)), 0.0f, 1.0f);
     p = p*scale + p0;
     trap = min(trap, r2);
   }
@@ -308,7 +329,7 @@ float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist, float side) 
     w *= 0.5;
     dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
-  return clamp(ao, 0.0, 1.0);
+  return clamp(ao, 0.0f, 1.0f);
 }
 
 #ifndef _FAKE_GLSL_
