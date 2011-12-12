@@ -297,7 +297,7 @@ vec3 normal(vec3 pos, float d_pos) {
 // `normal`, `view` and `light` should be normalized.
 vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor, vec3 specular) {
   vec3 halfLV = normalize(light + view);
-  float spe = pow(max( dot(normal, halfLV), 0.0 ), float(32.0));
+  float spe = pow(float(max( float(dot(normal, halfLV)), 0.0f )), float(32.0));
   float dif = dot(normal, light) * 0.5 + 0.75;
   return diffuseColor*dif + specular*spe;
 }
