@@ -198,13 +198,13 @@ GLuint background_texture;
 // Helper functions
 
 // Compute the dot product of two vectors.
-float dot(const float x[3], const float y[3]) {
+double dot(const double x[3], const double y[3]) {
   return x[0]*y[0] + x[1]*y[1] + x[2]*y[2];
 }
 
 // Normalize a vector. If it was zero, return 0.
-int normalize(float x[3]) {
-  float len = dot(x, x); if (len == 0) return 0;
+int normalize(double x[3]) {
+  double len = dot(x, x); if (len == 0) return 0;
   len = 1/sqrt(len); x[0] *= len; x[1] *= len; x[2] *= len;
   return 1;
 }
@@ -319,7 +319,7 @@ char* parName[NUMPARS][3];
 class KeyFrame {
   public:
    // View matrix.
-   float v[16];
+   double v[16];
 
    // Declare fractal and other parameters.
    #define PROCESS(a,b,c,d) a b;
@@ -333,23 +333,23 @@ class KeyFrame {
 
    KeyFrame() { memset(this, 0, sizeof *this); }
 
-   float distanceTo(const KeyFrame& other) const {
-      float delta[3] = { v[12]-other.v[12],
-                         v[13]-other.v[13],
-                         v[14]-other.v[14] };
+   double distanceTo(const KeyFrame& other) const {
+      double delta[3] = { v[12]-other.v[12],
+                          v[13]-other.v[13],
+                          v[14]-other.v[14] };
       return sqrt(dot(delta, delta));
    }
-   float* right() { return &v[0]; }
-   float* up() { return &v[4]; }
-   float* ahead() { return &v[8]; }
-   float* pos() { return &v[12]; }
+   double* right() { return &v[0]; }
+   double* up() { return &v[4]; }
+   double* ahead() { return &v[8]; }
+   double* pos() { return &v[12]; }
 
    void setKey(bool key) { isKey_ = key; }
    bool isKey() const { return isKey_; }
 
    void orthogonalize() {
       if (!normalize(ahead())) { ahead()[0]=ahead()[1]=0; ahead()[2]=1; }
-      float l = dot(ahead(), up());
+      double l = dot(ahead(), up());
       for (int i=0; i<3; i++) up()[i] -= l*ahead()[i];
       if (!normalize(up())) {  // Error? Make upDirection.z = 0.
          up()[2] = 0;
@@ -371,14 +371,14 @@ class KeyFrame {
 
    // Move camera in a direction relative to the view direction.
    // Behaves like `glTranslate`.
-   void move(float x, float y, float z) {
+   void move(double x, double y, double z) {
       for (int i=0; i<3; i++) {
          pos()[i] += right()[i]*x + up()[i]*y + ahead()[i]*z;
       }
    }
 
    // Move camera in the normalized absolute direction `dir` by `len` units.
-   void moveAbsolute(float* dir, float len) {
+   void moveAbsolute(double* dir, double len) {
       for (int i=0; i<3; i++) {
          pos()[i] += len * dir[i];
       }
@@ -386,15 +386,15 @@ class KeyFrame {
 
    // Rotate the camera by `deg` degrees around a normalized axis.
    // Behaves like `glRotate` without normalizing the axis.
-   void rotate(float deg, float x, float y, float z) {
-     float s = sin(deg*PI/180), c = cos(deg*PI/180), t = 1-c;
-     float r[3][3] = {
+   void rotate(double deg, double x, double y, double z) {
+     double s = sin(deg*PI/180), c = cos(deg*PI/180), t = 1-c;
+     double r[3][3] = {
       { x*x*t +   c, x*y*t + z*s, x*z*t - y*s },
       { y*x*t - z*s, y*y*t +   c, y*z*t + x*s },
       { z*x*t + y*s, z*y*t - x*s, z*z*t +   c }
      };
      for (int i=0; i<3; i++) {
-      float c[3];
+      double c[3];
       for (int j=0; j<3; j++) c[j] = v[i+j*4];
       for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
      }
@@ -403,7 +403,7 @@ class KeyFrame {
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
    void activate() const {
       glMatrixMode(GL_MODELVIEW);
-      glLoadMatrixf(v);
+      glLoadMatrixd(v);
    }
 
    // Set the OpenGL modelview and projection for gl*() functions.
@@ -415,15 +415,15 @@ class KeyFrame {
       glFrustum(-fW, fW, -fH, fH, zNear, zFar);
 
       orthogonalize();
-      float matrix[16] = {
+      double matrix[16] = {
          right()[0], up()[0], -ahead()[0], 0,
          right()[1], up()[1], -ahead()[1], 0,
          right()[2], up()[2], -ahead()[2], 0,
                   0,       0,           0, 1
       };
       glMatrixMode(GL_MODELVIEW);
-      glLoadMatrixf(matrix);
-      glTranslatef(-pos()[0], -pos()[1], -pos()[2]);
+      glLoadMatrixd(matrix);
+      glTranslated(-pos()[0], -pos()[1], -pos()[2]);
    }
 
    // Load configuration.
@@ -457,9 +457,9 @@ class KeyFrame {
 
         double val;
 
-        if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos()[0], &pos()[1], &pos()[2]); continue; }
-        if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
-        if (!strcmp(s, "upDirection")) { v=fscanf(f, " %f %f %f", &up()[0], &up()[1], &up()[2]); continue; }
+        if (!strcmp(s, "position")) { v=fscanf(f, " %lf %lf %lf", &pos()[0], &pos()[1], &pos()[2]); continue; }
+        if (!strcmp(s, "direction")) { v=fscanf(f, " %lf %lf %lf", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
+        if (!strcmp(s, "upDirection")) { v=fscanf(f, " %lf %lf %lf", &up()[0], &up()[1], &up()[2]); continue; }
 
         #define PROCESS(type, name, nameString, doSpline) \
          if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
@@ -555,7 +555,7 @@ class KeyFrame {
                     float speed = 0.0) {
      #define glSetUniformf(name) \
        glUniform1f(glGetUniformLocation(program, #name), name);
-     #define glSetUniformv(name) \
+     #define glSetUniformfv(name) \
        glUniform3fv(glGetUniformLocation(program, #name), lengthof(name), (float*)name);
      #define glSetUniformi(name) \
        glUniform1i(glGetUniformLocation(program, #name), name);
@@ -571,7 +571,7 @@ class KeyFrame {
      glSetUniformf(time); glSetUniformf(focus);
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
-     glSetUniformv(par);
+     glSetUniformfv(par);
 
      #undef glSetUniformf
      #undef glSetUniformv
@@ -625,8 +625,8 @@ void suggestDeltaTime(KeyFrame& camera, const vector<KeyFrame>& keyframes) {
   if (keyframes.empty()) {
     camera.delta_time = 0;
   } else {
-    float dist = camera.distanceTo(keyframes[keyframes.size() - 1]);
-    float steps = dist / camera.speed;
+    double dist = camera.distanceTo(keyframes[keyframes.size() - 1]);
+    double steps = dist / camera.speed;
     camera.delta_time = steps / config.fps;
   }
 }
@@ -678,11 +678,11 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
     for (int f = 0; f < nsubframes; ++f) {
       KeyFrame tmp = config;  // Start with default values.
       tmp.setKey(f == 0);
-      const float t = f * (1. / nsubframes);
+      const double t = f * (1. / nsubframes);
 
       // The CatmullRom spline function; 0 <= t <= 1
       #define SPLINE(X,p0,p1,p2,p3) \
-        (X = (float)(.5 * ( (2 * p1 + \
+        (X = (double)(.5 * ( (2 * p1 + \
                             (-p0 + p2)*t + \
                             (2*p0 - 5*p1 + 4*p2 - p3)*t*t + \
                             (-p0 + 3*p1 - 3*p2 + p3)*t*t*t))))
@@ -1509,13 +1509,13 @@ int main(int argc, char **argv) {
       glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // right eye
       for (size_t i = 0; i < splines.size(); ++i) {
         splines[i].move(splines[i].speed, 0, 0);
-        glVertex3fv(splines[i].pos());
+        glVertex3dv(splines[i].pos());
         splines[i].move(-2*splines[i].speed, 0, 0);
       }
       glEnd();
       glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // left eye
       for (size_t i = 0; i < splines.size(); ++i) {
-        glVertex3fv(splines[i].pos());
+        glVertex3dv(splines[i].pos());
       }
       glEnd();
 
@@ -1535,10 +1535,10 @@ int main(int argc, char **argv) {
         glBegin(GL_LINES);
         KeyFrame tmp = keyframes[i];
         tmp.move(tmp.speed, 0, 0);
-        glVertex3fv(tmp.pos());
+        glVertex3dv(tmp.pos());
         tmp = keyframes[i];
         tmp.move(-tmp.speed, 0, 0);
-        glVertex3fv(tmp.pos());
+        glVertex3dv(tmp.pos());
         glEnd();
       }
     }
@@ -1611,7 +1611,7 @@ int main(int argc, char **argv) {
 
     // Show position and fps in the caption.
     char caption[2048], controllerStr[256];
-    sprintf(caption, "%s %.2ffps %5lu [%.3f %.3f %.3f] %dms",
+    sprintf(caption, "%s %.2ffps %5lu [%.3lf %.3lf %.3lf] %dms",
         printController(controllerStr, ctl),
         getFPS(), (unsigned long)splines_index,
         camera.pos()[0], camera.pos()[1], camera.pos()[2],
