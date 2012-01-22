@@ -27,7 +27,7 @@ using namespace std;
 
 // Hackery to get the list of DE and COLORING funcs from the glsl.
 map<string, float (*)(GLSL::vec3)> DE_funcs;
-map<string, double (*)(GLSL::vec3)> DE64_funcs;
+map<string, double (*)(GLSL::dvec3)> DE64_funcs;
 map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
 
 class DE_initializer {
@@ -35,7 +35,7 @@ class DE_initializer {
   DE_initializer(string name, float (*func)(GLSL::vec3)) {
     DE_funcs[name] = func;
   }
-  DE_initializer(string name, double (*func)(GLSL::vec3)) {
+  DE_initializer(string name, double (*func)(GLSL::dvec3)) {
     DE64_funcs[name] = func;
   }
 };
