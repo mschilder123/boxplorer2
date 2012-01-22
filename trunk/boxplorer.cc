@@ -66,21 +66,25 @@ using namespace std;
 #define PI          3.14159265358979324
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), exit(-1), 1 )
 #define lengthof(x) ( sizeof(x)/sizeof((x)[0]) )
-//#define sign(x)     ( (x)<0 ? -1 : 1 )
 
 #include "glsl.h"
 
 // Hackery to get the list of DE and COLORING funcs from the glsl.
 map<string, float (*)(GLSL::vec3)> DE_funcs;
-map<string, double (*)(GLSL::vec3)> DE64_funcs;
+map<string, double (*)(GLSL::dvec3)> DE64_funcs;
 map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
 
 class DE_initializer {
  public:
   DE_initializer(string name, float (*func)(GLSL::vec3)) {
+    printf("DECLARE_DE(%s)\n", name.c_str());
     DE_funcs[name] = func;
   }
-  DE_initializer(string name, double (*func)(GLSL::vec3)) {
+  DE_initializer(string name, double (*func)(GLSL::dvec3)) {
+    printf("DECLARE_DE(%s)\n", name.c_str());
+    // Strip _64 from name.
+    size_t x64 = name.find("_64");
+    if (x64 != string::npos) name.erase(x64);
     DE64_funcs[name] = func;
   }
 };
@@ -88,6 +92,8 @@ class DE_initializer {
 #define DECLARE_COLORING(a)  // not interested in color funcs here
 
 string de_func_name;
+double (*de_func_64)(GLSL::dvec3) = NULL;
+float (*de_func)(GLSL::vec3) = NULL;
 
 namespace GLSL {
 
@@ -290,7 +296,7 @@ float getFPS(void) {
   PROCESS(float, mouse_rot_speed, "mouse_rot_speed", false) \
   PROCESS(float, fov_x, "fov_x", true) \
   PROCESS(float, fov_y, "fov_y", true) \
-  PROCESS(float, speed, "speed", true) \
+  PROCESS(double, speed, "speed", true) \
   PROCESS(float, min_dist, "min_dist", true) \
   PROCESS(int, max_steps, "max_steps", true) \
   PROCESS(int, iters, "iters", true) \
@@ -538,7 +544,7 @@ class KeyFrame {
        PROCESS_CONFIG_PARAMS
        #undef PROCESS
 
-       fprintf(f, "position %g %g %g\n", pos()[0], pos()[1], pos()[2]);
+       fprintf(f, "position %12.12e %12.12e %12.12e\n", pos()[0], pos()[1], pos()[2]);
        fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
        fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
        for (size_t i=0; i<lengthof(par); i++) {
@@ -552,7 +558,7 @@ class KeyFrame {
    // Send parameters to gpu.
    void setUniforms(float x_scale, float x_offset,
                     float y_scale, float y_offset,
-                    float speed = 0.0) {
+                    double speed = 0.0) {
      #define glSetUniformf(name) \
        glUniform1f(glGetUniformLocation(program, #name), name);
      #define glSetUniformfv(name) \
@@ -569,7 +575,12 @@ class KeyFrame {
      glSetUniformf(y_scale); glSetUniformf(y_offset);
      glSetUniformf(speed); glSetUniformi(nrays);
      glSetUniformf(time); glSetUniformf(focus);
+
      glUniform1f(glGetUniformLocation(program, "xres"), width);
+
+     // Try setting double precision uniforms.
+     if (glUniform1d) glUniform1d(glGetUniformLocation(program, "dspeed"), speed);
+     if (glUniform3dv) glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
 
      glSetUniformfv(par);
 
@@ -729,6 +740,7 @@ typedef enum Controller {
 // They get a pointer to the modified value and a signed count of consecutive changes.
 void m_mul(float* x, int d) { *x *= pow(10, sign(d)/20.); }
 void m_mulSlow(float* x, int d) { *x *= pow(10, sign(d)/40.); }
+void m_mulSlow(double* x, int d) { *x *= pow(10, sign(d)/40.); }
 void m_tan(float* x, int d) { *x = atan(tan(*x*PI/180/2) * pow(0.1, sign(d)/40.) ) /PI*180*2; }
 void m_progressiveInc(int* x, int d) { *x += sign(d) * ((abs(d)+4) / 4); }
 void m_progressiveAdd(float* x, int d) { *x += 0.001 * (sign(d) * ((abs(d)+4) / 4)); }
@@ -764,10 +776,10 @@ char* printController(char* s, Controller c) {
               (int)(camera.ahead()[2]*100));
     } break;
     case CTL_TIME: {
-      sprintf(s, "Speed %f DeltaT %.3f", camera.speed, camera.delta_time);
+      sprintf(s, "Speed %.8e DeltaT %.3f", camera.speed, camera.delta_time);
     } break;
     case CTL_3D: {
-      sprintf(s, "Sep %f Foc %.3f", camera.speed, camera.focus);
+      sprintf(s, "Sep %.8e Foc %.3f", camera.speed, camera.focus);
     } break;
   }
   return s;
@@ -1384,14 +1396,21 @@ int main(int argc, char **argv) {
     CatmullRom(keyframes, &splines, config.loop);
   }
 
-  float last_de = 0;
+  double last_de = 0;
 
-  // Check availability of DE
-  if (!de_func_name.empty())
-    if (DE_funcs.find(de_func_name) == DE_funcs.end()) {
+  // Check availability of DE; setup func ptr.
+  if (!de_func_name.empty()) {
+    if (DE64_funcs.find(de_func_name) != DE64_funcs.end()) {
+      // First pick is double version.
+      de_func_64 = DE64_funcs[de_func_name];
+    } else if (DE_funcs.find(de_func_name) != DE_funcs.end()) {
+      // Next pick float version.
+      de_func = DE_funcs[de_func_name];
+    } else {
       printf(__FUNCTION__ ": unknown DE %s\n", de_func_name.c_str());
       de_func_name.clear();
     }
+  }
 
   while (!done) {
     int ctlXChanged = 0, ctlYChanged = 0;
@@ -1448,7 +1467,7 @@ int main(int argc, char **argv) {
       glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     }
 
-    if (!de_func_name.empty()) {
+    if (de_func || de_func_64) {
       // Get a DE.
       // Setup just the vars needed for DE. For now, iters and par[0..10]
       // TODO: make de() method of camera?
@@ -1456,11 +1475,13 @@ int main(int argc, char **argv) {
       for (int i = 0; i < 10; ++i) {
         GLSL::par[i] = GLSL::vec3(camera.par[i][0], camera.par[i][1], camera.par[i][2]);
       }
-      float de =
-        GLSL::abs(DE_funcs[de_func_name](GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
+      double de =
+        de_func_64
+          ?GLSL::abs(de_func_64(GLSL::dvec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])))
+          :GLSL::abs(de_func(GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
       if (de != last_de) {
-        printf("de=%f\n", de);
-        camera.speed = GLSL::clamp(de/10.0,0.000001,1.0);
+        printf("de=%12.12e\n", de);
+        camera.speed = GLSL::clamp(de/10.0,DBL_EPSILON,1.0);
       }
       last_de = de;
     }
@@ -1841,7 +1862,7 @@ int main(int argc, char **argv) {
         }
 
         if (keyframe < keyframes.size()) {
-          printf("at keyframe %lu, speed %f, delta_time %f\n",
+          printf("at keyframe %lu, speed %.8e, delta_time %f\n",
               (unsigned long)keyframe, keyframes[keyframe].speed,
               keyframes[keyframe].delta_time);
         }
@@ -1871,7 +1892,7 @@ int main(int argc, char **argv) {
         if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
         if (keyframe < keyframes.size()) {
           camera = keyframes[keyframe];
-          printf("at keyframe %lu, speed %f, delta_time %f\n",
+          printf("at keyframe %lu, speed %.8e, delta_time %f\n",
               (unsigned long)keyframe, keyframes[keyframe].speed,
               keyframes[keyframe].delta_time);
         } else camera = config;
@@ -1968,8 +1989,8 @@ int main(int argc, char **argv) {
     if (keystate[SDLK_q]) m_rotateZ2(camera.keyb_rot_speed);
     if (keystate[SDLK_e]) m_rotateZ2(-camera.keyb_rot_speed);
 
-   if (keystate[SDLK_z]){ if (camera.speed > 0.000001) camera.speed -= camera.speed/10; printf("speed %f\n", camera.speed);}
-   if (keystate[SDLK_c]){ if (camera.speed < 1.0) camera.speed += camera.speed/10; printf("speed %f\n", camera.speed);}
+   if (keystate[SDLK_z]){ if (camera.speed > 0.000001) camera.speed -= camera.speed/10; printf("speed %.8e\n", camera.speed);}
+   if (keystate[SDLK_c]){ if (camera.speed < 1.0) camera.speed += camera.speed/10; printf("speed %.8e\n", camera.speed);}
 
     // Change the value of the active controller.
     if (!ctlXChanged) {

@@ -200,7 +200,7 @@ DECLARE_DE(de_mandelbox)
 
 #ifdef _FAKE_GLSL_
 
-double de_mandelbox64(vec3 pos) {
+double de_mandelbox_64(dvec3 pos) {
   double minRad2 = clamp(double(MB_MINRAD2), 1.0e-9, 1.0);
   dvec4 scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
   dvec4 p = dvec4(pos,1.0), p0 = p;  // p.w is the distance estimate
@@ -213,9 +213,14 @@ double de_mandelbox64(vec3 pos) {
     ps *= psm;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-           - ps) * DIST_MULTIPLIER;
+           - ps) * .9;
 }
-DECLARE_DE(de_mandelbox64)
+DECLARE_DE(de_mandelbox_64)
+
+double de_Z0_64(dvec3 pos) {
+  return abs(pos.z * .3);
+}
+DECLARE_DE(de_Z0_64)
 
 #endif  // _FAKE_GLSL_
 
