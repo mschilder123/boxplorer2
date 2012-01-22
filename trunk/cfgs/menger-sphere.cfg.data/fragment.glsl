@@ -50,6 +50,7 @@ mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat + z0.z*ss
 vec3 aoColor = vec3(0, 0, 0);
 
 //Functions to call.
+#undef d
 #define d d_SphereSponge
 #define color color_SphereSponge
 
