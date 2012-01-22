@@ -9,6 +9,7 @@
 
 #if !defined(_WIN32)
 
+#include <float.h>
 #include <unistd.h>
 #define MKDIR(a) mkdir((a), 0755)
 
@@ -579,8 +580,10 @@ class KeyFrame {
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
      // Try setting double precision uniforms.
+#if !defined(_MACOSX)
      if (glUniform1d) glUniform1d(glGetUniformLocation(program, "dspeed"), speed);
      if (glUniform3dv) glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
+#endif
 
      glSetUniformfv(par);
 
@@ -1302,6 +1305,10 @@ int main(int argc, char **argv) {
   bool configSpeed = false;
   bool fixedFov = false;
   int enableDof = 0;
+#if defined(_MACOSX)
+  // Shit won't work on mac.
+  enableDof = -1;
+#endif
 
   // Peel known options off the back..
   while (argc>1) {
