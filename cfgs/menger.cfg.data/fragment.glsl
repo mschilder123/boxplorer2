@@ -184,7 +184,7 @@ vec3 c_menger(vec3 p) {
 DECLARE_COLORING(c_menger)
 
 float de_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9f, 1.0f);
+  float minRad2 = clamp(MB_MINRAD2, float(1.0e-9), float(1.0));
   vec4 scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
   vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
@@ -262,7 +262,7 @@ DECLARE_DE(de_combi)
 
 // Compute the color at `pos`.
 vec3 c_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9f, 1.0f);
+  float minRad2 = clamp(MB_MINRAD2, float(1.0e-9), float(1.0));
   vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
   vec3 p = pos, p0 = p;
   float trap = 1.0;
@@ -270,7 +270,7 @@ vec3 c_mandelbox(vec3 pos) {
   for (int i=0; i<color_iters; i++) {
     p = clamp(p, -1.0, 1.0) * 2.0 - p;
     float r2 = dot(p, p);
-    p *= clamp(float(max(minRad2/r2, minRad2)), 0.0f, 1.0f);
+    p *= clamp(float(max(minRad2/r2, minRad2)), float(0.0), float(1.0));
     p = p*scale + p0;
     trap = min(trap, r2);
   }
@@ -302,7 +302,7 @@ vec3 normal(vec3 pos, float d_pos) {
 // `normal`, `view` and `light` should be normalized.
 vec3 blinn_phong(vec3 normal, vec3 view, vec3 light, vec3 diffuseColor, vec3 specular) {
   vec3 halfLV = normalize(light + view);
-  float spe = pow(float(max( float(dot(normal, halfLV)), 0.0f )), float(32.0));
+  float spe = pow(float(max( float(dot(normal, halfLV)), 0.0 )), float(32.0));
   float dif = dot(normal, light) * 0.5 + 0.75;
   return diffuseColor*dif + specular*spe;
 }
@@ -334,7 +334,7 @@ float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist, float side) 
     w *= 0.5;
     dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
-  return clamp(ao, 0.0f, 1.0f);
+  return clamp(ao, float(0.0), float(1.0));
 }
 
 #ifndef _FAKE_GLSL_
@@ -356,7 +356,8 @@ vec3 background_color(in vec3 vp) {
     u = 1. - theta;
   }
   //return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
-  return texture2DLod(bg_texture, vec2(u+time/10.0,v), BG_BLUR).xyz;
+  //return texture2DLod(bg_texture, vec2(u+time/10.0,v), BG_BLUR).xyz;
+  return texture2D(bg_texture, vec2(u+time/10.0,v)).xyz;
 }
 #else
 // TODO: add texture2DLod to fake glsl
