@@ -34,7 +34,7 @@ uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
 #define MOD par[8].x  // {min=1 max=5 step=.01}
 #define SCALE par[8].y  // {min=1 max=5 step=.01}
 #define INTRA_D par[8].z  // {min=.01 max=10.0 step=.01}
-#define INITIAL_K par[0].x  // {min=0 max=5 step=.01}
+#define INITIAL_K par[0].z // {min=0 max=5 step=.01}
 #define DE_EPS par[0].y  // {min=.0000001 max=.001 step=.0000001}
 
 #define Angle par[0].z  // {min=-3 max=3 step=.001}
