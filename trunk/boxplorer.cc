@@ -579,10 +579,10 @@ class KeyFrame {
 
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
-     // Try setting double precision uniforms.
-#if !defined(_MACOSX)
-     if (glUniform1d) glUniform1d(glGetUniformLocation(program, "dspeed"), speed);
-     if (glUniform3dv) glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
+#if defined(PFNGLUNIFORM1DPROC)
+     // Pass in double precision values, if supported.
+     glUniform1d(glGetUniformLocation(program, "dspeed"), speed);
+     glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
 #endif
 
      glSetUniformfv(par);
@@ -1484,8 +1484,10 @@ int main(int argc, char **argv) {
       }
       double de =
         de_func_64
-          ?GLSL::abs(de_func_64(GLSL::dvec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])))
-          :GLSL::abs(de_func(GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
+          ?GLSL::abs(de_func_64(
+              GLSL::dvec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])))
+          :GLSL::abs(de_func(
+              GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
       if (de != last_de) {
         printf("de=%12.12e\n", de);
         camera.speed = GLSL::clamp(de/10.0,DBL_EPSILON,1.0);
