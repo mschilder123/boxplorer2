@@ -579,7 +579,7 @@ class KeyFrame {
 
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
-#if defined(PFNGLUNIFORM1DPROC)
+#if defined(GL_ARB_gpu_shader_fp64)
      // Pass in double precision values, if supported.
      glUniform1d(glGetUniformLocation(program, "dspeed"), speed);
      glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
@@ -1479,7 +1479,7 @@ int main(int argc, char **argv) {
       // Setup just the vars needed for DE. For now, iters and par[0..10]
       // TODO: make de() method of camera?
       GLSL::iters = camera.iters;
-      for (int i = 0; i < 10; ++i) {
+      for (int i = 0; i < 20; ++i) {
         GLSL::par[i] = GLSL::vec3(camera.par[i][0], camera.par[i][1], camera.par[i][2]);
       }
       double de =
