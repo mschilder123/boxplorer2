@@ -676,7 +676,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 
   // Compute controlpoint time based on sum of delta_time up to it.
   // Note we don't spline delta_time but we do spline time.
-  float time = 0;
+  double time = 0;
   for (size_t i = 0; i < n - 1; ++i) {
     if (i) time += controlpoints[i].delta_time;
     controlpoints[i].time = time;
