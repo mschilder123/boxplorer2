@@ -246,8 +246,8 @@ Uint32* frameDurations;
 int frameDurationsIndex = 0;
 Uint32 lastFrameTime;
 
-float now() {
-  return (float)SDL_GetTicks() / 1000.0;
+double now() {
+  return (double)SDL_GetTicks() / 1000.0;
 }
 
 // Initialize the FPS structure.
@@ -307,8 +307,8 @@ float getFPS(void) {
   PROCESS(float, ao_strength, "ao_strength", true) \
   PROCESS(float, glow_strength, "glow_strength", true) \
   PROCESS(float, dist_to_color, "dist_to_color", true) \
-  PROCESS(float, delta_time, "delta_time", false) \
-  PROCESS(float, time, "time", true) \
+  PROCESS(double, delta_time, "delta_time", false) \
+  PROCESS(double, time, "time", true) \
   PROCESS(float, fps, "fps", false) \
   PROCESS(int, depth_size, "depth_size", false) \
   PROCESS(float, z_near, "z_near", true) \
@@ -692,14 +692,14 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
     for (int f = 0; f < nsubframes; ++f) {
       KeyFrame tmp = config;  // Start with default values.
       tmp.setKey(f == 0);
-      const double t = f * (1. / nsubframes);
+      const double t = f * ((double)1 / nsubframes);
 
       // The CatmullRom spline function; 0 <= t <= 1
       #define SPLINE(X,p0,p1,p2,p3) \
         (X = (double)(.5 * ( (2 * p1 + \
-                            (-p0 + p2)*t + \
-                            (2*p0 - 5*p1 + 4*p2 - p3)*t*t + \
-                            (-p0 + 3*p1 - 3*p2 + p3)*t*t*t))))
+                            t*((-p0 + p2) + \
+                             t*(2*p0 - 5*p1 + 4*p2 - p3) + \
+                               t*(-p0 + 3*p1 - 3*p2 + p3))))))
 
       // Spline position, direction.
       for (size_t j = 0; j < lengthof(tmp.v); ++j) {
@@ -747,6 +747,7 @@ void m_mulSlow(double* x, int d) { *x *= pow(10, sign(d)/40.); }
 void m_tan(float* x, int d) { *x = atan(tan(*x*PI/180/2) * pow(0.1, sign(d)/40.) ) /PI*180*2; }
 void m_progressiveInc(int* x, int d) { *x += sign(d) * ((abs(d)+4) / 4); }
 void m_progressiveAdd(float* x, int d) { *x += 0.001 * (sign(d) * ((abs(d)+4) / 4)); }
+void m_progressiveAdd(double* x, int d) { *x += 0.001 * (sign(d) * ((abs(d)+4) / 4)); }
 void m_singlePress(int* x, int d) { if (d==1 || d==-1) *x += d; }
 
 void m_rotateX(int d) { camera.rotate(sign(d)*camera.keyb_rot_speed, 0, 1, 0); }
@@ -1388,11 +1389,12 @@ int main(int argc, char **argv) {
   vector<KeyFrame> splines;
   size_t splines_index = 0;
 
-  float frame_time = 1 / config.fps;
-  float render_time = 0;
-  float render_start = 0;
+  double frame_time = 1 / config.fps;
+  printf(__FUNCTION__ " : frame time %g\n", frame_time);
+  double render_time = 0;
+  double render_start = 0;
 
-  float dist_along_spline = 0;
+  double dist_along_spline = 0;
   size_t keyframe = keyframes.size();
 
   bool ignoreNextMouseUp = false;
@@ -1452,9 +1454,9 @@ int main(int argc, char **argv) {
             render_time += frame_time;
           } else {
             // Previewing. Use real time (low framerate == jumpy preview!).
-            float n = now();
+            double n = now();
             if (n > render_start + camera.time) continue;  // late, skip frame.
-            float w = (render_start + camera.time) - n;
+            double w = (render_start + camera.time) - n;
             if (w >= frame_time) {  // early, redraw frame.
               splines_index = prev_splines_index;
             }
@@ -1780,6 +1782,7 @@ int main(int argc, char **argv) {
         if (!keyframes.empty()) {
             CatmullRom(keyframes, &splines, config.loop);
             splines_index = 0;
+            dist_along_spline = 0;
             render_time = 0;
             render_start = now();
             keyframe = 0;

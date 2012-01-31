@@ -214,7 +214,7 @@ void main() {
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
     col = c(p, totalD);
-	dvec3 n = normal(p, 2*abs(D));
+	dvec3 n = normal(p, 2.0*abs(D));
     col = blinn_phong(n, -dp, normalize(eye_in+/*dp+*/dvec3(0,1,0)), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, abs(D)));
 
