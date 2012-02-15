@@ -16,7 +16,7 @@ To make the 3d easy on the eyes, boxplorer2 has a couple of parameters you can t
 
 When navigating a compatible configuration, boxplorer2 computes the distance estimation for the current position and sets _speed_ to that estimate / 10. As the name _speed_ suggests, this value is also used for speed of movement, so getting closer to the fractal surface will both slow the rate of movement down as well as shrink your virtual head.
 
-You can control _speed_ and _focus_ manually by selection the view controller with the v key and then control the two values with arrows keys.
+You can control _speed_ and _focus_ manually by selecting the view controller with the v key and then control the two values with arrows keys.
 
 = Try it! =
 
