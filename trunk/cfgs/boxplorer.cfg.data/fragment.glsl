@@ -15,7 +15,7 @@
 varying vec3 eye, dir;
 
 // Interactive parameters.
-uniform vec3 par[10];
+uniform vec3 par[20];
 
 uniform float
   min_dist,           // Distance at which raymarching stops.
@@ -140,16 +140,32 @@ float ambient_occlusion(vec3 p, vec3 n) {
   return clamp(ao, 0.0, 1.0);
 }
 
+// ytalinflusa's noise [0..1>
+float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
+
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
+void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
+#endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
 
 void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
 
-  vec3 p = eye_in, dp = normalize(dir);
+  float noise = pnoise(gl_FragCoord.xy);
 
-  float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
+  vec3 p = eye_in;
+  float totalD = d(p) * noise, D = 3.4e38, extraD = 0.0, lastD;
 
   // Intersect the view ray with the Mandelbox using raymarching.
   int steps;
@@ -194,7 +210,7 @@ void main() {
   }
 
   // Glow is based on the number of steps.
-  col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
+  col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
 
   float zFar = 5.0;
   float zNear = 0.0001;
