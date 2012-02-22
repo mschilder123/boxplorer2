@@ -21,11 +21,18 @@ class dvec4;
 
 class vec2 {
 public:
+  vec2(float a);
   vec2(float a, float b);
   vec3 xxy() const;
   vec3 xyx() const;
   vec3 yxx() const;
   vec2 operator-(const vec2& b) const;
+  vec2 operator+(const vec2& b) const;
+  vec2 operator*(const float b) const;
+  vec2 operator*(const vec2& b) const;
+  vec2 operator/(const vec2& b) const;
+  vec2 operator+=(const vec2& b);
+  vec2 operator-=(const vec2& b);
   float x,y;
 };
 
@@ -34,6 +41,7 @@ class vec3 {
   vec3();
   vec3(float k);
   vec3(float xx, float yy, float zz);
+  vec3(const vec2& b, float c);
   vec3(const vec3& b);
   vec3& operator=(const vec3& b);
   vec3& operator*=(const float k);
@@ -104,16 +112,24 @@ class dvec4 {
 };
 
 
+vec2::vec2(float a) : x(a), y(a) {}
 vec2::vec2(float a, float b) : x(a), y(b) {}
 vec3 vec2::xxy() const { return vec3(x,x,y); }
 vec3 vec2::xyx() const { return vec3(x,y,x); }
 vec3 vec2::yxx() const { return vec3(y,x,x); }
 vec2 vec2::operator-(const vec2& b) const { return vec2(x-b.x, y-b.y); }
+vec2 vec2::operator+(const vec2& b) const { return vec2(x+b.x, y+b.y); }
+vec2 vec2::operator*(const float b) const { return vec2(x*b, y*b); }
+vec2 vec2::operator*(const vec2& b) const { return vec2(x*b.x, y*b.y); }
+vec2 vec2::operator/(const vec2& b) const { return vec2(x/b.x, y/b.y); }
+vec2 vec2::operator-=(const vec2& b) { x-=b.x; y-=b.y; return *this; }
+vec2 vec2::operator+=(const vec2& b) { x+=b.x; y+=b.y; return *this; }
 
 
 vec3::vec3() : x(0), y(0), z(0) {}
 vec3::vec3(float k) : x(k), y(k), z(k) {}
 vec3::vec3(float xx, float yy, float zz) { x = xx; y = yy; z = zz; }
+vec3::vec3(const vec2& b, float c) : x(b.x), y(b.y), z(c) {}
 vec3::vec3(const vec3&b) : x(b.x), y(b.y), z(b.z) {}
 vec3& vec3::operator=(const vec3& b) { x= b.x; y= b.y; z= b.z; return *this; }
 vec3& vec3::operator*=(const float k) { x*= k; y*= k; z*= k; return *this; }
@@ -221,6 +237,10 @@ float cos(const float& a) { return (float)::cos(a); }
 vec3 sin(const vec3& a) {
   return vec3(sin(a.x), sin(a.y), sin(a.z));
 }
+float floor(const float& a) { return (float)::floor(a); }
+
+vec2 max(const vec2& a, const vec2& b) { return vec2(max(a.x, b.x), max(a.y, b.y)); }
+vec2 floor(const vec2& a) { return vec2(floor(a.x), floor(a.y)); }
 
 class mat4 {
  public:

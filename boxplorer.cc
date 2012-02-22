@@ -33,6 +33,7 @@
 #pragma comment(lib, "glu32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "comdlg32.lib")
 
 #endif  // _WIN32
 
@@ -54,6 +55,10 @@ using namespace std;
 #include "default_shaders.h"
 
 #include "TGA.h"
+
+#if defined(_WIN32)
+#include <CommDlg.h>
+#endif
 
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
@@ -1350,6 +1355,24 @@ int main(int argc, char **argv) {
   if (config.loadConfig(configFile, &defines)) {
     changeWorkingDirectory(configFile);
   } else {
+#if defined(_WIN32)
+    // For windows users that don't specify an argument, offer a dialog.
+    char filename[256] = {0};
+    OPENFILENAME opf = {0};
+    opf.lpstrFilter = "Fractal configuration files\0*.cfg\0\0";
+    opf.nFilterIndex = 1L;
+    opf.lpstrFile = filename;
+    opf.nMaxFile = 255;
+    opf.nMaxFileTitle=50;
+    opf.lpstrTitle = "Open fractal configuration file";
+    opf.nFileOffset = 0;
+    opf.lpstrDefExt = "cfg";
+    opf.Flags = OFN_PATHMUSTEXIST | OFN_READONLY;
+    opf.lStructSize = sizeof(OPENFILENAME);
+    if (GetOpenFileName(&opf) && config.loadConfig(opf.lpstrFile, &defines)) {
+      changeWorkingDirectory(opf.lpstrFile);
+    } else
+#endif
     die("Usage: boxplorer <configuration-file.cfg>\n");
   }
 
