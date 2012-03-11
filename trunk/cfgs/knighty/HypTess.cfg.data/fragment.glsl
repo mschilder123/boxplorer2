@@ -83,6 +83,21 @@ vec4 hnormalizew(vec4 v){//normalization of (timelike) vectors in Minkowski spac
 	return v*l;
 }
 
+float cosh(float val)
+{
+    float tmp = exp(val);
+    float cosH = (tmp + 1.0 / tmp) / 2.0;
+    return cosH;
+}
+ 
+float sinh(float val)
+{
+    float tmp = exp(val);
+    float sinH = (tmp - 1.0 / tmp) / 2.0;
+    return sinH;
+}
+
+
 void init() {
 	float cospin=cos(PI/5.);
 	float scospin=sqrt(4./3.*cospin*cospin-3./4.);
@@ -176,13 +191,13 @@ float d_sphere(vec3 pos) {
 
 float d(vec3 pos) {
 	float ds = d_sphere(pos);
-	if (ds > 0) return ds * .95;
+	if (ds > 0.0) return ds * .95;
 	return min(-ds, d_verts(pos)) * .95;
 }
 
 vec3 c(vec3 pos){
 	float ds = d_sphere(pos);
-    if (ds > 0 || -ds < d_verts(pos))
+    if (ds > 0.0 || -ds < d_verts(pos))
 		return vec3(.7,.7,.7);
 	float r=length(pos);
 	vec4 z4=vec4(2.*pos,1.+r*r)*1./(1.-r*r);
@@ -276,8 +291,8 @@ vec3 background_color(in vec3 vp) {
     u = 1. - theta;
   }
   //return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
-  return texture2DLod(bg_texture, vec2(u+time/10.0,v), BG_BLUR).xyz;
-  //return texture2D(bg_texture, vec2(u+time/10.0,v)).xyz;
+  //return texture2DLod(bg_texture, vec2(u+time/10.0,v), BG_BLUR).xyz;
+  return texture2D(bg_texture, vec2(u+time/10.0,v)).xyz;
 }
 #else
 // TODO: add texture2DLod to fake glsl
@@ -389,7 +404,7 @@ void main() {
   if (totalD < MAX_DIST) {
     p += dp * totalD;
 	float ds = d_sphere(p);
-    if (ds > 0 || -ds < d_verts(p)) {
+    if (ds > 0.0 || -ds < d_verts(p)) {
 	  sphereHit = true;
       n = normalize(p);  // easy accurate normal for sphere hit
 	} else {
