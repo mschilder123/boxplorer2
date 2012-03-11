@@ -348,8 +348,8 @@ vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
 	return vec4(
 		clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
 		clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
-		1.0,
-		clamp(3.0*(L1_Size-d)/L1_Size, 0.0, 1.0));
+		clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+		clamp(pow(1.5*(L1_Size-d)/L1_Size, 3.0), 0.0, 1.0));
 }
 
 // Get base color at p, plus Blinn_phing and ambient occulusion.
