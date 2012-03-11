@@ -580,7 +580,8 @@ class KeyFrame {
      glSetUniformf(x_scale); glSetUniformf(x_offset);
      glSetUniformf(y_scale); glSetUniformf(y_offset);
      glSetUniformf(speed); glSetUniformi(nrays);
-     glSetUniformf(time); glSetUniformf(focus);
+     glUniform1f(glGetUniformLocation(program, "time"), config.time);
+     glSetUniformf(focus);
 
      glUniform1f(glGetUniformLocation(program, "xres"), width);
 
@@ -1492,6 +1493,9 @@ int main(int argc, char **argv) {
       } else {
         splines.clear();
       }
+      config.time = camera.time;
+    } else {
+      config.time = now();
     }
 
     if (config.enable_dof && camera.dof_scale > .0001) {
