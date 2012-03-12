@@ -45,16 +45,15 @@ varying vec3 eye, dir;
 #define T par[2].y  // {min=0 max=1 step=.01}
 
 //vertex radius 
-#define VRadius par[3].x  // {min=-1 max=1 step=.01}
+#define VRadius par[3].x  // {min=0 max=1 step=.01}
 
 //segments radius 
-#define SRadius par[3].y  // {min=-1 max=1 step=.01}
-
-#define RotAngle par[4].x
+#define SRadius par[3].y  // {min=0 max=1 step=.01}
 
 //cutting sphere radius
 #define CSphRad par[4].y  // {min=0 max=1 step=.01}
 
+#define RotAngle par[4].x
 #define RotVector par[14]
 
 //#group HTess-Color
@@ -97,7 +96,6 @@ float sinh(float val)
     return sinH;
 }
 
-
 void init() {
 	float cospin=cos(PI/5.);
 	float scospin=sqrt(4./3.*cospin*cospin-3./4.);
@@ -118,6 +116,7 @@ void init() {
 	cSR=cosh(SRadius);sSR=sinh(SRadius);
 	cRA=cosh(RotAngle);sRA=-sinh(RotAngle);
 }
+
 vec4 Rotate(vec4 p){
 	//this is a (hyperbolic) rotation (that is, a boost) on the plane defined by RotVector and w axis
 	//We do not need more because the remaining 3 rotation are in our 3D space
@@ -181,7 +180,7 @@ float d_verts(vec3 pos) {
 	vec4 z4=vec4(2.*pos,1.+r*r)*1./(1.-r*r);//Inverse stereographic projection of pos: z4 lies onto the unit 3-parabolid of revolution around w axis centered at 0.
 	z4=Rotate(z4);
 	z4=fold(z4);
-	return min(dist2Vertex(z4,r),dist2Segments(z4,r));
+	return min(dist2Vertex(z4,r),dist2Segments(z4,r)) *.95;
 }
 
 float d_sphere(vec3 pos) {
@@ -191,8 +190,8 @@ float d_sphere(vec3 pos) {
 
 float d(vec3 pos) {
 	float ds = d_sphere(pos);
-	if (ds > 0.0) return ds * .95;
-	return min(-ds, d_verts(pos)) * .95;
+	if (ds > 0.0) return ds;
+	return min(-ds, d_verts(pos));
 }
 
 vec3 c(vec3 pos){
@@ -223,8 +222,8 @@ const float normal_eps = 0.00001;
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
 //  vec2 Eps = vec2(0, max(d_pos, normal_eps));
-//  vec2 Eps = vec2(0, d_pos);
-  vec2 Eps = vec2(0, normal_eps);
+  vec2 Eps = vec2(0, max(d_pos,normal_eps));
+//  vec2 Eps = vec2(0, normal_eps);
   return normalize(vec3(
   // 3-tap central differences, error = O(eps^2)
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
@@ -259,7 +258,7 @@ vec3 mix_reflection(vec3 normal, vec3 view, vec3 baseColor, vec3 reflectionColor
 
 // Ambient occlusion approximation.
 float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist, float side) {
-  float ao_ed = ao_eps; //totalD*ao_eps/m_dist;
+  float ao_ed = m_dist; //ao_eps; //totalD*ao_eps/m_dist;
   float ao = 1.0, w = ao_strength/ao_ed;
   float dist = 2.0 * ao_ed;
 
@@ -316,6 +315,7 @@ int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dis
 
 // Trace from point p back to light(s). Return received direct light.
 vec3 shade(vec3 p, vec3 l1, float side, float m_zoom, vec3 n, vec3 col, vec3 dp) {
+	if (L1_Size == 0.0) return col;
 	vec3 dir = l1 - p;
 	float l1_dist = length(dir);
 	dir = normalize(dir);
@@ -419,13 +419,14 @@ void main() {
   float firstD = totalD;
   vec3 finalCol = rayCol;
 
-  if (sphereHit) {
 	// March reflected ray a couple of times.
 	for (int ray = 1; ray < nrays &&
+					sphereHit &&
 					totalD < MAX_DIST &&
 					colFactor > 0.0; ++ray) {
+		sphereHit = false;
 		dp = reflect(dp, n);  // reflect view direction
-		p += dp * (-totalD + (1.5) * m_dist);  // reproject eye
+		p += dp * (-totalD + (1.5+noise) * m_dist);  // reproject eye
 
 		float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
 		steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
@@ -433,7 +434,13 @@ void main() {
 		vec4 rlight = lightBulb(p + dp * totalD, dp, totalD - oldTotalD);
 		if (totalD < MAX_DIST) {
 			p += dp * totalD;
-			n = normal(p, m_dist * .5);
+			float ds = d_sphere(p);
+			if (ds > 0.0 || -ds < d_verts(p)) {
+				sphereHit = true;
+				n = normalize(p);  // easy accurate normal for sphere hit
+			} else {
+				n = normal(p, m_dist * .5);
+			}
 			rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
 			rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
 		} else {
@@ -443,7 +450,6 @@ void main() {
 		finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
 		colFactor *= SHINE * SHINE;  // reflection drop-off.
 	}
-  }
 
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
