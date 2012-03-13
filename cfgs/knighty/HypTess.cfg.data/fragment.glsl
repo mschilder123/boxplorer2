@@ -44,10 +44,10 @@ varying vec3 eye, dir;
 #define W par[2].x  // {min=0 max=1 step=.01}
 #define T par[2].y  // {min=0 max=1 step=.01}
 
-//vertex radius 
+//vertex radius
 #define VRadius par[3].x  // {min=0 max=1 step=.01}
 
-//segments radius 
+//segments radius
 #define SRadius par[3].y  // {min=0 max=1 step=.01}
 
 //cutting sphere radius
@@ -74,92 +74,90 @@ varying vec3 eye, dir;
 vec4 nc,nd,p;
 float cVR,sVR,cSR,sSR,cRA,sRA;
 float hdot(vec4 a, vec4 b){//dot product for Minkowski space.
-	return dot(a.xyz,b.xyz)-a.w*b.w;
+  return dot(a.xyz,b.xyz)-a.w*b.w;
 }
 
 vec4 hnormalizew(vec4 v){//normalization of (timelike) vectors in Minkowski space.
-	float l=1./sqrt(v.w*v.w-dot(v.xyz,v.xyz));
-	return v*l;
+  float l=1./sqrt(v.w*v.w-dot(v.xyz,v.xyz));
+  return v*l;
 }
 
-float cosh(float val)
-{
-    float tmp = exp(val);
-    float cosH = (tmp + 1.0 / tmp) / 2.0;
-    return cosH;
+float cosh(float val) {
+  float tmp = exp(val);
+  float cosH = (tmp + 1.0 / tmp) / 2.0;
+  return cosH;
 }
- 
-float sinh(float val)
-{
-    float tmp = exp(val);
-    float sinH = (tmp - 1.0 / tmp) / 2.0;
-    return sinH;
+
+float sinh(float val) {
+  float tmp = exp(val);
+  float sinH = (tmp - 1.0 / tmp) / 2.0;
+  return sinH;
 }
 
 void init() {
-	float cospin=cos(PI/5.);
-	float scospin=sqrt(4./3.*cospin*cospin-3./4.);
+  float cospin=cos(PI/5.);
+  float scospin=sqrt(4./3.*cospin*cospin-3./4.);
 
-	//na and nb are simply vec4(1.,0.,0.,0.) and vec4(0.,1.,0.,0.) respectively
-	nc=0.5*vec4(0,-1,sqrt(3.),0.);
-	nd=vec4(-0.5,-cospin,-cospin/sqrt(3.),-scospin);
+  //na and nb are simply vec4(1.,0.,0.,0.) and vec4(0.,1.,0.,0.) respectively
+  nc=0.5*vec4(0,-1,sqrt(3.),0.);
+  nd=vec4(-0.5,-cospin,-cospin/sqrt(3.),-scospin);
 
-	vec4 pabc,pbdc,pcda,pdba;
-	pabc=vec4(0.,0.,0.,0.5*sqrt(3.));
-	pbdc=0.5*sqrt(3.)*vec4(scospin,0.,0.,0.5);
-	pcda=vec4(0.,0.5*sqrt(3.)*scospin,0.5*scospin,cospin*2./sqrt(3.));
-	pdba=vec4(0.,0.,scospin,cospin/sqrt(3.));
-	
-	p=hnormalizew(U*pabc+V*pbdc+W*pcda+T*pdba);
+  vec4 pabc,pbdc,pcda,pdba;
+  pabc=vec4(0.,0.,0.,0.5*sqrt(3.));
+  pbdc=0.5*sqrt(3.)*vec4(scospin,0.,0.,0.5);
+  pcda=vec4(0.,0.5*sqrt(3.)*scospin,0.5*scospin,cospin*2./sqrt(3.));
+  pdba=vec4(0.,0.,scospin,cospin/sqrt(3.));
 
-	cVR=cosh(VRadius);sVR=sinh(VRadius);
-	cSR=cosh(SRadius);sSR=sinh(SRadius);
-	cRA=cosh(RotAngle);sRA=-sinh(RotAngle);
+  p=hnormalizew(U*pabc+V*pbdc+W*pcda+T*pdba);
+
+  cVR=cosh(VRadius);sVR=sinh(VRadius);
+  cSR=cosh(SRadius);sSR=sinh(SRadius);
+  cRA=cosh(RotAngle);sRA=-sinh(RotAngle);
 }
 
 vec4 Rotate(vec4 p){
-	//this is a (hyperbolic) rotation (that is, a boost) on the plane defined by RotVector and w axis
-	//We do not need more because the remaining 3 rotation are in our 3D space
-	//That would be redundant.
-	//This rotation is equivalent to a translation inside the hyperbolic space when the camera is at 0,0,0
-	vec4 p1=p;
-	vec3 rv;
-	rv=normalize(RotVector);
-	float vp=dot(rv,p.xyz);
-	p1.xyz+=rv*(vp*(cRA-1.)+p.w*sRA);
-	p1.w+=vp*sRA+p.w*(cRA-1.);
-	return p1;
+  //this is a (hyperbolic) rotation (that is, a boost) on the plane defined by RotVector and w axis
+  //We do not need more because the remaining 3 rotation are in our 3D space
+  //That would be redundant.
+  //This rotation is equivalent to a translation inside the hyperbolic space when the camera is at 0,0,0
+  vec4 p1=p;
+  vec3 rv;
+  rv=normalize(RotVector);
+  float vp=dot(rv,p.xyz);
+  p1.xyz+=rv*(vp*(cRA-1.)+p.w*sRA);
+  p1.w+=vp*sRA+p.w*(cRA-1.);
+  return p1;
 }
 
 vec4 fold(vec4 pos) {//beside using minkowski dot product, its exactly the same as for euclidean space
-	for(int i=0;i<iters;i++){
-		pos.xy=abs(pos.xy);
-		float t=-2.*min(0.,hdot(pos,nc)); pos+=t*nc;
-		t=-2.*min(0.,hdot(pos,nd)); pos+=t*nd;
-	}
-	return pos;
+  for(int i=0;i<iters;i++){
+    pos.xy=abs(pos.xy);
+    float t=-2.*min(0.,hdot(pos,nc)); pos+=t*nc;
+    t=-2.*min(0.,hdot(pos,nd)); pos+=t*nd;
+  }
+  return pos;
 }
 
 float DD(float ca, float sa, float r){//converts hyperbolic distance to distance in projection flat space. ca and sa are the hyperbolic cosine and sine of the hyperbolic distance which is an "angle".
-	return (2.*r*ca+(1.+r*r)*sa)/((1.+r*r)*ca+2.*r*sa+1.-r*r)-r;
+  return (2.*r*ca+(1.+r*r)*sa)/((1.+r*r)*ca+2.*r*sa+1.-r*r)-r;
 }
 
 float dist2Vertex(vec4 z, float r){
-	float ca=-hdot(z,p), sa=0.5*sqrt(-hdot(p-z,p-z)*hdot(p+z,p+z));
-	
-	return DD(ca*cVR-sa*sVR,sa*cVR-ca*sVR,r);
+  float ca=-hdot(z,p), sa=0.5*sqrt(-hdot(p-z,p-z)*hdot(p+z,p+z));
+
+  return DD(ca*cVR-sa*sVR,sa*cVR-ca*sVR,r);
 }
 
 float dist2Segment(vec4 z, vec4 n, float r){
-	//pmin is the orthogonal projection of z onto the plane defined by p and n
-	//then pmin is projected onto the unit sphere
-	float zn=hdot(z,n),zp=hdot(z,p),np=hdot(n,p);
-	float det=-1./(1.+np*np);
-	float alpha=det*(zp-zn*np), beta=det*(-np*zp-zn);
-	vec4 pmin=hnormalizew(alpha*p+min(0.,beta)*n);
-	//ca and sa are the hyperbolic cosine and sine of the "angle" between z and pmin. This is the distance in hyperbolic space.
-	float ca=-hdot(z,pmin), sa=0.5*sqrt(-hdot(pmin-z,pmin-z)*hdot(pmin+z,pmin+z));
-	return DD(ca*cSR-sa*sSR,sa*cSR-ca*sSR,r);//we subtract the width of the sgment before conversion
+  //pmin is the orthogonal projection of z onto the plane defined by p and n
+  //then pmin is projected onto the unit sphere
+  float zn=hdot(z,n),zp=hdot(z,p),np=hdot(n,p);
+  float det=-1./(1.+np*np);
+  float alpha=det*(zp-zn*np), beta=det*(-np*zp-zn);
+  vec4 pmin=hnormalizew(alpha*p+min(0.,beta)*n);
+  //ca and sa are the hyperbolic cosine and sine of the "angle" between z and pmin. This is the distance in hyperbolic space.
+  float ca=-hdot(z,pmin), sa=0.5*sqrt(-hdot(pmin-z,pmin-z)*hdot(pmin+z,pmin+z));
+  return DD(ca*cSR-sa*sSR,sa*cSR-ca*sSR,r);//we subtract the width of the sgment before conversion
 }
 //it is possible to compute the distance to a face just as for segments: pmin will be the orthogonal projection
 // of z onto the 3-plane defined by p and two n's (na and nb, na and nc, na and and, nb and nd... and so on).
@@ -167,53 +165,52 @@ float dist2Segment(vec4 z, vec4 n, float r){
 //it's not implemented here because it is better with transparency
 
 float dist2Segments(vec4 z, float r){
-	float da=dist2Segment(z, vec4(1.,0.,0.,0.), r);
-	float db=dist2Segment(z, vec4(0.,1.,0.,0.), r);
-	float dc=dist2Segment(z, nc, r);
-	float dd=dist2Segment(z, nd, r);
-	
-	return min(min(da,db),min(dc,dd));
+  float da=dist2Segment(z, vec4(1.,0.,0.,0.), r);
+  float db=dist2Segment(z, vec4(0.,1.,0.,0.), r);
+  float dc=dist2Segment(z, nc, r);
+  float dd=dist2Segment(z, nd, r);
+
+  return min(min(da,db),min(dc,dd));
 }
 
 float d_verts(vec3 pos) {
-	float r=length(pos);
-	vec4 z4=vec4(2.*pos,1.+r*r)*1./(1.-r*r);//Inverse stereographic projection of pos: z4 lies onto the unit 3-parabolid of revolution around w axis centered at 0.
-	z4=Rotate(z4);
-	z4=fold(z4);
-	return min(dist2Vertex(z4,r),dist2Segments(z4,r)) *.95;
+  float r=length(pos);
+  vec4 z4=vec4(2.*pos,1.+r*r)*1./(1.-r*r);//Inverse stereographic projection of pos: z4 lies onto the unit 3-parabolid of revolution around w axis centered at 0.
+  z4=Rotate(z4);
+  z4=fold(z4);
+  return min(dist2Vertex(z4,r),dist2Segments(z4,r)) *.95;
 }
 
 float d_sphere(vec3 pos) {
-	float r=length(pos);
-	return r-CSphRad;
+  float r=length(pos);
+  return r-CSphRad;
 }
 
 float d(vec3 pos) {
-	float ds = d_sphere(pos);
-	if (ds > 0.0) return ds;
-	return min(-ds, d_verts(pos));
+  float ds = d_sphere(pos);
+  if (ds > 0.0) return ds;
+  return min(-ds, d_verts(pos));
 }
 
 vec3 c(vec3 pos){
-	float ds = d_sphere(pos);
-    if (ds > 0.0 || -ds < d_verts(pos))
-		return vec3(.7,.7,.7);
-	float r=length(pos);
-	vec4 z4=vec4(2.*pos,1.+r*r)*1./(1.-r*r);
-	z4=Rotate(z4);
-	z4=fold(z4);
-	float da=dist2Segment(z4, vec4(1.,0.,0.,0.), r);
-	float db=dist2Segment(z4, vec4(0.,1.,0.,0.), r);
-	float dc=dist2Segment(z4, nc, r);
-	float dd=dist2Segment(z4, nd, r);
-	float dv=dist2Vertex(z4,r);
-	float d=min(min(min(da,db),min(dc,dd)),dv);
-	vec3 color=segAColor;
-	if(d==db) color=segBColor;
-	if(d==dc) color=segCColor;
-	if(d==dd) color=segDColor;
-	if(d==dv) color=verticesColor;
-	return color;
+  float ds = d_sphere(pos);
+  if (ds > 0.0 || -ds < d_verts(pos)) return vec3(.7,.7,.7);
+  float r=length(pos);
+  vec4 z4=vec4(2.*pos,1.+r*r)*1./(1.-r*r);
+  z4=Rotate(z4);
+  z4=fold(z4);
+  float da=dist2Segment(z4, vec4(1.,0.,0.,0.), r);
+  float db=dist2Segment(z4, vec4(0.,1.,0.,0.), r);
+  float dc=dist2Segment(z4, nc, r);
+  float dd=dist2Segment(z4, nd, r);
+  float dv=dist2Vertex(z4,r);
+  float d=min(min(min(da,db),min(dc,dd)),dv);
+  vec3 color=segAColor;
+  if(d==db) color=segBColor;
+  if(d==dc) color=segCColor;
+  if(d==dd) color=segDColor;
+  if(d==dv) color=verticesColor;
+  return color;
 }
 
 const float normal_eps = 0.00001;
@@ -301,64 +298,64 @@ vec3 background_color(vec3 vp) { return backgroundColor; }
 // Intersect the view ray with the fractal using raymarching.
 // returns # steps
 int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dist), float m_zoom) {
-	int steps;
-	for (steps = 0; steps < max_steps; ++steps) {
-		// float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
-		float D = side * d(p + dp * totalD);
-		if (D < m_dist) break;
-		totalD += D;
-		if (totalD > MAX_DIST) break;
-		m_dist = m_zoom * totalD;
-	}
-	return steps;
+  int steps;
+  for (steps = 0; steps < max_steps; ++steps) {
+    // float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
+    float D = side * d(p + dp * totalD);
+    if (D < m_dist) break;
+    totalD += D;
+    if (totalD > MAX_DIST) break;
+    m_dist = m_zoom * totalD;
+  }
+  return steps;
 }
 
 // Trace from point p back to light(s). Return received direct light.
 vec3 shade(vec3 p, vec3 l1, float side, float m_zoom, vec3 n, vec3 col, vec3 dp) {
-	if (L1_Size == 0.0) return col;
-	vec3 dir = l1 - p;
-	float l1_dist = length(dir);
-	dir = normalize(dir);
-	float fudge = 2.0 * min_dist;
-	p += dir * fudge;
-	float totalD = 0.0;
-	float m_dist = max(min_dist, m_zoom * totalD);  // reset m_dist, fresh ray
-	rayMarch(p, dir, totalD, side, m_dist, m_zoom);  // trace towards light
+  if (L1_Size == 0.0) return col;
+  vec3 dir = l1 - p;
+  float l1_dist = length(dir);
+  dir = normalize(dir);
+  float fudge = 2.0 * min_dist;
+  p += dir * fudge;
+  float totalD = 0.0;
+  float m_dist = max(min_dist, m_zoom * totalD);  // reset m_dist, fresh ray
+  rayMarch(p, dir, totalD, side, m_dist, m_zoom);  // trace towards light
 
-    float falloff = pow(1.0 + l1_dist, 3.0);
-	vec3 c = vec3(0.3,0.3,0.4) * clamp(2.0 / falloff, 0.0, 1.0);
-	c = blinn_phong(n, -dp, dir, col, c);
-	if (totalD < l1_dist + fudge) c = c * .5;
-	return c;
+  float falloff = pow(1.0 + l1_dist, 3.0);
+  vec3 c = vec3(0.3,0.3,0.4) * clamp(2.0 / falloff, 0.0, 1.0);
+  c = blinn_phong(n, -dp, dir, col, c);
+  if (totalD < l1_dist + fudge) c = c * .5;
+  return c;
 }
 
 vec3 getLight1() {
-	vec3 l = L1_Vector;
-	return l * vec3(0,cos(time),sin(time));  // circle around
+  vec3 l = L1_Vector;
+  return l * vec3(0,cos(time),sin(time));  // circle around
 }
 
 // return color and ratio to mix in pure light from L1_Vector (direct visibility).
 vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
-	vec3 x1 = x2 - dp * totalD;
-	vec3 x0 = getLight1();
-	float t = -dot(x1 - x0, x2 - x1) / dot(x2 - x1, x2 - x1);
-	if (t <= 0.0 || t >= 1.0) return vec4(0.0);  // not near this segment.
-	float d = length(cross(x0 - x1, x0 - x2)) / length(x2 - x1);
-	if (d > L1_Size) return vec4(0.0);  // larger than light radius
-	return vec4(
-		clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
-		clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
-		clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
-		clamp(pow(1.5*(L1_Size-d)/L1_Size, 3.0), 0.0, 1.0));
+  vec3 x1 = x2 - dp * totalD;
+  vec3 x0 = getLight1();
+  float t = -dot(x1 - x0, x2 - x1) / dot(x2 - x1, x2 - x1);
+  if (t <= 0.0 || t >= 1.0) return vec4(0.0);  // not near this segment.
+  float d = length(cross(x0 - x1, x0 - x2)) / length(x2 - x1);
+  if (d > L1_Size) return vec4(0.0);  // larger than light radius
+  return vec4(
+    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+    clamp(pow(1.5*(L1_Size-d)/L1_Size, 3.0), 0.0, 1.0));
 }
 
 // Get base color at p, plus Blinn_phing and ambient occulusion.
 vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, float m_zoom) {
-	vec3 col = c(p);
-	col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col, specularColor);
-	col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist, side));
-	col = shade(p, getLight1(), side, m_zoom, n, col, dp);
-	return col;
+  vec3 col = c(p);
+  col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col, specularColor);
+  col = mix(aoColor, col, ambient_occlusion(p, n, totalD, m_dist, side));
+  col = shade(p, getLight1(), side, m_zoom, n, col, dp);
+  return col;
 }
 
 uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
@@ -403,13 +400,13 @@ void main() {
   bool sphereHit = false;
   if (totalD < MAX_DIST) {
     p += dp * totalD;
-	float ds = d_sphere(p);
+    float ds = d_sphere(p);
     if (ds > 0.0 || -ds < d_verts(p)) {
-	  sphereHit = true;
+      sphereHit = true;
       n = normalize(p);  // easy accurate normal for sphere hit
-	} else {
+    } else {
       n = normal(p, m_dist * .5);
-	}
+    }
     rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
     rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
   } else {
@@ -419,37 +416,37 @@ void main() {
   float firstD = totalD;
   vec3 finalCol = rayCol;
 
-	// March reflected ray a couple of times.
-	for (int ray = 1; ray < nrays &&
-					sphereHit &&
-					totalD < MAX_DIST &&
-					colFactor > 0.0; ++ray) {
-		sphereHit = false;
-		dp = reflect(dp, n);  // reflect view direction
-		p += dp * (-totalD + (1.5+noise) * m_dist);  // reproject eye
+  // March reflected ray a couple of times.
+  for (int ray = 1; ray < nrays &&
+          sphereHit &&
+          totalD < MAX_DIST &&
+          colFactor > 0.0; ++ray) {
+    sphereHit = false;
+    dp = reflect(dp, n);  // reflect view direction
+    p += dp * (-totalD + (1.5+noise) * m_dist);  // reproject eye
 
-		float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
-		steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
+    float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
+    steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
 
-		vec4 rlight = lightBulb(p + dp * totalD, dp, totalD - oldTotalD);
-		if (totalD < MAX_DIST) {
-			p += dp * totalD;
-			float ds = d_sphere(p);
-			if (ds > 0.0 || -ds < d_verts(p)) {
-				sphereHit = true;
-				n = normalize(p);  // easy accurate normal for sphere hit
-			} else {
-				n = normal(p, m_dist * .5);
-			}
-			rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
-			rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
-		} else {
-			rayCol = background_color(dp);
-		}
-		finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
-		finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
-		colFactor *= SHINE * SHINE;  // reflection drop-off.
-	}
+    vec4 rlight = lightBulb(p + dp * totalD, dp, totalD - oldTotalD);
+    if (totalD < MAX_DIST) {
+      p += dp * totalD;
+      float ds = d_sphere(p);
+      if (ds > 0.0 || -ds < d_verts(p)) {
+        sphereHit = true;
+        n = normalize(p);  // easy accurate normal for sphere hit
+      } else {
+        n = normal(p, m_dist * .5);
+      }
+      rayCol = rayColor(p, dp, n, totalD, m_dist, side, m_zoom);
+      rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
+    } else {
+      rayCol = background_color(dp);
+    }
+    finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
+    finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
+    colFactor *= SHINE * SHINE;  // reflection drop-off.
+  }
 
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
