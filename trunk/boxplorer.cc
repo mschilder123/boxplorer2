@@ -1113,14 +1113,20 @@ void initGraphics() {
 
   if (background_texture == 0 && background.data() != NULL) {
     // Load background image into texture
+
     glGenTextures(1, &background_texture);
+	  glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, background_texture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, background.width(), background.height(),
                  0, GL_BGR, GL_UNSIGNED_BYTE, background.data());
-    glGenerateMipmap(GL_TEXTURE_2D);
+    #if defined(_MACOSX)
+      glGenerateMipmapEXT(GL_TEXTURE_2D); 
+    #else
+      glGenerateMipmap(GL_TEXTURE_2D);
+    #endif
     printf(__FUNCTION__ " : background texture at %d\n", background_texture);
     glBindTexture(GL_TEXTURE_2D, 0);
   }
@@ -1138,12 +1144,19 @@ void initGraphics() {
 
 
   // Create depthbuffer
-  glDeleteRenderbuffers(1, &depthBuffer);
-  glGenRenderbuffers(1, &depthBuffer);
-  glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
-                        config.width, config.height);
-  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+  #if defined(_MACOSX)
+    glDeleteRenderbuffersEXT(1, &depthBuffer);
+    glGenRenderbuffersEXT(1, &depthBuffer);
+    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, depthBuffer);
+    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT, config.width, config.height);
+    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+  #else
+    glDeleteRenderbuffers(1, &depthBuffer);
+    glGenRenderbuffers(1, &depthBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, config.width, config.height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+  #endif
 
   if ((status = glGetError()) != GL_NO_ERROR)
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1160,33 +1173,61 @@ void initGraphics() {
   glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
   // Allocate / generate mips
-  glGenerateMipmap(GL_TEXTURE_2D);
+
+  #if defined(_MACOSX)
+    glGenerateMipmapEXT(GL_TEXTURE_2D);
+  #else
+    glGenerateMipmap(GL_TEXTURE_2D);
+  #endif
 
   glBindTexture(GL_TEXTURE_2D, 0);
 
   // Create framebuffer
-  glDeleteFramebuffers(1, &fbo);
-  glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  #if defined(_MACOSX)
+    glDeleteFramebuffersEXT(1, &fbo);
+    glGenFramebuffersEXT(1, &fbo);
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
 
-  // Attach texture to framebuffer as colorbuffer
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                         GL_TEXTURE_2D, texture, 0);
+    // Attach texture to framebuffer as colorbuffer
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                           GL_TEXTURE_2D, texture, 0);
 
-  // Attach depthbuffer to framebuffer
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                            GL_RENDERBUFFER, depthBuffer);
+    // Attach depthbuffer to framebuffer
+    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT,
+                              GL_RENDERBUFFER_EXT, depthBuffer);
+  #else
+    glDeleteFramebuffers(1, &fbo);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    // Attach texture to framebuffer as colorbuffer
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+    // Attach depthbuffer to framebuffer
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
+  #endif
+  
 
   if ((status = glGetError()) != GL_NO_ERROR)
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+  #if defined(_MACOSX)
+    status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+    if (status != GL_FRAMEBUFFER_COMPLETE_EXT)
+  #else
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+  #endif
 
-  status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-  if (status != GL_FRAMEBUFFER_COMPLETE)
     die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
 
   // Back to normal framebuffer.
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  #if defined(_MACOSX)
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
+  #else
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  #endif
+  
   if ((status = glGetError()) != GL_NO_ERROR)
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 }
@@ -1313,7 +1354,7 @@ int main(int argc, char **argv) {
   int enableDof = 0;
 #if defined(_MACOSX)
   // Shit won't work on mac.
-  enableDof = -1;
+  enableDof = 1;//change bermarte
 #endif
 
   // Peel known options off the back..
@@ -1498,7 +1539,11 @@ int main(int argc, char **argv) {
 
     if (config.enable_dof && camera.dof_scale > .0001) {
       // If we have some DoF to render, render to texture.
+    #if defined(_MACOSX)
+      glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+    #else
       glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    #endif
     }
 
     if (de_func || de_func_64) {
@@ -1604,12 +1649,19 @@ int main(int argc, char **argv) {
 
     if (config.enable_dof && camera.dof_scale > .0001) {
       // If we're rendering some DoF, draw texture on screen.
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+      #if defined(_MACOSX)
+        glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+      #else
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      #endif
       glEnable(GL_TEXTURE_2D);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture);
-      glGenerateMipmap(GL_TEXTURE_2D);
+      #if defined(_MACOSX)
+        glGenerateMipmapEXT(GL_TEXTURE_2D);
+      #else
+        glGenerateMipmap(GL_TEXTURE_2D);
+      #endif 
 
       glUseProgram(dof_program);  // Activate our alpha channel shader.
 
