@@ -1153,9 +1153,14 @@ void initGraphics() {
   glGenTextures(1, &texture);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  // Allocate storage, float rgba
+  // Allocate storage, float rgba if available
+#ifdef GL_RGBA32F
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
                0, GL_BGRA, GL_FLOAT, NULL);
+#else
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height,
+               0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+#endif
 
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
