@@ -148,9 +148,7 @@ const char frame_default_fs[]=
   "uniform float speed;\n"
   "void main(){"
   " vec4 c=texture2DLod(my_texture, texture_coordinate, 0.);"
-  " float a = z_far / (z_far - z_near);"
-  " float b = z_far * z_near / (z_near - z_far);"
-  " float d = b / (c.w - a);"
+  " float d = -z_far * z_near / (c.w * (z_far - z_near) - z_far);\n"
   " gl_FragColor = texture2DLod(my_texture, texture_coordinate,\n"
   "         abs(log(1.0 + d / (speed * dof_scale)) + dof_offset));"
   "}";
