@@ -138,7 +138,7 @@ const char frame_default_vs[]=
   "}";
 
 const char frame_default_fs[]=
-  "#extension GL_ARB_shader_texture_lod:enable\n"
+  "#extension GL_ARB_shader_texture_lod:enable\n"  // explicit enable for osx.
   "varying vec2 texture_coordinate;"
   "uniform sampler2D my_texture;\n"
   "uniform float z_near;  // {min=.00001 max=.009 step=.00001}\n"
@@ -150,5 +150,5 @@ const char frame_default_fs[]=
   " float a = z_far / (z_far - z_near);"
   " float b = z_far * z_near / (z_near - z_far);"
   " float d = b / (c.w - a);"
-  " gl_FragColor=texture2DLod(my_texture, texture_coordinate, abs(d * dof_scale + dof_offset));"
+  " gl_FragColor = texture2DLod(my_texture, texture_coordinate, abs(d * dof_scale + dof_offset));"
   "}";
