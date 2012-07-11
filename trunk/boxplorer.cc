@@ -1120,7 +1120,7 @@ void initGraphics() {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, background.width(), background.height(),
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, background.width(), background.height(),
                  0, GL_BGR, GL_UNSIGNED_BYTE, background.data());
     glGenerateMipmap(GL_TEXTURE_2D);
     printf(__FUNCTION__ " : background texture at %d\n", background_texture);
@@ -1138,8 +1138,7 @@ void initGraphics() {
   (dof_program = setupShaders2()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
-
-  // Create depthbuffer
+  // Create depth buffer
   glDeleteRenderbuffers(1, &depthBuffer);
   glGenRenderbuffers(1, &depthBuffer);
   glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
@@ -1154,11 +1153,11 @@ void initGraphics() {
   glGenTextures(1, &texture);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  // Allocate storage
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height,
-               0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+  // Allocate storage, float rgba
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
+               0, GL_BGRA, GL_FLOAT, NULL);
 
-  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
   // Allocate / generate mips
 

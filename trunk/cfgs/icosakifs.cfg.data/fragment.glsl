@@ -32,6 +32,8 @@
 
 // Camera position and direction.
 varying vec3 eye, dir;
+varying float zoom;
+uniform float xres;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -51,12 +53,12 @@ uniform int iters,    // Number of fractal iterations.
   frameno;
 
 // Colors. Can be negative or >1 for interestiong effects.
-vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
+vec3 backgroundColor = vec3(.07, 0.06, 0.16),
   surfaceColor1 = vec3(0.95, 0.64, 0.1),
   surfaceColor2 = vec3(0.89, 0.95, 0.75),
   surfaceColor3 = vec3(0.55, 0.06, 0.03),
   specularColor = vec3(1.0, 0.8, 0.4),
-  glowColor = vec3(0.03, 0.4, 0.4),
+  glowColor = vec3(0.03, 0.09, 0.4),
   aoColor = vec3(0, 0, 0);
 
 // precomputed constants
@@ -75,6 +77,7 @@ mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat + z0.z*ss
                             z0.y*z0.x*usat - z0.z*ssat, z0.y*z0.y*usat + csat,      z0.y*z0.z*usat + z0.x*ssat,
 			    z0.z*z0.x*usat + z0.y*ssat, z0.z*z0.y*usat - z0.x*ssat,                                                                      z0.z*z0.z*usat + csat
 		      );
+
 // Compute the distance from `pos` to the Mandelbox.
 float de_box(vec3 pos) {
   vec4 p = vec4(pos,1), p0 = p;  // p.w is the distance estimate
@@ -105,7 +108,7 @@ float de_menger(vec3 z0) {
       t=z0.x*n3[0]+z0.y*n3[1]+z0.z*n3[2];
       if(t<0.0){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
    }
-    for (i=0;i<iters && r<20.0;i++){
+    for (i=0;i<iters;i++){
       //vec3 zz0;
       z0=z0*RotationMatrix;
       r=(z0.x*z0.x)+(z0.y*z0.y)+(z0.z*z0.z);
@@ -121,7 +124,6 @@ float de_menger(vec3 z0) {
       z0.z=abs(z0.z);
       t=z0.x*n3[0]+z0.y*n3[1]+z0.z*n3[2];
       if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
-
 
       // Stretching:
       // for an icosahedron: stc[]=ftris[];
@@ -139,7 +141,6 @@ float de_menger(vec3 z0) {
 
     float k= (sqrt(r)-2.0)*pow(scale,float(-i));
     return k;
-    //return (sqrt(x*x+y*y+z*z)-2)*(scale)^(-i);
 }
 
 // Compute the color at `pos`.
@@ -167,27 +168,12 @@ float normal_eps = 0.00001;
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
-  vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
+  vec2 Eps = vec2(0, d_pos);
   return normalize(vec3(
-  // 2-tap forward differences, error = O(eps)
-//    -d_pos+d(pos+Eps.yxx),
-//    -d_pos+d(pos+Eps.xyx),
-//    -d_pos+d(pos+Eps.xxy)
-
   // 3-tap central differences, error = O(eps^2)
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
     -d(pos-Eps.xyx)+d(pos+Eps.xyx),
     -d(pos-Eps.xxy)+d(pos+Eps.xxy)
-
-  // 4-tap forward differences, error = O(eps^3)
-//    -2.0*d(pos-Eps.yxx)-3.0*d_pos+6.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    -2.0*d(pos-Eps.xyx)-3.0*d_pos+6.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    -2.0*d(pos-Eps.xxy)-3.0*d_pos+6.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
-
-  // 5-tap central differences, error = O(eps^4)
-//    d(pos-Eps.zxx)-8.0*d(pos-Eps.yxx)+8.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    d(pos-Eps.xzx)-8.0*d(pos-Eps.xyx)+8.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    d(pos-Eps.xxz)-8.0*d(pos-Eps.xxy)+8.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
   ));
 }
 
@@ -209,49 +195,53 @@ float ambient_occlusion(vec3 p, vec3 n) {
 
   for (int i=0; i<5; i++) {
     float D = d(p + n*dist);
-    ao -= (dist-D) * w;
+    ao -= (dist-abs(D)) * w;
     w *= 0.5;
     dist = dist*2.0 - ao_eps;  // 2,3,5,9,17
   }
   return clamp(ao, 0.0, 1.0);
 }
 
+// ytalinflusa's noise [0..1>
+float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
+
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
+void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
+#endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
 
 void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  float m_zoom = zoom * 0.5 / xres;
+  vec3 p = eye_in;
 
-  vec3 p = eye_in, dp = normalize(dir);
+  float noise = pnoise(gl_FragCoord.xy);
+  float D = d(p);
+  float side = 1.0; //sign(D); interior not good w/ this DE..
+  float totalD = side * D * noise;
+  float m_dist = m_zoom * totalD;
 
-  float odd = fract(gl_FragCoord.y * .5);
-  float displace = (4. * odd - 1.) * speed;
-  p += displace * vec3(gl_ModelViewMatrix[0]);
-
-  float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
-
-  // Intersect the view ray with the Mandelbox using raymarching.
+  // Intersect the view ray with the fractal using raymarching.
   int steps;
   for (steps=0; steps<max_steps; steps++) {
-    lastD = D;
-    D = d(p + totalD * dp);
+    D = side * d(p + totalD * dp);
 
-    // Overstepping: have we jumped too far? Cancel last step.
-    if (extraD > 0.0 && D < extraD) {
-      totalD -= extraD;
-      extraD = 0.0;
-      D = 3.4e38;
-      steps--;
-      continue;
-    }
-
-    if (D < min_dist || D > MAX_DIST) break;
-
+    if (D < m_dist) break;
     totalD += D;
+    if (totalD > MAX_DIST) break;
 
-    // Overstepping is based on the optimal length of the last step.
-    totalD += extraD = 0.096 * D*(D+extraD)/lastD;
+    m_dist = m_zoom * totalD;
   }
 
   p += totalD * dp;
@@ -260,16 +250,17 @@ void main() {
   vec3 col = backgroundColor;
 
   // We've got a hit or we're not sure.
-  if (D < MAX_DIST) {
-    vec3 n = normal(p, D);
+  if (D < MAX_DIST)
+  {
+    vec3 n = normal(p, m_dist);
     col = color(p);
     col = blinn_phong(n, -dp, normalize(eye_in+vec3(0,1,0)+dp), col);
     col = mix(aoColor, col, ambient_occlusion(p, n));
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
-    if (D > min_dist) {
-      col = mix(col, backgroundColor, clamp(log(D/min_dist) * dist_to_color, 0.0, 1.0));
+    if (D > m_dist) {
+      col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
   }
 
