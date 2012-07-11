@@ -138,6 +138,7 @@ const char frame_default_vs[]=
   "}";
 
 const char frame_default_fs[]=
+  "#extension GL_ARB_shader_texture_lod:enable\n"
   "varying vec2 texture_coordinate;"
   "uniform sampler2D my_texture;\n"
   "uniform float z_near;  // {min=.00001 max=.009 step=.00001}\n"
