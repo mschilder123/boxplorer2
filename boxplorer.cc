@@ -1619,6 +1619,8 @@ int main(int argc, char **argv) {
                   camera.dof_scale);
       glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
                   camera.dof_offset);
+      glUniform1f(glGetUniformLocation(dof_program, "speed"),
+                  camera.speed);
 
       // Ortho projection, entire screen in regular pixel coordinates.
       glMatrixMode(GL_PROJECTION);
