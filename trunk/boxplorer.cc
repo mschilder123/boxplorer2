@@ -1153,13 +1153,19 @@ void initGraphics() {
   glGenTextures(1, &texture);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  // Allocate storage, float rgba if available
+  // Allocate storage, float rgba if available. Pick max alpha width.
 #ifdef GL_RGBA32F
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
                0, GL_BGRA, GL_FLOAT, NULL);
 #else
+#ifdef GL_RGBA16
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
+               0, GL_BGRA, GL_UNSIGNED_SHORT, NULL);
+#else
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height,
                0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+  fprintf(stderr, __FUNCTION__ " : 8 bit alpha, very granular DoF experience ahead..\n");
+#endif
 #endif
 
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
