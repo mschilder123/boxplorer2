@@ -138,17 +138,22 @@ const char frame_default_vs[]=
   "}";
 
 const char frame_default_fs[]=
-  "#extension GL_ARB_shader_texture_lod:enable\n"  // explicit enable for osx.
+  "#extension GL_ARB_shader_texture_lod : enable\n"  // explicit enable for osx.
   "varying vec2 texture_coordinate;"
   "uniform sampler2D my_texture;\n"
   "uniform float z_near;  // {min=.00001 max=.009 step=.00001}\n"
   "uniform float z_far;  // {min=.01 max=10. step=.01}\n"
   "uniform float dof_offset;  // {min=-5. max=5. step=.01}\n"
-  "uniform float dof_scale;  // {min=0. max=100. step=.1}\n"
+  "uniform float dof_scale;  // {min=-29.5. max=100. step=.5}\n"
   "uniform float speed;\n"
-  "void main(){"
-  " vec4 c=texture2DLod(my_texture, texture_coordinate, 0.);"
+  "void main() {"
+  " vec4 c = texture2DLod(my_texture, texture_coordinate, 0.);"
   " float d = -z_far * z_near / (c.w * (z_far - z_near) - z_far);\n"
   " gl_FragColor = texture2DLod(my_texture, texture_coordinate,\n"
-  "         abs(log(1.0 + d / (speed * dof_scale)) + dof_offset));"
+  // 30.0 and .5 make for reasonable views w/ old .cfgs
+  // But have no other meaning. Remove once .cfgs are updated?
+  // TODO: figure proper CoC / focal plane params
+  // TODO: random sample to avoid mipmap patterns
+  "     abs(log(1.0 + d / (speed * (30.0 + dof_scale))) - .5 + dof_offset));\n"
+  " gl_FragDepth = c.w;\n"  // copy Z
   "}";
