@@ -1115,12 +1115,15 @@ void initGraphics() {
     // Load background image into texture
 
     glGenTextures(1, &background_texture);
-	  glEnable(GL_TEXTURE_2D);
+    glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, background_texture);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, background.width(), background.height(),
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8,
+                 background.width(), background.height(),
                  0, GL_BGR, GL_UNSIGNED_BYTE, background.data());
     glGenerateMipmap(GL_TEXTURE_2D);
     printf(__FUNCTION__ " : background texture at %d\n", background_texture);
@@ -1130,75 +1133,79 @@ void initGraphics() {
   if ((status = glGetError()) != GL_NO_ERROR)
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-  if (!config.enable_dof) return;
+  if (config.enable_dof) {
+    // Compile DoF shader, setup FBO as render target.
 
-  if ((status = glGetError()) != GL_NO_ERROR)
-    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    (dof_program = setupShaders2()) ||
+        die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
-  (dof_program = setupShaders2()) ||
-      die("Error in GLSL shader compilation (see stderr.txt for details).\n");
+    // Create depth buffer
+    glDeleteRenderbuffers(1, &depthBuffer);  // free existing
 
-  // Create depth buffer
-  glDeleteRenderbuffers(1, &depthBuffer);
-  glGenRenderbuffers(1, &depthBuffer);
-  glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, config.width, config.height);
-  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glGenRenderbuffers(1, &depthBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
+                          config.width, config.height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-  if ((status = glGetError()) != GL_NO_ERROR)
-    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    if ((status = glGetError()) != GL_NO_ERROR)
+      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-  // Create texture to render to
-  glDeleteTextures(1, &texture);
-  glGenTextures(1, &texture);
-  glBindTexture(GL_TEXTURE_2D, texture);
+    // Create texture to render to
+    glDeleteTextures(1, &texture);  // free existing
 
-  // Allocate storage, float rgba if available. Pick max alpha width.
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+
+    // Allocate storage, float rgba if available. Pick max alpha width.
 #ifdef GL_RGBA32F
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
-               0, GL_BGRA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
+                 0, GL_BGRA, GL_FLOAT, NULL);
 #else
 #ifdef GL_RGBA16
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
-               0, GL_BGRA, GL_UNSIGNED_SHORT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
+                 0, GL_BGRA, GL_UNSIGNED_SHORT, NULL);
 #else
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config.width, config.height,
-               0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-  fprintf(stderr, __FUNCTION__ " : 8 bit alpha, very granular DoF experience ahead..\n");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, config.width, config.height,
+                 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    fprintf(stderr, __FUNCTION__ " : 8 bit alpha, very granular DoF experience ahead..\n");
 #endif
 #endif
 
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
-  // Allocate / generate mips
+    // Create framebuffer
+    glDeleteFramebuffers(1, &fbo);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-  glGenerateMipmap(GL_TEXTURE_2D);
+    // Attach texture to framebuffer as colorbuffer
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           texture, 0);
 
-  glBindTexture(GL_TEXTURE_2D, 0);
+    // Attach depthbuffer to framebuffer
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                              GL_RENDERBUFFER, depthBuffer);
 
-  // Create framebuffer
-  glDeleteFramebuffers(1, &fbo);
-  glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    if ((status = glGetError()) != GL_NO_ERROR)
+      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-  // Attach texture to framebuffer as colorbuffer
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+      die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
 
-  // Attach depthbuffer to framebuffer
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
-  
-  if ((status = glGetError()) != GL_NO_ERROR)
-    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    // Back to normal framebuffer.
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-  if (status != GL_FRAMEBUFFER_COMPLETE)
-    die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
-
-  // Back to normal framebuffer.
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  
-  if ((status = glGetError()) != GL_NO_ERROR)
-    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    if ((status = glGetError()) != GL_NO_ERROR)
+      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+  }
 }
 
 TwBar* bar = NULL;
@@ -1395,12 +1402,12 @@ int main(int argc, char **argv) {
   bool keyframesChanged = false;
   LoadKeyFrames(fixedFov);
   LoadBackground();
- 
+
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
       die("SDL initialization failed: %s\n", SDL_GetError());
   atexit(SDL_Quit);
-  
+
    // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics();
   initTwBar();
@@ -1453,7 +1460,7 @@ int main(int argc, char **argv) {
   while (!done) {
     int ctlXChanged = 0, ctlYChanged = 0;
 
-    // Splined keyframes playback logic. Mess.
+    // Splined keyframes playback logic. Messy. Sets up next camera.
     if (!splines.empty()) {
       if (rendering && splines_index >= splines.size()) break;  // done
 
@@ -1502,18 +1509,15 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
-    if (config.enable_dof && camera.dof_scale > .0001) {
-      // If we have some DoF to render, render to texture.
-      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    }
-
     if (de_func || de_func_64) {
-      // Get a DE.
-      // Setup just the vars needed for DE. For now, iters and par[0..10]
+      // Get a distance estimate, for navigation and eye separation.
+      // Setup just the vars needed for DE. For now, iters and par[0..20]
       // TODO: make de() method of camera?
       GLSL::iters = camera.iters;
       for (int i = 0; i < 20; ++i) {
-        GLSL::par[i] = GLSL::vec3(camera.par[i][0], camera.par[i][1], camera.par[i][2]);
+        GLSL::par[i] = GLSL::vec3(camera.par[i][0],
+                                  camera.par[i][1],
+                                  camera.par[i][2]);
       }
       double de =
         de_func_64
@@ -1523,16 +1527,18 @@ int main(int argc, char **argv) {
               GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
       if (de != last_de) {
         printf("de=%12.12e\n", de);
-        camera.speed = GLSL::clamp(de/10.0,DBL_EPSILON,1.0);
+        camera.speed = GLSL::clamp(de/10.0, DBL_EPSILON, 1.0);
       }
       last_de = de;
     }
 
-    if (!rendering) {
-      // If we're rendering a sequence to disk, we don't care about z-buffer.
-      // Otherwise, just overwrite since we write every pixel.
-      glEnable(GL_DEPTH_TEST);
-      glDepthFunc(GL_ALWAYS);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
+
+    if (config.enable_dof && camera.dof_scale != 0) {
+      // Render to different back buffer to compute DoF effects later,
+      // using alpha as depth channel.
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     }
 
     if (background_texture) {
@@ -1543,21 +1549,65 @@ int main(int argc, char **argv) {
     } else {
       glUseProgram(program);
     }
-    glUniform1i(glGetUniformLocation(program, "use_bg_texture"), background_texture);
+    glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
+                background_texture);
 
-    camera.render(stereoMode);
+    camera.render(stereoMode);  // draw fractal
 
     glUseProgram(0);
 
-    if (background_texture) {
-      glBindTexture(GL_TEXTURE_2D, 0);
+    if (background_texture) glBindTexture(GL_TEXTURE_2D, 0);
+
+    // If we're rendering some DoF effects, draw from buffer to screen.
+    if (config.enable_dof && camera.dof_scale != 0) {
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glEnable(GL_TEXTURE_2D);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our frame.
+
+      glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
+
+      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
+      glUniform1f(glGetUniformLocation(dof_program, "z_near"), camera.z_near);
+      glUniform1f(glGetUniformLocation(dof_program, "z_far"), camera.z_far);
+      glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
+                  camera.dof_scale);
+      glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
+                  camera.dof_offset);
+      glUniform1f(glGetUniformLocation(dof_program, "speed"),
+                  camera.speed);
+
+      // Ortho projection, entire screen in regular pixel coordinates.
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      glOrtho(0, config.width, config.height, 0, -1, 1);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+
+      // Draw our texture covering entire screen, running the frame shader.
+      glColor4f(1,1,1,1);
+      glBegin(GL_QUADS);
+        glTexCoord2f(0,1);
+        glVertex2f(0,0);
+        glTexCoord2f(0,0);
+        glVertex2f(0,config.height);
+        glTexCoord2f(1,0);
+        glVertex2f(config.width,config.height);
+        glTexCoord2f(1,1);
+        glVertex2f(config.width,0);
+      glEnd();
+
+      glUseProgram(0);
+
+      glDisable(GL_TEXTURE_2D);
     }
 
+    // Draw keyframe splined path, if we have 2+ keyframes and not rendering.
     if (!config.no_spline &&
-        stereoMode == ST_NONE &&
+        stereoMode == ST_NONE &&  // TODO: show path in 3d
         keyframes.size() > 1 &&
         splines.empty()) {
-      // Draw keyframe splined path, if we have 2+ keyframes and not rendering
       glDepthFunc(GL_LESS);
 
       camera.activateGl();
@@ -1608,51 +1658,6 @@ int main(int argc, char **argv) {
 
     glDisable(GL_DEPTH_TEST);
 
-    if (config.enable_dof && camera.dof_scale > .0001) {
-      // If we're rendering some DoF, draw texture on screen.
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glEnable(GL_TEXTURE_2D);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, texture);
-      glGenerateMipmap(GL_TEXTURE_2D);
-
-      glUseProgram(dof_program);  // Activate our alpha channel shader.
-
-      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
-      glUniform1f(glGetUniformLocation(dof_program, "z_near"), camera.z_near);
-      glUniform1f(glGetUniformLocation(dof_program, "z_far"), camera.z_far);
-      glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
-                  camera.dof_scale);
-      glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
-                  camera.dof_offset);
-      glUniform1f(glGetUniformLocation(dof_program, "speed"),
-                  camera.speed);
-
-      // Ortho projection, entire screen in regular pixel coordinates.
-      glMatrixMode(GL_PROJECTION);
-      glLoadIdentity();
-      glOrtho(0, config.width, config.height, 0, -1, 1);
-      glMatrixMode(GL_MODELVIEW);
-      glLoadIdentity();
-
-      // Draw our texture covering entire screen, running the frame shader.
-      glColor4f(1,1,1,1);
-      glBegin(GL_QUADS);
-        glTexCoord2f(0,1);
-        glVertex2f(0,0);
-        glTexCoord2f(0,0);
-        glVertex2f(0,config.height);
-        glTexCoord2f(1,0);
-        glVertex2f(config.width,config.height);
-        glTexCoord2f(1,1);
-        glVertex2f(config.width,0);
-      glEnd();
-
-      glUseProgram(0);
-
-      glDisable(GL_TEXTURE_2D);
-    }
-
     // Draw AntTweakBar
     if (!grabbedInput && !rendering) TwDraw();
 
@@ -1683,7 +1688,7 @@ int main(int argc, char **argv) {
     );
     SDL_WM_SetCaption(caption, 0);
 
-    // Process events.
+    // Process UI events.
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (grabbedInput ||
