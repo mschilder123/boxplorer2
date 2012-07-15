@@ -1,4 +1,4 @@
-
+// http://blog.hvidtfeldts.net/index.php/2012/03/spherical-worlds/
 // Adapted for boxplorer2 by marius.
 
 #define INOUT(a,b) inout a b
