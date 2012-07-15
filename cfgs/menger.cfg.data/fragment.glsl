@@ -6,6 +6,8 @@
 
 #ifndef _FAKE_GLSL_
 
+#extension GL_ARB_shader_texture_lod : enable
+
 #define DECLARE_DE(x)
 #define DECLARE_COLORING(x)
 #define INOUT(a,b) inout a b
@@ -84,7 +86,7 @@ uniform int nrays;        // {min=1 max=10} # of ray bounces.
 // Menger params
 #define ME_offsetVector par[2]
 #define ME_ITERS par[1].x // {min=0 max=20 step=1} iterations
-#define ME_SIZE par[1].y // {min=0 max=5 step=.01} size of menger box
+#define ME_SIZE par[1].y // {min=0 max=100 step=.01} size of menger box
 
 // PKleinian params
 #define PZ_thickness par[5].x // {min=0.0 max=3 step=.001}
@@ -97,7 +99,7 @@ uniform int nrays;        // {min=1 max=10} # of ray bounces.
 #define PK_CVector par[3]
 #define PK_Offset vec3(par[4].y,par[4].x,par[5].y)
 #define PK_Color par[17]
-#define PK_CMix par[7].x
+#define PK_CMix par[7].x  // {min=-2 max=2 step=.01}
 #define PK_DEoffset par[0].x
 
 #define SPHERE_SZ par[4].z // {min=0 max=5 step=.01}
@@ -107,22 +109,73 @@ uniform int nrays;        // {min=1 max=10} # of ray bounces.
 #define L1_Vector par[19]
 #define L1_Size par[18].x  // {min=0.001 max=1.0 step=.001}
 
+float de_menger(vec3 z0) {
+  float scale=2.;  // size of holes
+  float r=1.0;
+  z0 /= ME_SIZE;
+  int n_iters = int(ME_ITERS);
+  for (int i=0;i<n_iters;i++) {
+    z0 = abs(z0) + ME_offsetVector;
+    if( z0.x < z0.y){z0 = z0.yxz;}
+    if( z0.x < z0.z){z0 = z0.zyx;}
+    if( z0.y < z0.z){z0 = z0.xzy;}
+    r = z0.x;
+    z0 += z0*scale - scale;
+    if(z0.z<-0.5*scale) z0.z+=scale;
+  }
+  return (r-1.0)*pow(float(scale+1.),float(1-n_iters))*ME_SIZE;
+}
+DECLARE_DE(de_menger)
+
+//2D coordinates infinite tiling
+vec2 Tile2D(vec2 p, vec2 a){
+	p+=a;
+	p-=a*floor(p/(a*4.0))*4.0;
+	p-=max(p-a*2.0,0.0)*2.0;
+	p-=a;
+	return p;
+}
+
+float de_KIFSMenger(vec3 z0) {
+	z0 /= ME_SIZE;
+	z0=vec3(Tile2D(z0.xy,vec2(par[8].x, par[8].y)), z0.z); 
+	int i;
+	vec3 kz=abs(z0);
+	const float ME_SCALE = 2.0;
+	float r=max(kz.x,max(kz.y,kz.z));
+	int n_iters = int(ME_ITERS);
+	for (i=0;i<n_iters && r<10.0;i++){
+		z0=abs(z0);
+		if( z0.x - z0.y < 0.0) z0=z0.yxz;
+		if( z0.x - z0.z < 0.0) z0=z0.zyx;
+		if( z0.y - z0.z < 0.0) z0=z0.xzy;
+		if( z0.z - 1.0/3.0 < 0.0) z0.z += 2.0/3.0 - 2.0 * z0.z;
+		z0 += z0*ME_SCALE - ME_SCALE;
+		kz=abs(z0);
+		r=max(kz.x,max(kz.y,kz.z));
+	}
+	return (r-1.0)*pow(ME_SCALE+1,-float(i))*ME_SIZE;
+}
+
+vec3 c_menger(vec3 p) {
+  return surfaceColor1;  // Boring but reflections make it interesting.
+}
+DECLARE_COLORING(c_menger)
+
 // Compute the distance from `pos` to the PKlein basic shape.
 float de_PZshape(vec3 p) {
-   float rxy=sign(PZ_rxy)*(length(p.xy)-abs(PZ_rxy));
-   for(int i=0; i<int(PZ_iter); i++) p.z=2.*clamp(p.z, -PZ_mult, PZ_mult)-p.z;
-   return max(rxy,abs(length(p.xy)*p.z-PZ_thickness) / sqrt(dot(p,p)+abs(PZ_thickness)));
+  float rxy=sign(PZ_rxy)*(length(p.xy)-abs(PZ_rxy));
+  for(int i=0; i<int(PZ_iter); i++) p.z=2.*clamp(p.z, -PZ_mult, PZ_mult)-p.z;
+  return max(rxy,abs(length(p.xy)*p.z-PZ_thickness) / sqrt(dot(p,p)+abs(PZ_thickness)));
 }
 
 // Compute the distance from `pos` to the PKlein.
 float de_PKlein(vec3 p) {
-   //Just scale=1 Julia box
+  //Just scale=1 Julia box
   float r2=dot(p,p);
   float DEfactor=1.;
-  vec3 ap=p+vec3(1.);
 
   for(int i=0;i<iters;i++) {
-    ap=p;
     p=clamp(p, -PK_BSize, PK_BSize)*2.-p;  // Box folding
     r2=dot(p,p);  // Inversion
     float k=max(PK_CSize/r2,1.);
@@ -133,7 +186,8 @@ float de_PKlein(vec3 p) {
   //Ok... not perfect because the inversion transformation is tricky
   //but works Ok with this shape (maybe because of the "tube" along Z-axis
   //You may need to adjust DIST_MULTIPLIER especialy with non zero Julia seed
-  return (DIST_MULTIPLIER*de_PZshape(p-PK_Offset)/abs(DEfactor)-PK_DEoffset);
+//  return (DIST_MULTIPLIER*de_PZshape(p-PK_Offset)/abs(DEfactor)-PK_DEoffset);
+  return (DIST_MULTIPLIER*de_KIFSMenger(p-PK_Offset)/abs(DEfactor)-PK_DEoffset);
 }
 DECLARE_DE(de_PKlein)
 
@@ -160,29 +214,6 @@ vec3 c_PKlein(vec3 p) {
 }
 DECLARE_COLORING(c_PKlein)
 
-float de_menger(vec3 z0) {
-  float scale=2.;  // size of holes
-  float r=1.0;
-  z0 /= ME_SIZE;
-  int n_iters = int(ME_ITERS);
-  for (int i=0;i<n_iters;i++) {
-    z0 = abs(z0) + ME_offsetVector;
-    if( z0.x < z0.y){z0 = z0.yxz;}
-    if( z0.x < z0.z){z0 = z0.zyx;}
-    if( z0.y < z0.z){z0 = z0.xzy;}
-    r = z0.x;
-    z0 += z0*scale - scale;
-    if(z0.z<-0.5*scale) z0.z+=scale;
-  }
-  return (r-1.0)*pow(float(scale+1.),float(1-n_iters))*ME_SIZE;
-}
-DECLARE_DE(de_menger)
-
-vec3 c_menger(vec3 p) {
-  return surfaceColor1;  // Boring but reflections make it interesting.
-}
-DECLARE_COLORING(c_menger)
-
 float de_mandelbox(vec3 pos) {
   float minRad2 = clamp(MB_MINRAD2, float(1.0e-9), float(1.0));
   vec4 scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
@@ -193,8 +224,8 @@ float de_mandelbox(vec3 pos) {
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + p0;
   }
-  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-           - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
+  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
+//    return (de_KIFSMenger(p.xyz)/abs(p.w))*DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
 
@@ -255,8 +286,8 @@ float de_combi(vec3 z0) {
   // Use min() for union, max() for intersection of shapes.
   // max(-a, b) for subtraction.
   //return min(max(de_ssponge(z0),de_mandelbox(z0)), de_menger(z0));
-  return max(-de_cylinder(z0), de_mandelbox(z0));
-  //return min(de_sphere(z0), de_mandelbox(z0));
+  //return max(-de_cylinder(z0), de_mandelbox(z0));
+  return min(de_sphere(z0), de_mandelbox(z0));
 }
 DECLARE_DE(de_combi)
 
@@ -289,7 +320,7 @@ const float normal_eps = 0.00001;
 vec3 normal(vec3 pos, float d_pos) {
 //  vec2 Eps = vec2(0, max(d_pos, normal_eps));
 //  vec2 Eps = vec2(0, d_pos);
-  vec2 Eps = vec2(0, normal_eps);
+  vec2 Eps = vec2(0, max(normal_eps, d_pos));
   return normalize(vec3(
   // 3-tap central differences, error = O(eps^2)
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
@@ -356,8 +387,8 @@ vec3 background_color(in vec3 vp) {
     u = 1. - theta;
   }
   //return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
-  //return texture2DLod(bg_texture, vec2(u+time/10.0,v), BG_BLUR).xyz;
-  return texture2D(bg_texture, vec2(u+time/10.0,v)).xyz;
+  return texture2DLod(bg_texture, vec2(u+time/40.0,v), BG_BLUR).xyz;
+  //return texture2D(bg_texture, vec2(u+time/10.0,v)).xyz;
 }
 #else
 // TODO: add texture2DLod to fake glsl
@@ -392,7 +423,7 @@ vec3 shade(vec3 p, vec3 l1, float side, float m_zoom) {
   if (totalD >= l1_dist - fudge) {
     float falloff = pow(1.0 + l1_dist, 2.0);
 	return vec3(0.,0.,1.0) * clamp(2.0 / falloff, 0.0, 1.0);
-	}
+  }
   return vec3(0.0, 0.0, 0.0);
 }
 
@@ -403,12 +434,14 @@ vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
   float t = -dot(x1 - x0, x2 - x1) / dot(x2 - x1, x2 - x1);
   if (t < 0.0 || t > 1.0) return vec4(0.0);  // not near this segment.
   float d = length(cross(x0 - x1, x0 - x2)) / length(x2 - x1);
-  if (d > L1_Size) return vec4(0.0);  // larger than light radius
+  float delta = L1_Size - d;
+  if (delta < 0) return vec4(0.0);  // larger than light radius
+  delta /= L1_Size;
   return vec4(
-    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
-    clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
+    clamp(1.3*delta, 0.0, 1.0),
+    clamp(1.3*delta, 0.0, 1.0),
     1.0,
-	clamp(3.0*(L1_Size-d)/L1_Size, 0.0, 1.0));
+    clamp(3.0*delta, 0.0, 0.99 /*1.0 causes artifacts.. dunno why*/));
 }
 
 // Get base color at p, plus Blinn_phing and ambient occulusion.
@@ -422,7 +455,7 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
   return col;
 }
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 20x speed.
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
 void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
 #if !defined(ST_NONE)
 #if defined(ST_INTERLACED)
@@ -431,7 +464,7 @@ void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
 #endif
   eye_in = eye + eye_d;
-  dp = normalize(dir * (focus + 20.0) * abs(speed) - eye_d);
+  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
 #else  // ST_NONE
   eye_in = eye;
   dp = normalize(dir);
@@ -473,15 +506,16 @@ void main() {
   vec3 finalCol = rayCol;
 
 // uncomment to have only sphere be reflective.
-//  float D = (side * de_sphere(p) - totalD * m_dist) / (1.0 + m_dist);
-//  if (D < m_dist)
+//  if (de_sphere(p) < de_mandelbox(p))
+{
+//     n = normalize(p);
 
   // March reflected ray a couple of times.
   for (int ray = 1; ray < nrays &&
                     totalD < MAX_DIST &&
                     colFactor > 0.0; ++ray) {
     dp = reflect(dp, n);  // reflect view direction
-    p += dp * (-totalD + 1.1 * m_dist);  // reproject eye
+    p += dp * (-totalD + (3.+noise) * m_dist);  // reproject eye
 
     float oldTotalD = totalD;  // only trace lightbulbs on actual reflected path..
     steps += rayMarch(p, dp, totalD, side, m_dist, m_zoom);
@@ -497,8 +531,9 @@ void main() {
     }
     finalCol = mix_reflection(n, -dp, finalCol, rayCol, colFactor);
     finalCol = mix(finalCol, rlight.xyz, rlight.w * colFactor);
-    colFactor *= SHINE * SHINE;  // reflection drop-off.
+    colFactor *= (SHINE * SHINE);  // reflection drop-off.
   }
+}
 
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
@@ -510,5 +545,7 @@ void main() {
   float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
   gl_FragDepth = depth;
   gl_FragColor = vec4(finalCol, depth);
+  // This one blurs reflection, but only based on last (furthest) hit..
+  //gl_FragColor = vec4(finalCol, (a+b/clamp(totalD/length(dir), zNear, zFar)));
 }
 
