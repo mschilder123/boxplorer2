@@ -346,7 +346,7 @@ vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
     clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
     clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
     clamp(1.3*(L1_Size-d)/L1_Size, 0.0, 1.0),
-    clamp(pow(1.5*(L1_Size-d)/L1_Size, 3.0), 0.0, 1.0));
+    clamp(pow(1.5*(L1_Size-d)/L1_Size, 3.0), 0.0, 0.99));
 }
 
 // Get base color at p, plus Blinn_phing and ambient occulusion.
@@ -458,5 +458,6 @@ void main() {
   float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
   gl_FragDepth = depth;
   gl_FragColor = vec4(finalCol, depth);
+  //gl_FragColor = vec4(vec3(pow(finalCol.x,1.0/2.2), pow(finalCol.y, 1.0/2.2), pow(finalCol.z, 1.0/2.2)), depth);
 }
 

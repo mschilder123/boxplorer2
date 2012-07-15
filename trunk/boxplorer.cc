@@ -1111,9 +1111,9 @@ void initGraphics() {
   (program = setupShaders()) ||
       die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
-  if (background_texture == 0 && background.data() != NULL) {
+  if (background.data() != NULL) {
     // Load background image into texture
-
+    glDeleteTextures(1, &background_texture);  // free existing
     glGenTextures(1, &background_texture);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, background_texture);
@@ -1141,7 +1141,6 @@ void initGraphics() {
 
     // Create depth buffer
     glDeleteRenderbuffers(1, &depthBuffer);  // free existing
-
     glGenRenderbuffers(1, &depthBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
@@ -1153,7 +1152,6 @@ void initGraphics() {
 
     // Create texture to render to
     glDeleteTextures(1, &texture);  // free existing
-
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
 
