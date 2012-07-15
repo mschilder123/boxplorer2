@@ -154,7 +154,7 @@ float de_KIFSMenger(vec3 z0) {
 		kz=abs(z0);
 		r=max(kz.x,max(kz.y,kz.z));
 	}
-	return (r-1.0)*pow(ME_SCALE+1,-float(i))*ME_SIZE;
+	return (r-1.0)*pow(ME_SCALE+1.0,-float(i))*ME_SIZE;
 }
 
 vec3 c_menger(vec3 p) {
@@ -399,14 +399,23 @@ vec3 background_color(vec3 vp) { return backgroundColor; }
 // returns # steps
 int rayMarch(vec3 p, vec3 dp, INOUT(float,totalD), float side, INOUT(float,m_dist), float m_zoom) {
   int steps;
+  float D;
   for (steps = 0; steps < max_steps; ++steps) {
    // float D = (side * d(p + dp * totalD) - totalD * m_dist) / (1.0 + m_dist);
-   float D = side * d(p + dp * totalD);
+   D = side * d(p + dp * totalD);
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
     m_dist = m_zoom * totalD;
   }
+#if 1
+ if (D < m_dist)
+for (int i = 0; i<5; ++i) {
+  totalD += D - m_dist;
+  m_dist = m_zoom * totalD;
+  D = abs(side * d(p + dp * totalD));
+}
+#endif
   return steps;
 }
 
@@ -435,7 +444,7 @@ vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
   if (t < 0.0 || t > 1.0) return vec4(0.0);  // not near this segment.
   float d = length(cross(x0 - x1, x0 - x2)) / length(x2 - x1);
   float delta = L1_Size - d;
-  if (delta < 0) return vec4(0.0);  // larger than light radius
+  if (delta < 0.0) return vec4(0.0);  // larger than light radius
   delta /= L1_Size;
   return vec4(
     clamp(1.3*delta, 0.0, 1.0),
