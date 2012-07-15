@@ -154,7 +154,7 @@ float de_KIFSMenger(vec3 z0) {
 		kz=abs(z0);
 		r=max(kz.x,max(kz.y,kz.z));
 	}
-	return (r-1.0)*pow(ME_SCALE+1.0,-float(i))*ME_SIZE;
+	return (r-1.0)*pow(float(ME_SCALE+1.0),-float(i))*ME_SIZE;
 }
 
 vec3 c_menger(vec3 p) {
