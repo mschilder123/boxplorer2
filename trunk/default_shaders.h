@@ -146,14 +146,16 @@ const char frame_default_fs[]=
   "uniform float dof_offset;  // {min=-5. max=5. step=.01}\n"
   "uniform float dof_scale;  // {min=-29.5. max=100. step=.5}\n"
   "uniform float speed;\n"
+  "uniform float xres, yres;\n"
+  "float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0);}\n"
   "void main() {"
   " vec4 c = texture2DLod(my_texture, texture_coordinate, 0.);"
   " float d = -z_far * z_near / (c.w * (z_far - z_near) - z_far);\n"
-  " gl_FragColor = texture2DLod(my_texture, texture_coordinate,\n"
   // 30.0 and .5 make for reasonable views w/ old .cfgs
   // But have no other meaning. Remove once .cfgs are updated?
-  // TODO: figure proper CoC / focal plane params
-  // TODO: random sample to avoid mipmap patterns
-  "     abs(log(1.0 + d / (speed * (30.0 + dof_scale))) - .5 + dof_offset));\n"
+  // TODO: figure proper CoC / aperture / focal plane params
+  " float lod = abs(log(1.0 + d / (speed * (30.0 + dof_scale))) - .5 + dof_offset);\n"
+  " vec2 dv = vec2(((pnoise(gl_FragCoord.xy)-.5)*lod*lod)/xres, ((pnoise(gl_FragCoord.yx)-.5)*lod*lod)/yres);\n"
+  " gl_FragColor = texture2DLod(my_texture, texture_coordinate + dv, lod);\n"
   " gl_FragDepth = c.w;\n"  // copy Z
   "}";
