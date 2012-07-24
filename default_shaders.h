@@ -144,7 +144,7 @@ const char frame_default_fs[]=
   "uniform float z_near;  // {min=.00001 max=.009 step=.00001}\n"
   "uniform float z_far;  // {min=.01 max=10. step=.01}\n"
   "uniform float dof_offset;  // {min=-5. max=5. step=.01}\n"
-  "uniform float dof_scale;  // {min=-29.5. max=100. step=.5}\n"
+  "uniform float dof_scale;  // {min=-29.5. max=1000. step=.1}\n"
   "uniform float speed;\n"
   "uniform float xres, yres;\n"
   "float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0);}\n"
@@ -154,6 +154,7 @@ const char frame_default_fs[]=
   // 30.0 and .5 make for reasonable views w/ old .cfgs
   // But have no other meaning. Remove once .cfgs are updated?
   // TODO: figure proper CoC / aperture / focal plane params
+  // TODO: make DoF work w/ fp64 zooms; vary z_far and z_near
   " float lod = abs(log(1.0 + d / (speed * (30.0 + dof_scale))) - .5 + dof_offset);\n"
   " vec2 dv = vec2(((pnoise(gl_FragCoord.xy)-.5)*lod*lod)/xres, ((pnoise(gl_FragCoord.yx)-.5)*lod*lod)/yres);\n"
   " gl_FragColor = texture2DLod(my_texture, texture_coordinate + dv, lod);\n"

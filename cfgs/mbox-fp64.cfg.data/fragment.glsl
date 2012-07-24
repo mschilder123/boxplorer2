@@ -64,7 +64,7 @@ vec4 Z = vec4(0.55, 0.16, 0.03, 1.0);
 vec4 R = vec4(0.12, 0.1, 0.2, 0.7);
 
 vec3 specularColor = vec3(1.0, 0.8, 0.4);
-vec3 glowColor = vec3(0.03, 0.4, 0.4);
+vec3 glowColor = vec3(0.03, 0.9, 0.4);
 vec3 aoColor = vec3(0, 0, 0);
 
 #define OrbitStrength par[9].x  //{min=0 max=1 step=.01}
@@ -76,12 +76,18 @@ double absScalePowIters;
 void init() {
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-
   scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
-
   double s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
   for (int i=0; i<iters; i++) s*= ds;
   absScalePowIters = s;
+}
+
+double lengthd(dvec3 v) {  // wtf? why needed?
+  return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
+dvec3 normalized(dvec3 v) {
+  return v / lengthd(v);
 }
 
 double de_mandelbox(dvec3 pos) {
@@ -93,13 +99,13 @@ double de_mandelbox(dvec3 pos) {
     p = p*scale + p0;
 	if (r2 > 1000.0) break;
   }
-  return ( (length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
+  return ( (lengthd(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
 			- absScalePowIters) * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
 
 // Compute the color at `pos`.
-dvec3 c_mandelbox(dvec3 pos, double totalD) {
+vec3 c_mandelbox(dvec3 pos, double totalD) {
   dvec4 p = dvec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   dvec4 orbitTrap = dvec4(10000.0);
 
@@ -112,7 +118,7 @@ dvec3 c_mandelbox(dvec3 pos, double totalD) {
   }
 
   orbitTrap.w = sqrt(orbitTrap.w);
-  dvec3 orbitColor =
+  vec3 orbitColor =
         X.xyz*X.w*orbitTrap.x +
 		Y.xyz*Y.w*orbitTrap.y +
 		Z.xyz*Z.w*orbitTrap.z +
@@ -121,35 +127,32 @@ dvec3 c_mandelbox(dvec3 pos, double totalD) {
   return mix(BaseColor, 3.0*orbitColor,  OrbitStrength);
 }
 
+
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 dvec3 normal(dvec3 pos, double d_pos) {
   dvec2 Eps = dvec2(0, d_pos);
-  return normalize(dvec3(
-    -abs(d(pos-Eps.yxx))+abs(d(pos+Eps.yxx)),
-    -abs(d(pos-Eps.xyx))+abs(d(pos+Eps.xyx)),
-    -abs(d(pos-Eps.xxy))+abs(d(pos+Eps.xxy))
-  ));
+  return normalized(
+     dvec3(-abs(d(pos-Eps.yxx))+abs(d(pos+Eps.yxx)),
+           -abs(d(pos-Eps.xyx))+abs(d(pos+Eps.xyx)),
+           -abs(d(pos-Eps.xxy))+abs(d(pos+Eps.xxy))
+		  )
+     );
 }
 
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
 // `normal`, `view` and `light` should be normalized.
-dvec3 blinn_phong(dvec3 normal, dvec3 view, dvec3 light, dvec3 diffuseColor) {
-  dvec3 halfLV = normalize(light + view);
-  double spe = max( dot(normal, halfLV), 0.0 );
-  spe *= spe; // 2
-  spe *= spe; // 4
-  spe *= spe; // 8
-  spe *= spe; // 16
-  spe *= spe; // 32
-  double dif = dot(normal, light) * 0.5 + 0.75;
+vec3 blinn_phong(dvec3 normal, dvec3 view, dvec3 light, vec3 diffuseColor) {
+  dvec3 halfLV = normalized(light + view);
+  float spe = pow(float(max(dot(normal, halfLV), 0.0)), 16.0);
+  float dif = float(dot(normal, light)) * 0.5 + 0.75;
   return dif*diffuseColor + spe*specularColor;
 }
 
 // FAKE Ambient occlusion approximation.
 // uses current distance estimate as first dist. the size of AO is independent from distance from eye
-double ambient_occlusion(dvec3 p, dvec3 n, double DistAtp) {
-  double ao_ed= DistAtp;
+float ambient_occlusion(dvec3 p, dvec3 n, double DistAtp) {
+  double ao_ed = DistAtp;
   double ao = 1.0, w = ao_strength/ao_ed;
   double dist = 2.0 * ao_ed;
 
@@ -159,7 +162,7 @@ double ambient_occlusion(dvec3 p, dvec3 n, double DistAtp) {
     w *= 0.5;
     dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
-  return clamp(ao, 0.0, 1.0);
+  return clamp(float(ao), 0.0, 1.0);
 }
 
 // ytalinflusa's noise [0..1>
@@ -174,10 +177,10 @@ void setup_stereo(inout dvec3 eye_in, inout dvec3 dp) {
   dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4(dspeed, 0, 0, 0));
 #endif
   eye_in = deye + eye_d;
-  dp = normalize(dir * (focus + 30.0) * abs(dspeed) - eye_d);
+  dp = normalized(dir * (focus + 30.0) * abs(dspeed) - eye_d);
 #else  // ST_NONE
   eye_in = deye;
-  dp = normalize(dir);
+  dp = normalized(dir);
 #endif
 }
 
@@ -203,20 +206,20 @@ void main() {
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
-    m_dist =  m_zoom * totalD;
+    m_dist = m_zoom * totalD;
   }
 
   p += totalD * dp;
 
   // Color the surface with Blinn-Phong shading, ambient occlusion and glow.
-  dvec3 col = backgroundColor;
+  vec3 col = backgroundColor;
 
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
     col = c(p, totalD);
-	dvec3 n = normal(p, 2.0*abs(D));
-    col = blinn_phong(n, -dp, normalize(eye_in+/*dp+*/dvec3(0,1,0)), col);
-    col = mix(aoColor, col, ambient_occlusion(p, n, abs(D)));
+    dvec3 n = normal(p, abs(D));
+    col = blinn_phong(n, -dp, normalized(eye_in+dp+dvec3(0,-1,0)), col);
+    col = mix(aoColor, col, ambient_occlusion(p, n, 20.*m_dist));
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
@@ -234,5 +237,5 @@ void main() {
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
   gl_FragDepth = depth;
-  gl_FragColor = vec4(float(col.x),float(col.y),float(col.z), depth);
+  gl_FragColor = vec4(col, depth);
 }
