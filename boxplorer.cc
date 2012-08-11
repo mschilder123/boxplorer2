@@ -281,10 +281,17 @@ Uint32 getLastFrameDuration(void) {
 // Return the average FPS over the last X frames.
 float getFPS(void) {
   if (frameDurationsIndex < framesToAverage) return 0;  // not enough data
-
   int i; Uint32 sum;
   for (i=sum=0; i<framesToAverage; i++) sum += frameDurations[i];
-  return framesToAverage * 1000.f / sum;
+  float fps = framesToAverage * 1000.f / sum;
+#if 0
+  static Uint32 lastfps = 0;
+  if (lastFrameTime - lastfps > 1000) {
+    printf("fps %f\n", fps);
+    lastfps = lastFrameTime;
+  }
+#endif
+  return fps;
 }
 
 
@@ -626,7 +633,9 @@ class KeyFrame {
        case ST_NONE:
          activate();
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
-         glRects(-1,-1,1,1);  // draw entire screen
+         // Draw screen in N (==2 for now) steps for x-fire / sli
+         glRects(-1,-1,0,1);  // draw left half
+         glRects(0,-1,1,1);  // draw right half
          break;
        case ST_INTERLACED:
          activate();
@@ -701,10 +710,10 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 
       // The CatmullRom spline function; 0 <= t <= 1
       #define SPLINE(X,p0,p1,p2,p3) \
-        (X = (double)(.5 * ( (2 * p1 + \
+        (X = (double)(.5 * (2 * p1 + \
                             t*((-p0 + p2) + \
-                             t*(2*p0 - 5*p1 + 4*p2 - p3) + \
-                               t*(-p0 + 3*p1 - 3*p2 + p3))))))
+                             t*((2*p0 - 5*p1 + 4*p2 - p3) + \
+                                t*(-p0 + 3*p1 - 3*p2 + p3))))))
 
       // Spline position, direction.
       for (size_t j = 0; j < lengthof(tmp.v); ++j) {
