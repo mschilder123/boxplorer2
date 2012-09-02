@@ -7,8 +7,8 @@ LDFLAGS=-lm -lGL -lSDL -lX11
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o
 
-boxplorer: boxplorer.o Makefile.linux $(TW_OBJS)
-	g++ boxplorer.o $(TW_OBJS) -o boxplorer $(LDFLAGS)
+boxplorer: boxplorer.o Makefile.linux $(TW_OBJS) interpolate.o
+	g++ boxplorer.o $(TW_OBJS) interpolate.o -o boxplorer $(LDFLAGS)
 
 boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.linux
 	g++ -c $(CFLAGS) boxplorer.cc
@@ -21,6 +21,9 @@ edit-cfg: edit-cfg.cc Makefile.linux
 
 glsl: glsl.cc TGA.h glsl.h Makefile.linux cfgs/menger.cfg.data/fragment.glsl
 	g++ $(CFLAGS) glsl.cc -o glsl
+
+interpolate.o: interpolate.c
+	g++ -c $(CFLAGS) $<
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CFLAGS) $<

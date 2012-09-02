@@ -23,8 +23,8 @@
 #define MKDIR(a) mkdir(a)
 
 #pragma warning(disable: 4996) // unsafe function
-#pragma warning(disable: 4244) // conversion loss
-#pragma warning(disable: 4305) // truncation
+//#pragma warning(disable: 4244) // conversion loss
+//#pragma warning(disable: 4305) // truncation
 #pragma warning(disable: 4800) // forcing value to bool
 
 #pragma comment(lib, "SDL.lib")
@@ -54,6 +54,7 @@ using namespace std;
 #include "shader_procs.h"
 #include "default_shaders.h"
 
+#include "interpolate.h"
 #include "TGA.h"
 
 #if defined(_WIN32)
@@ -340,6 +341,9 @@ class KeyFrame {
    // View matrix.
    double v[16];
 
+   double q[4];  // quarterion orientation
+   double x[4];  // r4 splineable q
+
    // Declare fractal and other parameters.
    #define PROCESS(a,b,c,d) a b;
    PROCESS_CONFIG_PARAMS
@@ -368,8 +372,6 @@ class KeyFrame {
 
    void orthogonalize() {
       if (!normalize(ahead())) { ahead()[0]=ahead()[1]=0; ahead()[2]=1; }
-      double l = dot(ahead(), up());
-      for (int i=0; i<3; i++) up()[i] -= l*ahead()[i];
       if (!normalize(up())) {  // Error? Make upDirection.z = 0.
          up()[2] = 0;
          if (fabs(ahead()[2]) == 1) {
@@ -381,11 +383,14 @@ class KeyFrame {
             normalize(up());
          }
       }
+      double l = dot(ahead(), up());
+      for (int i=0; i<3; i++) up()[i] -= l*ahead()[i];
       // Compute rightDirection as a cross product of upDirection and direction.
       for (int i=0; i<3; i++) {
          int j = (i+1)%3, k = (i+2)%3;
          right()[i] = up()[j]*ahead()[k] - up()[k]*ahead()[j];
       }
+      right()[3] = 0; up()[3] = 0; ahead()[3] = 0; pos()[3] = 1;
    }
 
    // Move camera in a direction relative to the view direction.
@@ -417,6 +422,7 @@ class KeyFrame {
       for (int j=0; j<3; j++) c[j] = v[i+j*4];
       for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
      }
+     orthogonalize();
    }
 
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
@@ -659,12 +665,13 @@ void suggestDeltaTime(KeyFrame& camera, const vector<KeyFrame>& keyframes) {
   }
 }
 
-#define NSUBFRAMES 1000  // # splined subframes between keyframes.
+#define NSUBFRAMES 100  // # splined subframes between keyframes.
 
 void CatmullRom(const vector<KeyFrame>& keyframes,
                 vector<KeyFrame>* output,
                 bool loop = false,
                 int nsubframes = NSUBFRAMES) {
+  static bool once = false;  // true;
   output->clear();
   if (keyframes.size() < 2) return;  // Need at least two points.
 
@@ -688,6 +695,28 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 
   size_t n = controlpoints.size();
 
+  // Compute / check quats.
+  // Pick smaller angle between two quats.
+  mat2quat(controlpoints[0].v, controlpoints[0].q);
+  quat2x(controlpoints[0].q, controlpoints[0].x);
+  for (size_t i = 1; i < n; ++i) {
+    mat2quat(controlpoints[i].v, controlpoints[i].q);
+    double dot =
+      controlpoints[i - 1].q[0] * controlpoints[i].q[0] +
+      controlpoints[i - 1].q[1] * controlpoints[i].q[1] +
+      controlpoints[i - 1].q[2] * controlpoints[i].q[2] +
+      controlpoints[i - 1].q[3] * controlpoints[i].q[3];
+    if (dot < 0) {
+      // Angle between quats > 180; make quat current go 360 - angle.
+      controlpoints[i].q[0] *= -1;
+      controlpoints[i].q[1] *= -1;
+      controlpoints[i].q[2] *= -1;
+      controlpoints[i].q[3] *= -1;
+    }
+    // Compute splinable r4 map of quat for splining below.
+    quat2x(controlpoints[i].q, controlpoints[i].x);
+  }
+
   // Compute controlpoint time based on sum of delta_time up to it.
   // Note we don't spline delta_time but we do spline time.
   double time = 0;
@@ -706,20 +735,48 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
     for (int f = 0; f < nsubframes; ++f) {
       KeyFrame tmp = config;  // Start with default values.
       tmp.setKey(f == 0);
-      const double t = f * ((double)1 / nsubframes);
+      const double t = ((double)f) / nsubframes;
 
       // The CatmullRom spline function; 0 <= t <= 1
+      // Suffers from overshoot for non-evenly spaced control points.
+      // Need to look into Bessel-Overhauser mitigation.
       #define SPLINE(X,p0,p1,p2,p3) \
-        (X = (double)(.5 * (2 * p1 + \
-                            t*((-p0 + p2) + \
-                             t*((2*p0 - 5*p1 + 4*p2 - p3) + \
-                                t*(-p0 + 3*p1 - 3*p2 + p3))))))
+        ((X) = (double)(.5 * (2 * (p1) + \
+                            t*( (-(p0) + (p2)) + \
+                                t*( (2*(p0) - 5*(p1) + 4*(p2) - (p3)) + \
+                                    t*(-(p0) + 3*(p1) - 3*(p2) + (p3)) ) ) ) ) )
 
+#if 0
       // Spline position, direction.
       for (size_t j = 0; j < lengthof(tmp.v); ++j) {
         SPLINE(tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
+        if (once && j >= 12 && j < 16)
+        printf("%d.%d.%lu: %le= %le..%le..%le..%le\n",
+          i, f, j, tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
       }
-      // Spline par[] array.
+#else
+      // Spline over splinable representation of quat.
+      double x[4];
+      for (size_t j = 0; j < 4; ++j) {
+        SPLINE(x[j], p0->x[j], p1->x[j], p2->x[j], p3->x[j]);
+      }
+      double q[4];
+      x2quat(x, q);  // convert back to quat
+      quat2mat(q, tmp.v);  // convert quat to matrix
+
+      // Spline position into tmp.v[12..15]
+      for (size_t j = 12; j < 15; ++j) {
+        SPLINE(tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
+        if (once && j >= 12 && j < 16)
+        printf("%d.%d.%lu: %le= %le..%le..%le..%le\n",
+          i, f, j, tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
+      }
+#endif
+      if (once) printf("\n");
+
+      // Spline par[] array. Some of those could also be rotations, which will not
+      // spline nicely at all times..
+      // TODO: have couple of uniform quats for shader use and spline those nicely.
       for (size_t j = 0; j < lengthof(tmp.par); ++j) {
         SPLINE(tmp.par[j][0],
                p0->par[j][0], p1->par[j][0], p2->par[j][0], p3->par[j][0]);
@@ -739,6 +796,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
       output->push_back(tmp);
     }
   }
+  once = false;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1253,6 +1311,8 @@ void initTwParDefines() {
       TwAddVarRW(bar, varName.c_str(), TW_TYPE_COLOR3F, address, "");
     } else if (varName.find("Vector") != string::npos) {
       TwAddVarRW(bar, varName.c_str(), TW_TYPE_DIR3F, address, "");
+    } else if (varName.find("Quat") != string::npos) {
+      TwAddVarRW(bar, varName.c_str(), TW_TYPE_QUAT4F, address, "");
     } else {
       TwAddVarRW(bar, varName.c_str(), TW_TYPE_FLOAT, address, attr.c_str());
     }
