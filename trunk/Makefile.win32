@@ -8,9 +8,9 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
 	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj
 
 boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 $(TW_OBJS) \
-               cfgs\menger.cfg.data\fragment.glsl
+               cfgs\menger.cfg.data\fragment.glsl glsl.h interpolate.obj
 	cl -c $(CFLAGS) boxplorer.cc
-	link $(LDFLAGS) boxplorer.obj  $(TW_OBJS)
+	link $(LDFLAGS) boxplorer.obj  $(TW_OBJS) interpolate.obj
 
 shadershrink.exe: shadershrink.cc Makefile.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
@@ -20,6 +20,9 @@ glsl.exe: glsl.cc TGA.h glsl.h Makefile.win32 cfgs\menger.cfg.data\fragment.glsl
 
 edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
+
+interpolate.obj: interpolate.c
+	cl -c $(CFLAGS) $**
 
 TwBar.obj: AntTweakBar\src\TwBar.cpp
 	cl -c $(CFLAGS) $**
