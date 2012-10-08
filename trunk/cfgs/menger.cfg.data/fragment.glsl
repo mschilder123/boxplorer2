@@ -214,17 +214,40 @@ vec3 c_PKlein(vec3 p) {
 }
 DECLARE_COLORING(c_PKlein)
 
+#define rotationVector par[3]
+#define rotationAngle par[4].x  // { min=-5 max=5 step=.01}
+
 float de_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, float(1.0e-9), float(1.0));
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9f, 1.0f);
   vec4 scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  
+  float s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
+  for (int i=0; i<iters; i++) s*= ds;
+  float absScalePowIters = s;
+  
+  float csat = cos(rotationAngle);
+  float ssat = sin(rotationAngle);
+  float usat = 1.0f - csat;
+  vec3 u = normalize(rotationVector);
+  mat3 rotationMatrix = mat3(
+    u.x*u.x*usat + csat,     u.x*u.y*usat - u.z*ssat, u.x*u.z*usat + u.y*ssat,
+    u.y*u.x*usat + u.z*ssat, u.y*u.y*usat + csat,     u.y*u.z*usat - u.x*ssat,
+    u.z*u.x*usat - u.y*ssat, u.z*u.y*usat + u.x*ssat, u.z*u.z*usat + csat
+    );
+
+
+
   vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
+    p = vec4(rotationMatrix * p.xyz, p.w);
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + p0;
+    if (r2 > 100.0) break;
   }
-  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w - pow(abs(MB_SCALE), float(1-iters))) * DIST_MULTIPLIER;
+  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
+     - absScalePowIters) * DIST_MULTIPLIER;
 //    return (de_KIFSMenger(p.xyz)/abs(p.w))*DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
@@ -234,17 +257,34 @@ DECLARE_DE(de_mandelbox)
 double de_mandelbox_64(dvec3 pos) {
   double minRad2 = clamp(double(MB_MINRAD2), 1.0e-9, 1.0);
   dvec4 scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
-  dvec4 p = dvec4(pos,1.0), p0 = p;  // p.w is the distance estimate
-  double ps = abs(MB_SCALE), psm = 1.0/ps;
+  
+  double s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
+  for (int i=0; i<iters; i++) s*= ds;
+  double absScalePowIters = s;
+  
+  float csat = cos(-rotationAngle);
+  float ssat = sin(-rotationAngle);
+  float usat = 1.0f - csat;
+  vec3 u = normalize(rotationVector);
+  mat3 rotationMatrix = mat3(
+    u.x*u.x*usat + csat,     u.x*u.y*usat - u.z*ssat, u.x*u.z*usat + u.y*ssat,
+    u.y*u.x*usat + u.z*ssat, u.y*u.y*usat + csat,     u.y*u.z*usat - u.x*ssat,
+    u.z*u.x*usat - u.y*ssat, u.z*u.y*usat + u.x*ssat, u.z*u.z*usat + csat
+    );
+
+
+
+  dvec4 p = dvec4(pos, 1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
+    p = dvec4(rotationMatrix * dvec3(p.xyz), p.w);
     p = dvec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     double r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + p0;
-    ps *= psm;
+	//if (r2 > 100.0) break;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-           - ps) * .9;
+			- absScalePowIters) * 0.95 * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox_64)
 
@@ -547,8 +587,8 @@ void main() {
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
