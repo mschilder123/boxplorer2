@@ -23,7 +23,7 @@ const char default_fs[] =
   "varying vec3 eye,dir;"
   "uniform vec3 par[10];"
   "uniform float"
-   " min_dist,"
+   " speed,min_dist,"
     "ao_eps,"
     "ao_strength,"
     "glow_strength,"
@@ -121,8 +121,8 @@ const char default_fs[] =
       "}"
     "}"
     "col=mix(col,glowColor,float(steps)/float(max_steps)*glow_strength);"
-    "float zFar=5.0;"
-    "float zNear=0.0001;"
+    "float zNear=abs(speed);"
+    "float zFar=65535.0*zNear;"
     "float a=zFar/(zFar-zNear);"
     "float b=zFar*zNear/(zNear-zFar);"
     "float depth=(a+b/clamp(totalD/length(dir), zNear, zFar));"
@@ -130,33 +130,32 @@ const char default_fs[] =
     "gl_FragColor=vec4(col,depth);"
   "}";
 
-const char frame_default_vs[]=
+const char effects_default_vs[]=
   "varying vec2 texture_coordinate;"
   "void main(){"
-  " gl_Position=gl_ModelViewProjectionMatrix * gl_Vertex;"
+  " gl_Position=gl_ModelViewProjectionMatrix * gl_Vertex;\n"
   " texture_coordinate = vec2(gl_MultiTexCoord0);"
   "}";
 
-const char frame_default_fs[]=
+const char effects_default_fs[]=
   "#extension GL_ARB_shader_texture_lod : enable\n"  // explicit enable for osx.
   "varying vec2 texture_coordinate;"
   "uniform sampler2D my_texture;\n"
-  "uniform float z_near;  // {min=.00001 max=.009 step=.00001}\n"
-  "uniform float z_far;  // {min=.01 max=10. step=.01}\n"
   "uniform float dof_offset;  // {min=-5. max=5. step=.01}\n"
   "uniform float dof_scale;  // {min=-29.5. max=1000. step=.1}\n"
   "uniform float speed;\n"
   "uniform float xres, yres;\n"
   "float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0);}\n"
   "void main() {"
-  " vec4 c = texture2DLod(my_texture, texture_coordinate, 0.);"
-  " float d = -z_far * z_near / (c.w * (z_far - z_near) - z_far);\n"
+  " float z = texture2D(my_texture, texture_coordinate).w;"
+  " float z_near = abs(speed);"
+  " float z_far = 65535.0*z_near;"
+  " float d = -z_far * z_near / (z * (z_far - z_near) - z_far);\n"
   // 30.0 and .5 make for reasonable views w/ old .cfgs
   // But have no other meaning. Remove once .cfgs are updated?
   // TODO: figure proper CoC / aperture / focal plane params
-  // TODO: make DoF work w/ fp64 zooms; vary z_far and z_near
-  " float lod = abs(log(1.0 + d / (speed * (30.0 + dof_scale))) - .5 + dof_offset);\n"
+  " float lod = abs(log(1.0 + d / (abs(speed) * (30.0 + dof_scale))) - .5 + dof_offset);\n"
   " vec2 dv = vec2(((pnoise(gl_FragCoord.xy)-.5)*lod*lod)/xres, ((pnoise(gl_FragCoord.yx)-.5)*lod*lod)/yres);\n"
   " gl_FragColor = texture2DLod(my_texture, texture_coordinate + dv, lod);\n"
-  " gl_FragDepth = c.w;\n"  // copy Z
+  " gl_FragDepth = z;\n"  // copy Z
   "}";

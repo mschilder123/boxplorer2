@@ -1,3 +1,5 @@
+#extension GL_ARB_gpu_shader_fp64 : enable
+
 // Mandelbox shader by Rrrola
 // Original formula by Tglad
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
@@ -23,10 +25,11 @@
 #endif  // _FAKE_GLSL_
 
 #define P0 p0                    // standard Mandelbox
-//#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
+//#define P0 (p0-vec4(par[1],1.0))  // Mandelbox Julia
 
 #define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
+#define detail par[0].z  // {min=.1 max=10 step=.01}
 
 #define DIST_MULTIPLIER par[8].z  // {min=.01 max=1.0 step=.01}
 #define MAX_DIST 15.0
@@ -61,10 +64,13 @@ vec3 BaseColor = vec3(.3,.3,.3);
 vec4 X = vec4(0.95, 0.64, 0.1, .9);
 vec4 Y = vec4(0.89, 0.95, 0.75, .4);
 vec4 Z = vec4(0.55, 0.16, 0.03, 1.0);
+//vec4 X = vec4(0.95, 0.1, 0.1, .9);
+//vec4 Y = vec4(0.1, 0.95, 0.1, .9);
+//vec4 Z = vec4(0.1, 0.1, 0.95, .9);
 vec4 R = vec4(0.12, 0.1, 0.2, 0.7);
 
-vec3 specularColor = vec3(1.0, 0.8, 0.4);
-vec3 glowColor = vec3(0.03, 0.9, 0.4);
+vec3 specularColor = vec3(.9, 0.8, 0.4);
+vec3 glowColor = vec3(0.3, 0.3, 0.3);
 vec3 aoColor = vec3(0, 0, 0);
 
 #define OrbitStrength par[9].x  //{min=0 max=1 step=.01}
@@ -73,34 +79,55 @@ double minRad2;
 dvec4 scale;
 double absScalePowIters;
 
-void init() {
-  // compute couple of constants.
-  minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
-  double s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
-  for (int i=0; i<iters; i++) s*= ds;
-  absScalePowIters = s;
-}
+mat3 rotationMatrix;
+#define rotationVector par[3]
+#define rotationAngle par[4].x  // { min=-5 max=5 step=.01}
+#define rotationQuat par[3]  // that is par[3].xyz and par[4].x
 
 double lengthd(dvec3 v) {  // wtf? why needed?
   return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
+double lengthd2(dvec3 v) {  // wtf? why needed?
+  return max(abs(v.x), max(abs(v.y), abs(v.z)));
 }
 
 dvec3 normalized(dvec3 v) {
   return v / lengthd(v);
 }
 
+void init() {
+  // compute couple of constants.
+  minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
+  scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  
+  double s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
+  for (int i=0; i<iters; i++) s*= ds;
+  absScalePowIters = s;
+  
+  float csat = cos(rotationAngle);
+  float ssat = sin(rotationAngle);
+  float usat = 1.0 - csat;
+  vec3 u = normalize(rotationVector);
+  rotationMatrix = mat3(
+    u.x*u.x*usat + csat,     u.x*u.y*usat - u.z*ssat, u.x*u.z*usat + u.y*ssat,
+    u.y*u.x*usat + u.z*ssat, u.y*u.y*usat + csat,     u.y*u.z*usat - u.x*ssat,
+    u.z*u.x*usat - u.y*ssat, u.z*u.y*usat + u.x*ssat, u.z*u.z*usat + csat
+    );
+}
+
 double de_mandelbox(dvec3 pos) {
-  dvec4 p = dvec4(pos,1.0), p0 = p;  // p.w is the distance estimate
+  dvec4 p = dvec4(pos, 1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
+	p.xyz = rotationMatrix * p.xyz;
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
     double r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + p0;
-	if (r2 > 1000.0) break;
+    p = p*scale + P0;
+	if (r2 > 100.0) break;
   }
-  return ( (lengthd(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-			- absScalePowIters) * DIST_MULTIPLIER;
+  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
+			- absScalePowIters) * 0.95 * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
 
@@ -108,22 +135,27 @@ DECLARE_DE(de_mandelbox)
 vec3 c_mandelbox(dvec3 pos, double totalD) {
   dvec4 p = dvec4(pos,1.0), p0 = p;  // p.w is the distance estimate
   dvec4 orbitTrap = dvec4(10000.0);
-
-  for (int i=0; i<color_iters; i++) {
+  int i = 0;
+  for (; i<color_iters; i++) {
+    //p.xyz = rotationMatrix * p.xyz;
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
+
     double r2 = dot(p.xyz, p.xyz);
-	orbitTrap = min(orbitTrap, abs(dvec4(p.xyz, r2)));
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + p0;
+    orbitTrap = min(orbitTrap, abs(dvec4(p.xyz, r2)));
+
+	p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + P0;
+
+	if (r2 > 100.0) break;
   }
 
-  orbitTrap.w = sqrt(orbitTrap.w);
+  orbitTrap.w = clamp(sqrt(orbitTrap.w)*float(iters)/float(i), 0.0, 1.0);
   vec3 orbitColor =
         X.xyz*X.w*orbitTrap.x +
 		Y.xyz*Y.w*orbitTrap.y +
-		Z.xyz*Z.w*orbitTrap.z +
-		R.xyz*R.w*orbitTrap.w;
-
+		Z.xyz*Z.w*orbitTrap.z
+		+R.xyz*R.w*orbitTrap.w
+		;
   return mix(BaseColor, 3.0*orbitColor,  OrbitStrength);
 }
 
@@ -131,7 +163,7 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 dvec3 normal(dvec3 pos, double d_pos) {
-  dvec2 Eps = dvec2(0, d_pos);
+  dvec2 Eps = dvec2(0, 4.0*d_pos);
   return normalized(
      dvec3(-abs(d(pos-Eps.yxx))+abs(d(pos+Eps.yxx)),
            -abs(d(pos-Eps.xyx))+abs(d(pos+Eps.xyx)),
@@ -189,7 +221,7 @@ void main() {
 
   init();
 
-  double m_zoom = zoom * 0.5 / xres;
+  double m_zoom = zoom * .5 * sqrt(2)/ xres;
 
   double noise = pnoise(gl_FragCoord.xy);
 
@@ -202,7 +234,7 @@ void main() {
   double m_dist = m_zoom * totalD;
   int steps;
   for (steps=0; steps<max_steps; steps++) {
-    D = (side * d(p + totalD * dp));
+    D = (side * d(p + totalD * dp) - totalD * m_dist);
     if (D < m_dist) break;
     totalD += D;
     if (totalD > MAX_DIST) break;
@@ -217,7 +249,7 @@ void main() {
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
     col = c(p, totalD);
-    dvec3 n = normal(p, abs(D));
+    dvec3 n = normal(p, m_dist/*abs(D)*/);
     col = blinn_phong(n, -dp, normalized(eye_in+dp+dvec3(0,-1,0)), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, 20.*m_dist));
 
@@ -230,12 +262,13 @@ void main() {
 
   // Glow is based on the number of steps.
   col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
+  //col = mix(col, glowColor, clamp(float(totalD/dspeed/1000.0), 0.0, 1.0));
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
+  double zNear = abs(dspeed);
+  double zFar = 65535.0 * zNear;
+  double a = zFar / (zFar - zNear);
+  double b = zFar * zNear / (zNear - zFar);
+  float depth = float(a + b / clamp(totalD/length(dir), zNear, zFar));
   gl_FragDepth = depth;
   gl_FragColor = vec4(col, depth);
 }
