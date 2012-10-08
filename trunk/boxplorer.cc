@@ -23,8 +23,7 @@
 #define MKDIR(a) mkdir(a)
 
 #pragma warning(disable: 4996) // unsafe function
-//#pragma warning(disable: 4244) // conversion loss
-//#pragma warning(disable: 4305) // truncation
+
 #pragma warning(disable: 4800) // forcing value to bool
 
 #pragma comment(lib, "SDL.lib")
@@ -64,8 +63,8 @@ using namespace std;
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
-#define FRAME_VERTEX_SHADER_FILE   "frame_vertex.glsl"
-#define FRAME_FRAGMENT_SHADER_FILE "frame_fragment.glsl"
+#define EFFECTS_VERTEX_SHADER_FILE   "effects_vertex.glsl"
+#define EFFECTS_FRAGMENT_SHADER_FILE "effects_fragment.glsl"
 
 #ifdef PI
   #undef PI
@@ -75,6 +74,7 @@ using namespace std;
 #define lengthof(x) ( sizeof(x)/sizeof((x)[0]) )
 
 #include "glsl.h"
+
 
 // Hackery to get the list of DE and COLORING funcs from the glsl.
 map<string, float (*)(GLSL::vec3)> DE_funcs;
@@ -121,10 +121,10 @@ vec3 (*c)(vec3);
 #undef ST_NONE
 };
 
-#define sign(a) GLSL::sign(a)
+#pragma warning(disable: 4244) // conversion loss
+#pragma warning(disable: 4305) // truncation
 
-#define zNear 0.0001f
-#define zFar  5.0f
+#define sign(a) GLSL::sign(a)
 
 #define FPS_FRAMES_TO_AVERAGE 20
 
@@ -202,7 +202,7 @@ GLuint fbo;
 GLuint texture;
 // depth buffer attached to fbo
 GLuint depthBuffer;
-// the dof mipmapper program
+// the dof/fxaa mipmapper effects program
 int dof_program;
 // texture holding background image
 GLuint background_texture;
@@ -324,8 +324,6 @@ float getFPS(void) {
   PROCESS(double, time, "time", true) \
   PROCESS(float, fps, "fps", false) \
   PROCESS(int, depth_size, "depth_size", false) \
-  PROCESS(float, z_near, "z_near", true) \
-  PROCESS(float, z_far, "z_far", true) \
   PROCESS(float, dof_scale, "dof_scale", true) \
   PROCESS(float, dof_offset, "dof_offset", true) \
   PROCESS(int, enable_dof, "enable_dof", false) \
@@ -435,9 +433,11 @@ class KeyFrame {
    void activateGl() {
       glMatrixMode(GL_PROJECTION);
       glLoadIdentity();
-      float fH = tan( fov_y * PI / 360.0f ) * zNear;
-      float fW = tan( fov_x * PI / 360.0f ) * zNear;
-      glFrustum(-fW, fW, -fH, fH, zNear, zFar);
+      double z_near = abs(speed);
+      double z_far = speed * 65535.0;
+      double fH = tan( fov_y * PI / 360.0f ) * z_near;
+      double fW = tan( fov_x * PI / 360.0f ) * z_near;
+      glFrustum(-fW, fW, -fH, fH, z_near, z_far);
 
       orthogonalize();
       double matrix[16] = {
@@ -448,7 +448,8 @@ class KeyFrame {
       };
       glMatrixMode(GL_MODELVIEW);
       glLoadMatrixd(matrix);
-      glTranslated(-pos()[0], -pos()[1], -pos()[2]);
+      // Do not translate, keep eye at 0 to retain drawing precision.
+      //glTranslated(-pos()[0], -pos()[1], -pos()[2]);
    }
 
    // Load configuration.
@@ -543,8 +544,6 @@ class KeyFrame {
      if (ao_strength <= 0) ao_strength = 0.1;
      if (glow_strength <= 0) glow_strength = 0.25;
      if (dist_to_color <= 0) dist_to_color = 0.2;
-     if (z_near <= 0) z_near = zNear;
-     if (z_far <= 0) z_far = zFar;
 
      orthogonalize();
 
@@ -577,7 +576,7 @@ class KeyFrame {
    // Send parameters to gpu.
    void setUniforms(float x_scale, float x_offset,
                     float y_scale, float y_offset,
-                    double speed = 0.0) {
+                    double spd) {
      #define glSetUniformf(name) \
        glUniform1f(glGetUniformLocation(program, #name), name);
      #define glSetUniformfv(name) \
@@ -592,59 +591,53 @@ class KeyFrame {
      glSetUniformf(glow_strength); glSetUniformf(dist_to_color);
      glSetUniformf(x_scale); glSetUniformf(x_offset);
      glSetUniformf(y_scale); glSetUniformf(y_offset);
-     glSetUniformf(speed); glSetUniformi(nrays);
+     glSetUniformi(nrays);
      glSetUniformf(time); glSetUniformf(focus);
 
-     glUniform1f(glGetUniformLocation(program, "xres"), width);
+     glUniform1f(glGetUniformLocation(program, "speed"), spd);
+     glUniform1f(glGetUniformLocation(program, "xres"), config.width);
 
-#if defined(GL_ARB_gpu_shader_fp64)
-     // Pass in double precision values, if supported.
-     glUniform1d(glGetUniformLocation(program, "dspeed"), speed);
+     #if defined(GL_ARB_gpu_shader_fp64)
+     // Also pass in double precision values, if supported.
+     glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
      glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
-#endif
+     #endif
 
      glSetUniformfv(par);
 
      #undef glSetUniformf
-     #undef glSetUniformv
-     #undef glUnifor1i
+     #undef glSetUniformfv
+     #undef glUniform1i
    }
 
    void render(enum StereoMode stereo) {
+     activate();  // Load view matrix for shader.
      switch(stereo) {
        case ST_OVERUNDER: {  // left / right
-         activate();
          setUniforms(1.0, 0.0, 2.0, 1.0, +speed);
          glRects(-1,-1,1,0);  // draw bottom half of screen
-         activate();
          setUniforms(1.0, 0.0, 2.0, -1.0, -speed);
          glRects(-1,0,1,1);  // draw top half of screen
          } break;
        case ST_XEYED: {  // right | left
-         activate();
          setUniforms(2.0, +1.0, 1.0, 0.0, +speed);
          glRectf(-1,-1,0,1);  // draw left half of screen
-         activate();
          setUniforms(2.0, -1.0, 1.0, 0.0, -speed);
          glRectf(0,-1,1,1);  // draw right half of screen
          } break;
        case ST_SIDEBYSIDE: {  // left | right
-         activate();
          setUniforms(2.0, +1.0, 1.0, 0.0, -speed);
          glRectf(-1,-1,0,1);  // draw left half of screen
-         activate();
          setUniforms(2.0, -1.0, 1.0, 0.0, +speed);
          glRectf(0,-1,1,1);  // draw right half of screen
          } break;
        case ST_NONE:
-         activate();
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
          // Draw screen in N (==2 for now) steps for x-fire / sli
          glRects(-1,-1,0,1);  // draw left half
          glRects(0,-1,1,1);  // draw right half
          break;
        case ST_INTERLACED:
-         activate();
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
          glRects(-1,-1,1,1);  // draw entire screen
          break;
@@ -671,27 +664,10 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
                 vector<KeyFrame>* output,
                 bool loop = false,
                 int nsubframes = NSUBFRAMES) {
-  static bool once = false;  // true;
   output->clear();
   if (keyframes.size() < 2) return;  // Need at least two points.
 
   vector<KeyFrame> controlpoints(keyframes);
-  if (loop) {
-    // Replicate first two at end.
-    controlpoints.push_back(keyframes[0]);
-    if (controlpoints[controlpoints.size()-1].delta_time == 0) {
-      suggestDeltaTime(controlpoints[controlpoints.size() - 1], keyframes);
-    }
-    controlpoints.push_back(keyframes[1]);
-    // Last one is p0 for spline of first keyframe.
-    controlpoints.push_back(keyframes[keyframes.size()-1]);
-  } else {
-    // Replicate last one twice more.
-    controlpoints.push_back(keyframes[keyframes.size()-1]);
-    controlpoints.push_back(keyframes[keyframes.size()-1]);
-    // Last one is p0 for spline of first keyframe.
-    controlpoints.push_back(keyframes[0]);
-  }
 
   size_t n = controlpoints.size();
 
@@ -707,26 +683,50 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
       controlpoints[i - 1].q[2] * controlpoints[i].q[2] +
       controlpoints[i - 1].q[3] * controlpoints[i].q[3];
     if (dot < 0) {
-      // Angle between quats > 180; make quat current go 360 - angle.
+      // Angle between quats > 180; make current quat go smaller 360 - angle.
+      // Note: this fails to cover the two ends of a loop.
       controlpoints[i].q[0] *= -1;
       controlpoints[i].q[1] *= -1;
       controlpoints[i].q[2] *= -1;
       controlpoints[i].q[3] *= -1;
     }
-    // Compute splinable r4 map of quat for splining below.
+    // Compute splinable R4 mapping of quat for splining below.
     quat2x(controlpoints[i].q, controlpoints[i].x);
   }
 
-  // Compute controlpoint time based on sum of delta_time up to it.
+  if (loop) {
+    // Replicate first two at end to function as p2, p3 for splining.
+    controlpoints.push_back(controlpoints[0]);
+    if (controlpoints[controlpoints.size()-1].delta_time == 0) {
+      // Likely first point does not have delta_time specified.
+      // Try guess at one based on speed at last point and distance there to.
+      suggestDeltaTime(controlpoints[controlpoints.size() - 1], keyframes);
+    }
+    controlpoints.push_back(controlpoints[1]);
+    // Last specified keyframe is p0 for spline of first keyframe.
+    controlpoints.push_back(controlpoints[n - 1]);
+  } else {
+    // Replicate last one twice more.
+    controlpoints.push_back(controlpoints[n - 1]);
+    controlpoints.push_back(controlpoints[n - 1]);
+    // Last one is p0 for spline of first keyframe.
+    controlpoints.push_back(controlpoints[0]);
+  }
+
+  n = controlpoints.size();
+
+  // Compute each frame's target time based on sum of delta_time up to it.
   // Note we don't spline delta_time but we do spline time.
   double time = 0;
-  for (size_t i = 0; i < n - 1; ++i) {
-    if (i) time += controlpoints[i].delta_time;
+  controlpoints[0].time = 0;   // time starts at 0.
+  for (size_t i = 1; i < n - 1; ++i) {
+    time += controlpoints[i].delta_time;
     controlpoints[i].time = time;
   }
-  // Last one's time is splined into first one. Set to 0.
+  // Last one's time is p0 for spline of first one; set to 0 as well.
   controlpoints[n - 1].time = 0;
 
+  // Now spline all into intermediate frames.
   for (size_t i = 0; i < n - 3; ++i) {
     const KeyFrame *p0 = &controlpoints[i>0?i-1:n-1];
     const KeyFrame *p1 = &controlpoints[i];
@@ -746,33 +746,22 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
                                 t*( (2*(p0) - 5*(p1) + 4*(p2) - (p3)) + \
                                     t*(-(p0) + 3*(p1) - 3*(p2) + (p3)) ) ) ) ) )
 
-#if 0
-      // Spline position, direction.
-      for (size_t j = 0; j < lengthof(tmp.v); ++j) {
-        SPLINE(tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
-        if (once && j >= 12 && j < 16)
-        printf("%d.%d.%lu: %le= %le..%le..%le..%le\n",
-          i, f, j, tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
-      }
-#else
       // Spline over splinable representation of quat.
-      double x[4];
       for (size_t j = 0; j < 4; ++j) {
-        SPLINE(x[j], p0->x[j], p1->x[j], p2->x[j], p3->x[j]);
+        SPLINE(tmp.x[j], p0->x[j], p1->x[j], p2->x[j], p3->x[j]);
       }
-      double q[4];
-      x2quat(x, q);  // convert back to quat
-      quat2mat(q, tmp.v);  // convert quat to matrix
+      x2quat(tmp.x, tmp.q);  // convert back to quat
+      quat2mat(tmp.q, tmp.v);  // convert quat to the splined rotation matrix
 
       // Spline position into tmp.v[12..15]
       for (size_t j = 12; j < 15; ++j) {
-        SPLINE(tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
-        if (once && j >= 12 && j < 16)
-        printf("%d.%d.%lu: %le= %le..%le..%le..%le\n",
-          i, f, j, tmp.v[j], p0->v[j], p1->v[j], p2->v[j], p3->v[j]);
+        // To control numerical precision, re-base to (p2-p1)/2.
+        double a = p0->v[j], b = p1->v[j], c = p2->v[j], d = p3->v[j];
+        double base = .5 * (c - b);
+        a -= base; b -= base; c -= base; d -= base;
+        SPLINE(tmp.v[j], a, b, c, d);
+        tmp.v[j] += base;
       }
-#endif
-      if (once) printf("\n");
 
       // Spline par[] array. Some of those could also be rotations, which will not
       // spline nicely at all times..
@@ -785,6 +774,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
         SPLINE(tmp.par[j][2],
                p0->par[j][2], p1->par[j][2], p2->par[j][2], p3->par[j][2]);
       }
+
       // Spline all other params. Some are non-sensical.
       #define PROCESS(a,b,c,doSpline) \
         if (doSpline) SPLINE(tmp.b, p0->b, p1->b, p2->b, p3->b);
@@ -792,11 +782,10 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
       #undef PROCESS
       #undef SPLINE
 
-      tmp.orthogonalize();
+      //tmp.orthogonalize();  // this should be no-op given matrix came from quat
       output->push_back(tmp);
     }
   }
-  once = false;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1031,13 +1020,13 @@ int setupShaders2(void) {
   GLuint v,f,p;
   char log[2048]; int logLength;
 
-  (vs = readFile(FRAME_VERTEX_SHADER_FILE)) || ( vs = frame_default_vs );
-  (fs = readFile(FRAME_FRAGMENT_SHADER_FILE)) || ( fs = frame_default_fs );
+  (vs = readFile(EFFECTS_VERTEX_SHADER_FILE)) || ( vs = effects_default_vs );
+  (fs = readFile(EFFECTS_FRAGMENT_SHADER_FILE)) || ( fs = effects_default_fs );
 
-  if (fs != frame_default_fs) {
-     printf(__FUNCTION__ " : read shader from %s\n", FRAME_FRAGMENT_SHADER_FILE);
+  if (fs != effects_default_fs) {
+     printf(__FUNCTION__ " : read effects shader from %s\n", EFFECTS_FRAGMENT_SHADER_FILE);
   } else {
-     printf(__FUNCTION__ " : using default shader\n");
+     printf(__FUNCTION__ " : using default effects shader\n");
   }
 
   glsl_source.append(fs);
@@ -1063,8 +1052,8 @@ int setupShaders2(void) {
   glGetProgramInfoLog(p, sizeof(log), &logLength, log);
   if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
 
-  if (vs != frame_default_vs) free((char*)vs);
-  if (fs != frame_default_fs) free((char*)fs);
+  if (vs != effects_default_vs) free((char*)vs);
+  if (fs != effects_default_fs) free((char*)fs);
 
   GLint status;
   glGetProgramiv(p, GL_LINK_STATUS, &status);
@@ -1466,6 +1455,9 @@ int main(int argc, char **argv) {
 
   camera = config;
 
+  int savedWidth = config.width;
+  int savedHeight = config.height;
+
   bool keyframesChanged = false;
   LoadKeyFrames(fixedFov);
   LoadBackground();
@@ -1508,7 +1500,7 @@ int main(int argc, char **argv) {
     CatmullRom(keyframes, &splines, config.loop);
   }
 
-  double last_de = 0;
+  double last_de = 10.0;
 
   // Check availability of DE; setup func ptr.
   if (!de_func_name.empty()) {
@@ -1576,27 +1568,32 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
-    if (de_func || de_func_64) {
+    if (!rendering && (de_func || de_func_64)) {
       // Get a distance estimate, for navigation and eye separation.
       // Setup just the vars needed for DE. For now, iters and par[0..20]
       // TODO: make de() method of camera?
       GLSL::iters = camera.iters;
       for (int i = 0; i < 20; ++i) {
-        GLSL::par[i] = GLSL::vec3(camera.par[i][0],
-                                  camera.par[i][1],
-                                  camera.par[i][2]);
+        GLSL::par[i] = GLSL::vec3(camera.par[i]);
       }
-      double de =
-        de_func_64
-          ?GLSL::abs(de_func_64(
-              GLSL::dvec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])))
-          :GLSL::abs(de_func(
-              GLSL::vec3(camera.pos()[0], camera.pos()[1], camera.pos()[2])));
-      if (de != last_de) {
-        printf("de=%12.12e\n", de);
-        camera.speed = GLSL::clamp(de/10.0, DBL_EPSILON, 1.0);
+      // Sample along direction to sense clear space ahead.
+      GLSL::dvec3 pos(camera.pos());
+      double prev_de = 0.0, de = 0.0, first_de = 0.0;
+      bool first = true;
+      do {
+        prev_de = de;
+        pos += GLSL::dvec3(camera.ahead()) * de;
+        de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
+        if (first) first_de = de;
+        first = false;
+      } while (de > prev_de && de < 0.1);
+
+      if (first_de != last_de) {
+        printf("de=%12.12e, ahead=%12.12e\n", first_de, de);
+        camera.speed = first_de / 10.0;
+        //camera.speed = GLSL::clamp(first_de/10.0, DBL_EPSILON, last_de/9.0);
       }
-      last_de = de;
+      last_de = first_de;
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -1636,14 +1633,17 @@ int main(int argc, char **argv) {
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
 
       glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
-      glUniform1f(glGetUniformLocation(dof_program, "z_near"), camera.z_near);
-      glUniform1f(glGetUniformLocation(dof_program, "z_far"), camera.z_far);
       glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
                   camera.dof_scale);
       glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
                   camera.dof_offset);
       glUniform1f(glGetUniformLocation(dof_program, "speed"),
                   camera.speed);
+      #if defined(GL_ARB_gpu_shader_fp64)
+      // Also pass in double precision speed, if supported.
+      glUniform1d(glGetUniformLocation(dof_program, "dspeed"), camera.speed);
+      #endif
+
       glUniform1f(glGetUniformLocation(dof_program, "xres"), config.width);
       glUniform1f(glGetUniformLocation(dof_program, "yres"), config.height);
 
@@ -1691,13 +1691,20 @@ int main(int argc, char **argv) {
       glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // right eye
       for (size_t i = 0; i < splines.size(); ++i) {
         splines[i].move(splines[i].speed, 0, 0);
-        glVertex3dv(splines[i].pos());
+        // Translate points, eye is at origin.
+        glVertex3d(splines[i].pos()[0] - camera.pos()[0],
+                   splines[i].pos()[1] - camera.pos()[1],
+                   splines[i].pos()[2] - camera.pos()[2]);
+
         splines[i].move(-2*splines[i].speed, 0, 0);
       }
       glEnd();
       glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // left eye
       for (size_t i = 0; i < splines.size(); ++i) {
-        glVertex3dv(splines[i].pos());
+        // Translate points, eye is at origin.
+        glVertex3d(splines[i].pos()[0] - camera.pos()[0],
+                   splines[i].pos()[1] - camera.pos()[1],
+                   splines[i].pos()[2] - camera.pos()[2]);
       }
       glEnd();
 
@@ -1706,7 +1713,10 @@ int main(int argc, char **argv) {
       glColor4f(.1,.9,.9,1);
       glBegin(config.loop?GL_LINE_LOOP:GL_LINE_STRIP);  // light
       for (size_t i = 0; i < splines.size(); ++i) {
-        glVertex3fv(splines[i].par[19]);
+        // glVertex3dv(splines[i].par[19]);
+        glVertex3d(splines[i].par[19][0] - camera.pos()[0],
+                   splines[i].par[19][1] - camera.pos()[1],
+                   splines[i].par[19][2] - camera.pos()[2]);
       }
       glEnd();
 #endif
@@ -1717,10 +1727,15 @@ int main(int argc, char **argv) {
         glBegin(GL_LINES);
         KeyFrame tmp = keyframes[i];
         tmp.move(tmp.speed, 0, 0);
-        glVertex3dv(tmp.pos());
+        // Translate points, eye is at origin.
+        glVertex3d(tmp.pos()[0] - camera.pos()[0],
+                   tmp.pos()[1] - camera.pos()[1],
+                   tmp.pos()[2] - camera.pos()[2]);
         tmp = keyframes[i];
         tmp.move(-tmp.speed, 0, 0);
-        glVertex3dv(tmp.pos());
+        glVertex3d(tmp.pos()[0] - camera.pos()[0],
+                   tmp.pos()[1] - camera.pos()[1],
+                   tmp.pos()[2] - camera.pos()[2]);
         glEnd();
       }
     }
@@ -1805,6 +1820,7 @@ int main(int argc, char **argv) {
       case SDL_MOUSEMOTION: {
          if (grabbedInput == 0) {
            if (!dragging) {
+              // Peek at framebuffer color for keyframe markers.
               unsigned int bgr = getBGRpixel(event.motion.x, event.motion.y);
               if ((bgr & 0xffff) == 0) {
                 // No red or green at all : probably a keyframe marker.
@@ -1819,14 +1835,17 @@ int main(int argc, char **argv) {
                  SDL_SetCursor(arrow_cursor);
               }
            } else {
+             SDL_SetCursor(hand_cursor);
              // Drag currently selected keyframe around.
              if (keyframe < keyframes.size()) {
                // Should really be some screenspace conversion..
                // but this works ok for now.
+               double fY = 2.0 * tan(camera.fov_y * PI / 360.0f) / config.height;
+               double fX = 2.0 * tan(camera.fov_x * PI / 360.0f) / config.width;
                keyframes[keyframe].moveAbsolute(camera.up(),
-                   event.motion.yrel*-.05*keyframes[keyframe].speed);
+                   event.motion.yrel*-fY*camera.distanceTo(keyframes[keyframe]));
                keyframes[keyframe].moveAbsolute(camera.right(),
-                   event.motion.xrel*.05*keyframes[keyframe].speed);
+                   event.motion.xrel*fX*camera.distanceTo(keyframes[keyframe]));
              }
            }
          }
@@ -1860,13 +1879,18 @@ int main(int argc, char **argv) {
       case SDLK_RETURN: case SDLK_KP_ENTER: {
         config.fullscreen ^= 1; grabbedInput = 1;
         if (config.fullscreen) {
+          savedWidth = config.width; savedHeight = config.height;
           if (stereoMode == ST_INTERLACED) {
             // Zalman
             config.height = 1080; config.width = 1920;
           } else if (stereoMode == ST_SIDEBYSIDE || stereoMode == ST_OVERUNDER) {
             // HMZ-T1
             config.height = 720; config.width = 1280;
+          } else if (stereoMode == ST_NONE) {
+            config.height = 1600; config.width = 2560;  // 30"
           }
+        } else {
+          config.width = savedWidth; config.height = savedHeight;
         }
         initGraphics(); initTwBar();
       } break;
@@ -2023,50 +2047,62 @@ int main(int argc, char **argv) {
       case SDLK_DOWN:  ctlYChanged = 1; updateControllerY(ctl, -(consecutiveChanges=1), hasAlt); break;
       case SDLK_UP:    ctlYChanged = 1; updateControllerY(ctl,  (consecutiveChanges=1), hasAlt); break;
 
-        // Current keyframe manouvering in screenspace.
-        case SDLK_KP4: {
-          if (keyframe < keyframes.size()) {
-            keyframes[keyframe].moveAbsolute(camera.right(),
-                                             -.5*keyframes[keyframe].speed);
-          }
-        } break;
-        case SDLK_KP6: {
-          if (keyframe < keyframes.size()) {
-            keyframes[keyframe].moveAbsolute(camera.right(),
-                                             .5*keyframes[keyframe].speed);
-          }
-        } break;
-        case SDLK_KP8: {
-          if (keyframe < keyframes.size()) {
-            keyframes[keyframe].moveAbsolute(camera.up(),
-                                             .5*keyframes[keyframe].speed);
-          }
-        } break;
-        case SDLK_KP2: {
-          if (keyframe < keyframes.size()) {
-            keyframes[keyframe].moveAbsolute(camera.up(),
-                                             -.5*keyframes[keyframe].speed);
-          }
-        } break;
+      // Currently selected keyframe manouvering in screenspace.
+      // 4-6 left-right, 8-2 up-down, 9-1 further-closer, 7-3 speed at frame.
+      case SDLK_KP4: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].moveAbsolute(camera.right(),
+                                           -.5*keyframes[keyframe].speed);
+        }
+      } break;
+      case SDLK_KP6: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].moveAbsolute(camera.right(),
+                                           .5*keyframes[keyframe].speed);
+        }
+      } break;
+      case SDLK_KP8: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].moveAbsolute(camera.up(),
+                                           .5*keyframes[keyframe].speed);
+        }
+      } break;
+      case SDLK_KP2: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].moveAbsolute(camera.up(),
+                                           -.5*keyframes[keyframe].speed);
+        }
+      } break;
+      case SDLK_KP9: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].moveAbsolute(camera.ahead(),
+                                           .5*keyframes[keyframe].speed);
+        }
+      } break;
+      case SDLK_KP1: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].moveAbsolute(camera.ahead(),
+                                           -.5*keyframes[keyframe].speed);
+        }
+      } break;
+      case SDLK_KP3: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].speed *= 1.1;
+        }
+      } break;
+      case SDLK_KP7: {
+        if (keyframe < keyframes.size()) {
+          keyframes[keyframe].speed *= .9;
+        }
+      } break;
 
-        // Adjust keyframe speed / eye separation. Like mousewheel.
-        case SDLK_KP9: {
-          if (keyframe < keyframes.size()) {
-            keyframes[keyframe].speed *= 1.1;
-          }
-        } break;
-        case SDLK_KP7: {
-          if (keyframe < keyframes.size()) {
-            keyframes[keyframe].speed *= .9;
-          }
-        } break;
+      // See whether the active controller has changed.
+      default: {
+        Controller oldCtl = ctl;
+        changeController(event.key.keysym.sym, &ctl);
+        if (ctl != oldCtl) { consecutiveChanges = 0; }
+      } break;
 
-        // See whether the active controller has changed.
-        default: {
-          Controller oldCtl = ctl;
-          changeController(event.key.keysym.sym, &ctl);
-          if (ctl != oldCtl) { consecutiveChanges = 0; }
-        } break;
       }}
       break;
      }

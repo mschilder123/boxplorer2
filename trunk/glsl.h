@@ -39,9 +39,12 @@ public:
 class dvec3 {
  public:
   dvec3();
+  dvec3(const double* v);
   dvec3(const dvec3& b);
   dvec3(double xx, double yy, double zz);
   dvec3 operator*(const double k) const;
+  dvec3& operator=(const dvec3& b);
+  dvec3& operator+=(const dvec3& b);
   dvec3 operator-(const dvec3& b) const;
   double x; double y; double z;
 };
@@ -50,9 +53,11 @@ class vec3 {
  public:
   vec3();
   vec3(float k);
+  vec3(const float* v);
   vec3(float xx, float yy, float zz);
   vec3(const vec2& b, float c);
   vec3(const vec3& b);
+  vec3(const dvec3& b);
   vec3& operator=(const vec3& b);
   vec3& operator*=(const float k);
   vec3& operator/=(const float k);
@@ -130,10 +135,12 @@ vec2 vec2::operator+=(const vec2& b) { x+=b.x; y+=b.y; return *this; }
 
 
 vec3::vec3() : x(0), y(0), z(0) {}
+vec3::vec3(const float* v) : x(v[0]), y(v[1]), z(v[2]) {}
 vec3::vec3(float k) : x(k), y(k), z(k) {}
 vec3::vec3(float xx, float yy, float zz) { x = xx; y = yy; z = zz; }
 vec3::vec3(const vec2& b, float c) : x(b.x), y(b.y), z(c) {}
 vec3::vec3(const vec3&b) : x(b.x), y(b.y), z(b.z) {}
+vec3::vec3(const dvec3&b) : x(b.x), y(b.y), z(b.z) {}
 vec3& vec3::operator=(const vec3& b) { x= b.x; y= b.y; z= b.z; return *this; }
 vec3& vec3::operator*=(const float k) { x*= k; y*= k; z*= k; return *this; }
 vec3& vec3::operator/=(const float k) { x/= k; y/= k; z/= k; return *this; }
@@ -147,7 +154,7 @@ vec3 vec3::operator+(const vec3& b) const { return vec3(x+b.x, y+b.y, z+b.z); }
 vec3 vec3::operator/(const float k) const { return vec3(x/k, y/k, z/k); }
 vec3 vec3::cross(const vec3& b) const { return vec3(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x); }
 float vec3::dot(const vec3& b) const { return x*b.x + y*b.y + z*b.z; }
-double vec3::dot(const dvec3& b) const { return (double)x*b.x + (double)y*b.y + (double)z*b.z; }
+double vec3::dot(const dvec3& b) const { return ((double)x)*b.x + ((double)y)*b.y + ((double)z)*b.z; }
 void vec3::print(const char* a) const { printf("%s(%f,%f,%f)\n",a,x,y,z); }
 vec3 vec3::yxz_() const { return vec3(y,x,z); }
 vec3 vec3::xzy_() const { return vec3(x,z,y); }
@@ -156,10 +163,13 @@ vec3 vec3::zxy_() const { return vec3(z,x,y); }
 vec2 vec3::xy_() const { return vec2(x,y); }
 vec2 vec3::xz_() const { return vec2(x,z); }
 
-
+dvec3::dvec3(const dvec3&b) : x(b.x), y(b.y), z(b.z) {}
 dvec3::dvec3(double xx, double yy, double zz) : x(xx), y(yy), z(zz) {}
+dvec3::dvec3(const double* v) : x(v[0]), y(v[1]), z(v[2]) {}
 dvec3 dvec3::operator*(const double k) const { return dvec3(x*k, y*k, z*k); }
 dvec3 dvec3::operator-(const dvec3& b) const { return dvec3(x-b.x, y-b.y, z-b.z); }
+dvec3& dvec3::operator=(const dvec3& b) { x=b.x; y=b.y; z=b.z; return *this; }
+dvec3& dvec3::operator+=(const dvec3& b) { x+=b.x;y+=b.y;z+=b.z;return *this;}
 
 
 vec4::vec4() : x(0), y(0), z(0), w(0) {}
@@ -280,6 +290,9 @@ public:
 
   dvec3 operator*(const dvec3& b) {
     return dvec3(r1.dot(b), r2.dot(b), r3.dot(b));
+  }
+  vec3 operator*(const vec3& b) {
+    return vec3(r1.dot(b), r2.dot(b), r3.dot(b));
   }
 
   vec3 r1;

@@ -36,6 +36,9 @@ class DE_initializer {
     DE_funcs[name] = func;
   }
   DE_initializer(string name, double (*func)(GLSL::dvec3)) {
+    // Strip _64 from name.
+    size_t x64 = name.find("_64");
+    if (x64 != string::npos) name.erase(x64);
     DE64_funcs[name] = func;
   }
 };
@@ -71,8 +74,8 @@ vec3 ahead;
 vec3 up;
 float fov_x, fov_y;
 
-#define XRES 720
-#define YRES 480
+#define XRES 1280
+#define YRES 720
 
 // Make sure read parameters are sane.
 void sanitizeParameters(void) {
