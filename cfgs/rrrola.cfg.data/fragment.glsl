@@ -174,6 +174,12 @@ void main() {
     if (totalD > MAX_DIST) break;
     m_dist =  m_zoom * totalD;
   }
+  if (D < m_dist && par[1].y > 0.0)
+  for (int i = 0; i < 5; ++i) {
+    totalD += D - m_dist;
+    m_dist =  m_zoom * totalD;
+    D = abs(side * d(p + totalD * dp));
+  }
 
   p += totalD * dp;
 
@@ -197,8 +203,8 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
