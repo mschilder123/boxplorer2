@@ -334,6 +334,8 @@ float getFPS(void) {
 #define NUMPARS 20
 char* parName[NUMPARS][3];
 
+int config_width;
+
 class KeyFrame {
   public:
    // View matrix.
@@ -433,7 +435,7 @@ class KeyFrame {
    void activateGl() {
       glMatrixMode(GL_PROJECTION);
       glLoadIdentity();
-      double z_near = abs(speed);
+      double z_near = fabs(speed);
       double z_far = speed * 65535.0;
       double fH = tan( fov_y * PI / 360.0f ) * z_near;
       double fW = tan( fov_x * PI / 360.0f ) * z_near;
@@ -595,7 +597,7 @@ class KeyFrame {
      glSetUniformf(time); glSetUniformf(focus);
 
      glUniform1f(glGetUniformLocation(program, "speed"), spd);
-     glUniform1f(glGetUniformLocation(program, "xres"), config.width);
+     glUniform1f(glGetUniformLocation(program, "xres"), config_width);
 
      #if defined(GL_ARB_gpu_shader_fp64)
      // Also pass in double precision values, if supported.
@@ -1123,6 +1125,8 @@ void initGraphics() {
   (screen = SDL_SetVideoMode(config.width, config.height, bpp,
       SDL_OPENGL | (config.fullscreen ? SDL_FULLSCREEN : SDL_RESIZABLE)))
     || die("Video mode initialization failed: %s\n", SDL_GetError());
+
+  config_width = config.width;
 
   if (config.multisamples > 1) {
      glEnable(GL_MULTISAMPLE);  // redundant?
