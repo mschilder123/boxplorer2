@@ -218,7 +218,7 @@ DECLARE_COLORING(c_PKlein)
 #define rotationAngle par[4].x  // { min=-5 max=5 step=.01}
 
 float de_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9f, 1.0f);
+  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
   vec4 scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
   
   float s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
@@ -227,7 +227,7 @@ float de_mandelbox(vec3 pos) {
   
   float csat = cos(rotationAngle);
   float ssat = sin(rotationAngle);
-  float usat = 1.0f - csat;
+  float usat = 1.0 - csat;
   vec3 u = normalize(rotationVector);
   mat3 rotationMatrix = mat3(
     u.x*u.x*usat + csat,     u.x*u.y*usat - u.z*ssat, u.x*u.z*usat + u.y*ssat,
