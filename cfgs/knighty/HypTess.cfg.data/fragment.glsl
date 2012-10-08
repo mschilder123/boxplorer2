@@ -451,8 +451,8 @@ void main() {
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0*zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
