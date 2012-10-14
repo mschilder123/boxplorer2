@@ -38,11 +38,12 @@ void main() {
   float FXAA_REDUCE_MUL = 1.0/8.0;
   float FXAA_REDUCE_MIN = (1.0/128.0);
 
+  float z = texture2D(my_texture, texture_coordinate.xy).w;  // save z
+  vec4 rgbM  = texture2Dx(my_texture, texture_coordinate.xy).xyzw;
   vec3 rgbNW = texture2Dx(my_texture, texture_coordinate.xy + (vec2(-1.0, -1.0) * texcoordOffset)).xyz;
   vec3 rgbNE = texture2Dx(my_texture, texture_coordinate.xy + (vec2(+1.0, -1.0) * texcoordOffset)).xyz;
   vec3 rgbSW = texture2Dx(my_texture, texture_coordinate.xy + (vec2(-1.0, +1.0) * texcoordOffset)).xyz;
   vec3 rgbSE = texture2Dx(my_texture, texture_coordinate.xy + (vec2(+1.0, +1.0) * texcoordOffset)).xyz;
-  vec4 rgbM  = texture2Dx(my_texture, texture_coordinate.xy).xyzw;
 	
   vec3 luma = vec3(0.299, 0.587, 0.114);
   float lumaNW = (dot(rgbNW, luma));
@@ -74,8 +75,9 @@ void main() {
   float lumaB = (dot(rgbB, luma));
 
   if((lumaB < lumaMin) || (lumaB > lumaMax)){
-    gl_FragColor.xyz=rgbA;
+    gl_FragColor=vec4(rgbA,z);
   } else {
-    gl_FragColor.xyz=rgbB;
+    gl_FragColor=vec4(rgbB,z);
   }
+  gl_FragDepth = z;
 }
