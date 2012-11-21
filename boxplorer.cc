@@ -71,7 +71,7 @@ using namespace std;
 #endif
 #define PI          3.14159265358979324
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), exit(-1), 1 )
-#define lengthof(x) ( sizeof(x)/sizeof((x)[0]) )
+#define ARRAYSIZE(x) ( sizeof(x)/sizeof((x)[0]) )
 
 #include "glsl.h"
 
@@ -196,14 +196,16 @@ string defines;
 enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED, ST_SIDEBYSIDE }
     stereoMode = ST_NONE;
 
-// ogl framebuffer object
-GLuint fbo;
+// ogl framebuffer object, one for each eye.
+GLuint fbo[1];
 // texture that frame got rendered to
-GLuint texture;
+GLuint texture[1];
 // depth buffer attached to fbo
-GLuint depthBuffer;
+GLuint depthBuffer[1];
+
 // the dof/fxaa mipmapper effects program
 int dof_program;
+
 // texture holding background image
 GLuint background_texture;
 
@@ -285,7 +287,7 @@ float getFPS(void) {
   int i; Uint32 sum;
   for (i=sum=0; i<framesToAverage; i++) sum += frameDurations[i];
   float fps = framesToAverage * 1000.f / sum;
-#if 0
+#if 1
   static Uint32 lastfps = 0;
   if (lastFrameTime - lastfps > 1000) {
     printf("fps %f\n", fps);
@@ -494,7 +496,7 @@ class KeyFrame {
         PROCESS_CONFIG_PARAMS
         #undef PROCESS
 
-        for (i=0; i<lengthof(par); i++) {
+        for (i=0; i<ARRAYSIZE(par); i++) {
          char p[256];
          sprintf(p, "par%lu", (unsigned long)i);
          if (!strcmp(s, p)) {
@@ -567,7 +569,7 @@ class KeyFrame {
        fprintf(f, "position %12.12e %12.12e %12.12e\n", pos()[0], pos()[1], pos()[2]);
        fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
        fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
-       for (size_t i=0; i<lengthof(par); i++) {
+       for (size_t i=0; i<ARRAYSIZE(par); i++) {
          fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
        }
        fclose(f);
@@ -582,7 +584,7 @@ class KeyFrame {
      #define glSetUniformf(name) \
        glUniform1f(glGetUniformLocation(program, #name), name);
      #define glSetUniformfv(name) \
-       glUniform3fv(glGetUniformLocation(program, #name), lengthof(name), (float*)name);
+       glUniform3fv(glGetUniformLocation(program, #name), ARRAYSIZE(name), (float*)name);
      #define glSetUniformi(name) \
        glUniform1i(glGetUniformLocation(program, #name), name);
 
@@ -641,7 +643,8 @@ class KeyFrame {
          break;
        case ST_INTERLACED:
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
-         glRects(-1,-1,1,1);  // draw entire screen
+         glRects(-1,-1,0,1);  // draw left half
+         glRects(0,-1,1,1);  // draw right half
          break;
       }
     }
@@ -768,7 +771,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
       // Spline par[] array. Some of those could also be rotations, which will not
       // spline nicely at all times..
       // TODO: have couple of uniform quats for shader use and spline those nicely.
-      for (size_t j = 0; j < lengthof(tmp.par); ++j) {
+      for (size_t j = 0; j < ARRAYSIZE(tmp.par); ++j) {
         SPLINE(tmp.par[j][0],
                p0->par[j][0], p1->par[j][0], p2->par[j][0], p3->par[j][0]);
         SPLINE(tmp.par[j][1],
@@ -796,7 +799,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 typedef enum Controller {
   // user parameters: 0..9
   // other parameters:
-  CTL_FOV = lengthof(camera.par), CTL_RAY, CTL_ITER, CTL_AO, CTL_GLOW,
+  CTL_FOV = ARRAYSIZE(camera.par), CTL_RAY, CTL_ITER, CTL_AO, CTL_GLOW,
   CTL_TIME, CTL_CAM, CTL_3D,
   CTL_LAST = CTL_3D,
 } Controller;
@@ -1199,10 +1202,20 @@ void initGraphics() {
     (dof_program = setupShaders2()) ||
         die("Error in GLSL shader compilation (see stderr.txt for details).\n");
 
-    // Create depth buffer
-    glDeleteRenderbuffers(1, &depthBuffer);  // free existing
-    glGenRenderbuffers(1, &depthBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
+    // Create depth buffer(s)
+    glDeleteRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);  // free existing
+    glGenRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);
+
+    // Create textures to render to
+    glDeleteTextures(ARRAYSIZE(texture), texture);  // free existing
+    glGenTextures(ARRAYSIZE(texture), texture);
+
+    // Create framebuffers
+    glDeleteFramebuffers(ARRAYSIZE(fbo), fbo);  // free existing
+    glGenFramebuffers(ARRAYSIZE(fbo), fbo);
+
+  for (int i = 0; i < ARRAYSIZE(fbo); ++i) {
+    glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer[i]);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
                           config.width, config.height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -1210,10 +1223,7 @@ void initGraphics() {
     if ((status = glGetError()) != GL_NO_ERROR)
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-    // Create texture to render to
-    glDeleteTextures(1, &texture);  // free existing
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, texture[i]);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1238,18 +1248,15 @@ void initGraphics() {
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    // Create framebuffer
-    glDeleteFramebuffers(1, &fbo);
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
 
     // Attach texture to framebuffer as colorbuffer
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           texture, 0);
+                           texture[i], 0);
 
     // Attach depthbuffer to framebuffer
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                              GL_RENDERBUFFER, depthBuffer);
+                              GL_RENDERBUFFER, depthBuffer[i]);
 
     if ((status = glGetError()) != GL_NO_ERROR)
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1260,6 +1267,7 @@ void initGraphics() {
 
     // Back to normal framebuffer.
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
 
     if ((status = glGetError()) != GL_NO_ERROR)
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1292,7 +1300,7 @@ void initTwParDefines() {
     char _xyz = 'x';
     if (sscanf(line.c_str() + parStart + 5, "%d].%c",
                &index, &_xyz) < 1) continue;
-    if (index < 0 || index > (int)lengthof(camera.par)) continue;
+    if (index < 0 || index > (int)ARRAYSIZE(camera.par)) continue;
     if (_xyz < 'x' || _xyz > 'z') continue;
 
     printf("parameter %s par[%d].%c {%s}\n",
@@ -1603,40 +1611,45 @@ int main(int argc, char **argv) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
 
-    if (config.enable_dof && camera.dof_scale != 0) {
-      // Render to different back buffer to compute DoF effects later,
-      // using alpha as depth channel.
-      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    }
-
     if (background_texture) {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, background_texture);
-      glUseProgram(program);
-      glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
-    } else {
-      glUseProgram(program);
     }
+
+    glUseProgram(program);  // the fractal shader
+
+    glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
     glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
                 background_texture);
+
+   if (config.enable_dof && camera.dof_scale != 0) {
+      // Render to different back buffer to compute DoF effects later,
+      // using alpha as depth channel.
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo[frameno&0]);
+    }
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     camera.render(stereoMode);  // draw fractal
 
     glUseProgram(0);
 
-    if (background_texture) glBindTexture(GL_TEXTURE_2D, 0);
+    glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // If we're rendering some DoF effects, draw from buffer to screen.
     if (config.enable_dof && camera.dof_scale != 0) {
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
       glEnable(GL_TEXTURE_2D);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, texture);
-      glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our frame.
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, texture[frameno&0]);
 
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
 
-      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
+      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 1);
       glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
                   camera.dof_scale);
       glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
@@ -1663,12 +1676,23 @@ int main(int argc, char **argv) {
       glBegin(GL_QUADS);
         glTexCoord2f(0,1);
         glVertex2f(0,0);
+        glTexCoord2f(0,0.5);
+        glVertex2f(0,config.height/2);
+        glTexCoord2f(1,0.5);
+        glVertex2f(config.width,config.height/2);
+        glTexCoord2f(1,1);
+        glVertex2f(config.width,0);
+      glEnd();
+
+      glBegin(GL_QUADS);
+        glTexCoord2f(0,0.5);
+        glVertex2f(0,config.height/2);
         glTexCoord2f(0,0);
         glVertex2f(0,config.height);
         glTexCoord2f(1,0);
         glVertex2f(config.width,config.height);
-        glTexCoord2f(1,1);
-        glVertex2f(config.width,0);
+        glTexCoord2f(1,0.5);
+        glVertex2f(config.width,config.height/2);
       glEnd();
 
       glUseProgram(0);
@@ -1884,14 +1908,15 @@ int main(int argc, char **argv) {
         config.fullscreen ^= 1; grabbedInput = 1;
         if (config.fullscreen) {
           savedWidth = config.width; savedHeight = config.height;
-          if (stereoMode == ST_INTERLACED) {
-            // Zalman
+          if (stereoMode == ST_INTERLACED || stereoMode == ST_OVERUNDER) {
+            // Zalman or acer
             config.height = 1080; config.width = 1920;
           } else if (stereoMode == ST_SIDEBYSIDE || stereoMode == ST_OVERUNDER) {
             // HMZ-T1
             config.height = 720; config.width = 1280;
           } else if (stereoMode == ST_NONE) {
-            config.height = 1600; config.width = 2560;  // 30"
+//            config.height = 1600; config.width = 2560;  // 30"
+            config.height = 1080; config.width = 1920;  // 27"
           }
         } else {
           config.width = savedWidth; config.height = savedHeight;
