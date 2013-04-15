@@ -193,7 +193,7 @@ SDL_Surface* screen;
 string defines;
 
 // Pinhole camera modes.
-enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED, ST_SIDEBYSIDE }
+enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED, ST_SIDEBYSIDE, ST_QUADBUFFER }
     stereoMode = ST_NONE;
 
 // ogl framebuffer object, one for each eye.
@@ -622,6 +622,20 @@ class KeyFrame {
          glRects(-1,-1,1,0);  // draw bottom half of screen
          setUniforms(1.0, 0.0, 2.0, -1.0, -speed);
          glRects(-1,0,1,1);  // draw top half of screen
+         } break;
+       case ST_QUADBUFFER: {  // left / right
+         if(config.fullscreen) {
+           glDrawBuffer(GL_BACK_LEFT);
+           setUniforms(1.0, 0.0, 1.0, 0.0, -speed);
+           glRects(-1,-1,1,1);
+           glDrawBuffer(GL_BACK_RIGHT);
+           setUniforms(1.0, 0.0, 1.0, 0.0, +speed);
+           glRects(-1,-1,1,1);
+         } else {
+           setUniforms(1.0, 0.0, 1.0, 0.0, speed);
+           glRects(-1,-1,0,1);
+           glRects(0,-1,1,1);
+         }
          } break;
        case ST_XEYED: {  // right | left
          setUniforms(2.0, +1.0, 1.0, 0.0, +speed);
@@ -1125,9 +1139,20 @@ void initGraphics() {
   // Set the video mode, hide the mouse and grab keyboard and mouse input.
   if (screen == NULL) SDL_putenv((char*)"SDL_VIDEO_CENTERED=center");
   if (screen != NULL) SDL_FreeSurface(screen);
+
+  if(stereoMode==ST_QUADBUFFER && config.fullscreen) {
+  	SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
+  }
+
   (screen = SDL_SetVideoMode(config.width, config.height, bpp,
       SDL_OPENGL | (config.fullscreen ? SDL_FULLSCREEN : SDL_RESIZABLE)))
     || die("Video mode initialization failed: %s\n", SDL_GetError());
+
+  if(stereoMode==ST_QUADBUFFER && config.fullscreen) {
+    int ga = 0;
+    SDL_GL_GetAttribute(SDL_GL_STEREO, &ga);
+    if (ga == 0) die("No stereo rendering available: %s\n", SDL_GetError());
+  }
 
   config_width = config.width;
 
@@ -1408,6 +1433,8 @@ int main(int argc, char **argv) {
       stereoMode = ST_XEYED;
     } else if (!strcmp(argv[argc-1], "--sidebyside")) {
       stereoMode = ST_SIDEBYSIDE;
+    } else if (!strcmp(argv[argc-1], "--quadbuffer")) {
+      stereoMode = ST_QUADBUFFER;
     } else if (!strcmp(argv[argc-1], "--render")) {
       rendering = true;
     } else if (!strcmp(argv[argc-1], "--time")) {
