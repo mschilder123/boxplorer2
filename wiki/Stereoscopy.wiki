@@ -7,6 +7,7 @@ Boxplorer2 understands the following commandline parameters to tell it how to re
   * _--sidebyside_ : half width, right eye on right. Compatible with 3d tvs.
   * _--xeyed_ : full width, right eye on left. Good for free viewing.
   * _--interlaced_ : horizontal interlaced. Compatible with Zalman and LG D2342P-PN like devices.
+  * _--quadbuffer_ : OpenGL quad buffer. Tested on an AMD Radeon 7970 and an Optoma HD600X-LV.
 
 = Details =
 
