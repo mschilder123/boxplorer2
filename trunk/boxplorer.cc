@@ -624,18 +624,12 @@ class KeyFrame {
          glRects(-1,0,1,1);  // draw top half of screen
          } break;
        case ST_QUADBUFFER: {  // left / right
-         if(config.fullscreen) {
            glDrawBuffer(GL_BACK_LEFT);
            setUniforms(1.0, 0.0, 1.0, 0.0, -speed);
            glRects(-1,-1,1,1);
            glDrawBuffer(GL_BACK_RIGHT);
            setUniforms(1.0, 0.0, 1.0, 0.0, +speed);
            glRects(-1,-1,1,1);
-         } else {
-           setUniforms(1.0, 0.0, 1.0, 0.0, speed);
-           glRects(-1,-1,0,1);
-           glRects(0,-1,1,1);
-         }
          } break;
        case ST_XEYED: {  // right | left
          setUniforms(2.0, +1.0, 1.0, 0.0, +speed);
@@ -1140,15 +1134,15 @@ void initGraphics() {
   if (screen == NULL) SDL_putenv((char*)"SDL_VIDEO_CENTERED=center");
   if (screen != NULL) SDL_FreeSurface(screen);
 
-  if(stereoMode==ST_QUADBUFFER && config.fullscreen) {
-  	SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
+  if(stereoMode==ST_QUADBUFFER) {
+    SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
   }
 
   (screen = SDL_SetVideoMode(config.width, config.height, bpp,
       SDL_OPENGL | (config.fullscreen ? SDL_FULLSCREEN : SDL_RESIZABLE)))
     || die("Video mode initialization failed: %s\n", SDL_GetError());
 
-  if(stereoMode==ST_QUADBUFFER && config.fullscreen) {
+  if(stereoMode==ST_QUADBUFFER) {
     int ga = 0;
     SDL_GL_GetAttribute(SDL_GL_STEREO, &ga);
     if (ga == 0) die("No stereo rendering available: %s\n", SDL_GetError());
