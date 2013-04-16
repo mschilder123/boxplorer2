@@ -542,7 +542,7 @@ void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
   float halfx = xres / 2.0;
 
   vec2 q;
-  if (sign(speed) == -1) {
+  if (sign(speed) < 0.0) {
     // left. TODO: de-center a bit?
     q = gl_FragCoord.xy / vec2(halfx, yres);
   } else {
@@ -556,6 +556,7 @@ void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
   vec2 oculus_scale = vec2(0.3, 0.35);
   float r2 = dot(p, p);  // Radius squared, from center.
   p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
+  if (dot(p, p) > 0.33) discard;
 
   // Shift eye position, abs(speed) is half inter-occular distance.
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
