@@ -1506,7 +1506,7 @@ int main(int argc, char **argv) {
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
   if (stereoMode == ST_INTERLACED) config.enable_dof = 0;  // mipmapping does not work for interlaced.
   if (stereoMode == ST_OCULUS) {
-	  config.width = 1280; config.height = 800;  // Fix rez. Otherwise mirrored screen drops Rift?
+    config.width = 1280; config.height = 800;  // Fix rez. Otherwise mirrored screen drops Rift?
   }
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
@@ -1964,8 +1964,8 @@ int main(int argc, char **argv) {
           } else if (stereoMode == ST_OCULUS) {
             // Oculus Rift
             config.height = 800; config.width = 1280;
-			config.fov_y = 90.0; config.fov_x = 90.0;
-		  } else if (stereoMode == ST_NONE) {
+            config.fov_y = 90.0; config.fov_x = 90.0;
+          } else if (stereoMode == ST_NONE) {
             config.height = 1600; config.width = 2560;  // 30"
 //            config.height = 1080; config.width = 1920;  // 27"
           }
