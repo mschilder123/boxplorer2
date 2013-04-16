@@ -193,8 +193,14 @@ SDL_Surface* screen;
 string defines;
 
 // Pinhole camera modes.
-enum StereoMode { ST_NONE=0, ST_OVERUNDER, ST_XEYED, ST_INTERLACED, ST_SIDEBYSIDE, ST_QUADBUFFER }
-    stereoMode = ST_NONE;
+enum StereoMode { ST_NONE=0,
+                  ST_OVERUNDER,
+                  ST_XEYED,
+                  ST_INTERLACED,
+                  ST_SIDEBYSIDE,
+                  ST_QUADBUFFER,
+                  ST_OCULUS
+} stereoMode = ST_NONE;
 
 // ogl framebuffer object, one for each eye.
 GLuint fbo[1];
@@ -337,6 +343,7 @@ float getFPS(void) {
 char* parName[NUMPARS][3];
 
 int config_width;
+int config_height;
 
 class KeyFrame {
   public:
@@ -600,6 +607,7 @@ class KeyFrame {
 
      glUniform1f(glGetUniformLocation(program, "speed"), spd);
      glUniform1f(glGetUniformLocation(program, "xres"), config_width);
+     glUniform1f(glGetUniformLocation(program, "yres"), config_height);
 
      #if defined(GL_ARB_gpu_shader_fp64)
      // Also pass in double precision values, if supported.
@@ -653,6 +661,12 @@ class KeyFrame {
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
          glRects(-1,-1,0,1);  // draw left half
          glRects(0,-1,1,1);  // draw right half
+         break;
+       case ST_OCULUS:
+         setUniforms(2.0, +1.0, 1.0, 0.0, -speed);
+         glRectf(-1,-1,0,1);  // draw left half of screen
+         setUniforms(2.0, -1.0, 1.0, 0.0, +speed);
+         glRectf(0,-1,1,1);  // draw right half of screen
          break;
       }
     }
@@ -992,7 +1006,12 @@ int setupShaders(void) {
   p = glCreateProgram();
 
   v = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(v, 1, &vs, 0);
+  if (!defines.empty()) {
+    const char* srcs[2] = {defines.c_str(), vs};
+    glShaderSource(v, 2, srcs, 0);
+  } else {
+    glShaderSource(v, 1, &vs, 0);
+  }
   glCompileShader(v);
   glGetShaderInfoLog(v, sizeof(log), &logLength, log);
   if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
@@ -1149,6 +1168,7 @@ void initGraphics() {
   }
 
   config_width = config.width;
+  config_height = config.height;
 
   if (config.multisamples > 1) {
      glEnable(GL_MULTISAMPLE);  // redundant?
@@ -1429,6 +1449,9 @@ int main(int argc, char **argv) {
       stereoMode = ST_SIDEBYSIDE;
     } else if (!strcmp(argv[argc-1], "--quadbuffer")) {
       stereoMode = ST_QUADBUFFER;
+    } else if (!strcmp(argv[argc-1], "--oculus")) {
+      stereoMode = ST_OCULUS;
+      defines.append("#define ST_OCULUS\n");
     } else if (!strcmp(argv[argc-1], "--render")) {
       rendering = true;
     } else if (!strcmp(argv[argc-1], "--time")) {
