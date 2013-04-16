@@ -293,7 +293,7 @@ double de_mandelbox_64(dvec3 pos) {
   for (int i=0; i<iters; i++) s*= ds;
   double absScalePowIters = s;
   
-  float csat = cos(-rotationAngle);
+  float csat = cos(-rotationAngle);  // Note negate: messed up host vs. shader orientation?!
   float ssat = sin(-rotationAngle);
   float usat = 1.0f - csat;
   vec3 u = normalize(rotationVector);
@@ -312,6 +312,7 @@ double de_mandelbox_64(dvec3 pos) {
     double r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + p0;
+
 	//if (r2 > 100.0) break;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
@@ -535,7 +536,7 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
   return col;
 }
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
+uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
 void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
 #if !defined(ST_NONE)
 #if defined ST_OCULUS
@@ -543,27 +544,27 @@ void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
 
   vec2 q;
   if (sign(speed) < 0.0) {
-    // left. TODO: de-center a bit?
-    q = gl_FragCoord.xy / vec2(halfx, yres);
+    // left. 45 pixel shift towards center. Eyeballed.
+    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
   } else {
-    // right. TODO: de-center a bit?
-    q = (gl_FragCoord.xy - vec2(halfx, 0.0)) / vec2(halfx, yres);
+    // right. 45 pixel shift towards center.
+    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
   }
-  vec2 p = -1.0 + 2.0 * q;  // [-1..1]
+  vec2 p = -1.0 + 2.0 * q;
 
-  // Oculus barrel distort parameters. Hard-coded for now.
+  // Oculus barrel distort parameters.
   vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
-  vec2 oculus_scale = vec2(0.3, 0.35);
+  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
   float r2 = dot(p, p);  // Radius squared, from center.
   p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.33) discard;
+  if (dot(p, p) > 0.15) discard;  // Don't waste time on pixels we can't see.
 
   // Shift eye position, abs(speed) is half inter-occular distance.
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
   eye_in = eye + eye_d;
 
   // Note: no asymmetric frustum for Rift.
-  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 1.0, 0.0)));
+  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
 #else
 #if defined(ST_INTERLACED)
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
