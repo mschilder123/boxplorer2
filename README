@@ -51,9 +51,11 @@ frame based on the time difference between keyframes.
 
 Options for stereoscopic rendering:
 
---xeyed     : cross eyed side-by-side (half horizontal resolution).
---overunder : over-under mode (half vertical resolution).
+--xeyed      : cross eyed side-by-side (half horizontal resolution).
+--overunder  : over-under mode (half vertical resolution).
 --interlaced : Zalman display interlaced mode (left odd, right even).
+--sidebyside : half width, right eye on right. Compatible with 3d tvs.
+--quadbuffer : OpenGL quad buffer. Tested on an AMD Radeon 7970 and an Optoma HD600X-LV
 
 To make a flight path form a loop, edit the .cfg file to have it
 contain a line 'loop 1'. Or add --loop on the commandline.
