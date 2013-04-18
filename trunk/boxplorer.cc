@@ -632,12 +632,12 @@ class KeyFrame {
          glRects(-1,0,1,1);  // draw top half of screen
          } break;
        case ST_QUADBUFFER: {  // left / right
-           glDrawBuffer(GL_BACK_LEFT);
-           setUniforms(1.0, 0.0, 1.0, 0.0, -speed);
-           glRects(-1,-1,1,1);
-           glDrawBuffer(GL_BACK_RIGHT);
-           setUniforms(1.0, 0.0, 1.0, 0.0, +speed);
-           glRects(-1,-1,1,1);
+         glDrawBuffer(GL_BACK_LEFT);
+         setUniforms(1.0, 0.0, 1.0, 0.0, -speed);
+         glRects(-1,-1,1,1);
+         glDrawBuffer(GL_BACK_RIGHT);
+         setUniforms(1.0, 0.0, 1.0, 0.0, +speed);
+         glRects(-1,-1,1,1);
          } break;
        case ST_XEYED: {  // right | left
          setUniforms(2.0, +1.0, 1.0, 0.0, +speed);
@@ -1504,7 +1504,7 @@ int main(int argc, char **argv) {
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
-  if (stereoMode == ST_INTERLACED) config.enable_dof = 0;  // mipmapping does not work for interlaced.
+  if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER) config.enable_dof = 0;  // mipmapping does not work for interlaced.
   if (stereoMode == ST_OCULUS) {
     config.width = 1280; config.height = 800;  // Fix rez. Otherwise mirrored screen drops Rift?
   }
