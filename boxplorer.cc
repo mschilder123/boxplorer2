@@ -215,6 +215,9 @@ int dof_program;
 // texture holding background image
 GLuint background_texture;
 
+// Quad buffer polarity
+int polarity=1;
+
 ////////////////////////////////////////////////////////////////
 // Helper functions
 
@@ -633,10 +636,10 @@ class KeyFrame {
          } break;
        case ST_QUADBUFFER: {  // left / right
          glDrawBuffer(GL_BACK_LEFT);
-         setUniforms(1.0, 0.0, 1.0, 0.0, -speed);
+         setUniforms(1.0, 0.0, 1.0, 0.0, -speed*polarity);
          glRects(-1,-1,1,1);
          glDrawBuffer(GL_BACK_RIGHT);
-         setUniforms(1.0, 0.0, 1.0, 0.0, +speed);
+         setUniforms(1.0, 0.0, 1.0, 0.0, +speed*polarity);
          glRects(-1,-1,1,1);
          } break;
        case ST_XEYED: {  // right | left
@@ -1973,6 +1976,11 @@ int main(int argc, char **argv) {
           config.width = savedWidth; config.height = savedHeight;
         }
         initGraphics(); initTwBar();
+      } break;
+
+      // Switch quad buffer polarity
+      case SDLK_p: {
+        polarity*=-1;
       } break;
 
       // Save config and screenshot (filename = current time).
