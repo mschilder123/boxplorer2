@@ -215,8 +215,8 @@ int dof_program;
 // texture holding background image
 GLuint background_texture;
 
-// Quad buffer polarity
-int polarity=1;
+// DLP-Link L/R polarity
+double polarity=1;
 
 ////////////////////////////////////////////////////////////////
 // Helper functions
@@ -1978,7 +1978,7 @@ int main(int argc, char **argv) {
         initGraphics(); initTwBar();
       } break;
 
-      // Switch quad buffer polarity
+      // Switch DLP-Link L/R polarity
       case SDLK_p: {
         polarity*=-1;
       } break;
