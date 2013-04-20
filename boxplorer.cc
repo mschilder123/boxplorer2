@@ -218,6 +218,9 @@ GLuint background_texture;
 // DLP-Link L/R polarity
 double polarity=1;
 
+int kJOYSTICK;
+SDL_Joystick *joystick;
+
 ////////////////////////////////////////////////////////////////
 // Helper functions
 
@@ -1471,6 +1474,8 @@ int main(int argc, char **argv) {
       loop = true;
     } else if (!strncmp(argv[argc-1], "--kf=", 5)) {
       kKEYFRAME = argv[argc-1] + 5;
+    } else if (!strncmp(argv[argc-1], "--joystick=", 11)) {
+      kJOYSTICK = atoi(argv[argc-1] + 11);
     } else break;
     --argc;
   }
@@ -1528,6 +1533,16 @@ int main(int argc, char **argv) {
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
       die("SDL initialization failed: %s\n", SDL_GetError());
   atexit(SDL_Quit);
+
+  if(kJOYSTICK) {
+    SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+    for(int i=0; i < SDL_NumJoysticks(); i++ ) printf(__FUNCTION__ ": JoystickName %i: '%s'\n", i+1, SDL_JoystickName(i));
+    joystick = SDL_JoystickOpen(kJOYSTICK-1);
+    printf(__FUNCTION__ ": JoystickNumAxes   : %i\n", SDL_JoystickNumAxes(joystick));
+    printf(__FUNCTION__ ": JoystickNumButtons: %i\n", SDL_JoystickNumButtons(joystick));
+    printf(__FUNCTION__ ": JoystickNumBalls  : %i\n", SDL_JoystickNumBalls(joystick));
+    printf(__FUNCTION__ ": JoystickNumHats   : %i\n", SDL_JoystickNumHats(joystick));
+  }
 
    // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics();
@@ -1853,6 +1868,12 @@ int main(int argc, char **argv) {
     // Process UI events.
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+      if(joystick && event.type==SDL_JOYBUTTONDOWN) {
+        // Hack to reach "case SDLK_*" code:
+        event.type=SDL_KEYDOWN;
+        if(event.jbutton.button == 0) event.key.keysym.sym=SDLK_TAB;
+        else event.key.keysym.sym=SDLK_BACKSPACE;
+      }
       if (grabbedInput ||
           !TwEventSDL(&event, SDL_MAJOR_VERSION, SDL_MINOR_VERSION))
       switch (event.type) {
@@ -2201,6 +2222,8 @@ int main(int argc, char **argv) {
     // Get keyboard and mouse state.
     Uint8* keystate = SDL_GetKeyState(0);
     int mouse_dx, mouse_dy;
+    Sint16 joystick_x, joystick_y, joystick_z, joystick_r;
+    Uint8 joystick_hat;
     Uint8 mouse_buttons = SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
     int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
     int mouse_button_right = mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
@@ -2213,15 +2236,25 @@ int main(int argc, char **argv) {
     // does not jump after closing AntTweakBar.
     if (!grabbedInput) continue;
 
+    if(joystick) {
+      SDL_JoystickUpdate();
+      joystick_x   = SDL_JoystickGetAxis(joystick, 0);
+      joystick_y   = SDL_JoystickGetAxis(joystick, 1);
+      joystick_z   = SDL_JoystickGetAxis(joystick, 2);
+      joystick_r   = SDL_JoystickGetAxis(joystick, 3);
+      joystick_hat = SDL_JoystickGetHat (joystick, 0);
+    }
+
     (void)mouse_buttons;
     (void)mouse_button_left;
     (void)mouse_button_right;
 
     if (keystate[SDLK_w]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDLK_s]) camera.move(0, 0, -camera.speed);  //back
+    if (joystick_z != 0)  camera.move(0, 0,  camera.speed * -joystick_z / 1000.0);
 
-    if (keystate[SDLK_a]) camera.move(-camera.speed, 0, 0);  //left
-    if (keystate[SDLK_d]) camera.move( camera.speed, 0, 0);  //right
+    if (keystate[SDLK_a] || (joystick_hat & SDL_HAT_LEFT )) camera.move(-camera.speed, 0, 0);  //left
+    if (keystate[SDLK_d] || (joystick_hat & SDL_HAT_RIGHT)) camera.move( camera.speed, 0, 0);  //right
 
     // Mouse look.
     if (grabbedInput && (mouse_dx != 0 || mouse_dy != 0)) {
@@ -2230,6 +2263,13 @@ int main(int argc, char **argv) {
     }
     if (keystate[SDLK_q]) m_rotateZ2(camera.keyb_rot_speed);
     if (keystate[SDLK_e]) m_rotateZ2(-camera.keyb_rot_speed);
+
+    // Joystick look.
+    if (joystick_x != 0 || joystick_y != 0) {
+      m_rotateX2(camera.mouse_rot_speed * joystick_x * camera.fov_x / 90.0 / 100.0);
+      m_rotateY2(camera.mouse_rot_speed * joystick_y * camera.fov_y / 75.0 / 100.0);
+    }
+    if (joystick_r != 0) m_rotateZ2(camera.keyb_rot_speed * joystick_r / 1000.0);
 
    if (keystate[SDLK_z]){ if (camera.speed > 0.000001) camera.speed -= camera.speed/10; printf("speed %.8e\n", camera.speed);}
    if (keystate[SDLK_c]){ if (camera.speed < 1.0) camera.speed += camera.speed/10; printf("speed %.8e\n", camera.speed);}
