@@ -2222,8 +2222,8 @@ int main(int argc, char **argv) {
     // Get keyboard and mouse state.
     Uint8* keystate = SDL_GetKeyState(0);
     int mouse_dx, mouse_dy;
-    Sint16 joystick_x, joystick_y, joystick_z, joystick_r;
-    Uint8 joystick_hat;
+    Sint16 joystick_x=0, joystick_y=0, joystick_z=0, joystick_r=0;
+    Uint8 joystick_hat=0;
     Uint8 mouse_buttons = SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
     int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
     int mouse_button_right = mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
