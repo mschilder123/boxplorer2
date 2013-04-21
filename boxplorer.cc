@@ -2251,10 +2251,12 @@ int main(int argc, char **argv) {
 
     if (keystate[SDLK_w]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDLK_s]) camera.move(0, 0, -camera.speed);  //back
-    if (joystick_z != 0)  camera.move(0, 0,  camera.speed * -joystick_z / 1000.0);
+    if (joystick_z != 0)  camera.move(0, 0,  camera.speed * -joystick_z / 10000.0);
 
     if (keystate[SDLK_a] || (joystick_hat & SDL_HAT_LEFT )) camera.move(-camera.speed, 0, 0);  //left
     if (keystate[SDLK_d] || (joystick_hat & SDL_HAT_RIGHT)) camera.move( camera.speed, 0, 0);  //right
+    if (joystick_hat & SDL_HAT_DOWN) camera.move(0, -camera.speed, 0);  //down
+    if (joystick_hat & SDL_HAT_UP  ) camera.move(0,  camera.speed, 0);  //up
 
     // Mouse look.
     if (grabbedInput && (mouse_dx != 0 || mouse_dy != 0)) {
@@ -2266,10 +2268,10 @@ int main(int argc, char **argv) {
 
     // Joystick look.
     if (joystick_x != 0 || joystick_y != 0) {
-      m_rotateX2(camera.mouse_rot_speed * joystick_x * camera.fov_x / 90.0 / 100.0);
-      m_rotateY2(camera.mouse_rot_speed * joystick_y * camera.fov_y / 75.0 / 100.0);
+      m_rotateX2(camera.mouse_rot_speed *  joystick_x * camera.fov_x / 90.0 / 5000.0);
+      m_rotateY2(camera.mouse_rot_speed * -joystick_y * camera.fov_y / 75.0 / 5000.0);
     }
-    if (joystick_r != 0) m_rotateZ2(camera.keyb_rot_speed * joystick_r / 1000.0);
+    if (joystick_r != 0) m_rotateZ2(camera.keyb_rot_speed * joystick_r / 10000.0);
 
    if (keystate[SDLK_z]){ if (camera.speed > 0.000001) camera.speed -= camera.speed/10; printf("speed %.8e\n", camera.speed);}
    if (keystate[SDLK_c]){ if (camera.speed < 1.0) camera.speed += camera.speed/10; printf("speed %.8e\n", camera.speed);}
