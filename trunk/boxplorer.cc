@@ -637,7 +637,7 @@ class KeyFrame {
          setUniforms(1.0, 0.0, 2.0, -1.0, -speed);
          glRects(-1,0,1,1);  // draw top half of screen
          } break;
-       case ST_QUADBUFFER: {  // left / right
+       case ST_QUADBUFFER: {  // left - right
          glDrawBuffer(GL_BACK_LEFT);
          setUniforms(1.0, 0.0, 1.0, 0.0, -speed*polarity);
          glRects(-1,-1,1,1);
@@ -1536,11 +1536,10 @@ int main(int argc, char **argv) {
 
   if(kJOYSTICK) {
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-    for(int i=0; i < SDL_NumJoysticks(); i++ ) printf(__FUNCTION__ ": JoystickName %i: '%s'\n", i+1, SDL_JoystickName(i));
+    for(int i=0; i < SDL_NumJoysticks(); i++) printf(__FUNCTION__ ": JoystickName %i: '%s'\n", i+1, SDL_JoystickName(i));
     joystick = SDL_JoystickOpen(kJOYSTICK-1);
     printf(__FUNCTION__ ": JoystickNumAxes   : %i\n", SDL_JoystickNumAxes(joystick));
     printf(__FUNCTION__ ": JoystickNumButtons: %i\n", SDL_JoystickNumButtons(joystick));
-    printf(__FUNCTION__ ": JoystickNumBalls  : %i\n", SDL_JoystickNumBalls(joystick));
     printf(__FUNCTION__ ": JoystickNumHats   : %i\n", SDL_JoystickNumHats(joystick));
   }
 
@@ -1868,10 +1867,10 @@ int main(int argc, char **argv) {
     // Process UI events.
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-      if(joystick && event.type==SDL_JOYBUTTONDOWN) {
+      if(event.type==SDL_JOYBUTTONDOWN) {
         // Hack to reach "case SDLK_*" code:
         event.type=SDL_KEYDOWN;
-        if(event.jbutton.button == 0) event.key.keysym.sym=SDLK_TAB;
+        if(event.jbutton.button) event.key.keysym.sym=SDLK_TAB;
         else event.key.keysym.sym=SDLK_BACKSPACE;
       }
       if (grabbedInput ||
