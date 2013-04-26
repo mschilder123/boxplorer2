@@ -26,6 +26,8 @@
 
 #define P0 p0                    // standard Mandelbox
 //#define P0 (p0-vec4(par[1],1.0))  // Mandelbox Julia
+//#define P0 vec4(par[1],1.0)
+//#define JuliaVector par[1]
 
 #define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
@@ -37,7 +39,7 @@
 // Camera position and direction.
 varying vec3 eye, dir;
 varying float zoom;
-uniform float xres;
+uniform float xres, yres;
 
 uniform dvec3 deye;  // eye position in double precision
 
@@ -58,7 +60,7 @@ uniform int color_iters;  // Number of fractal iterations for coloring. {min=0 m
 uniform int max_steps;  // Maximum raymarching steps. {min=0 max=1000 step=1}
 
 // Colors. Can be negative or >1 for interestiong effects.
-vec3 backgroundColor = vec3(0.07, 0.06, 0.16);
+vec3 backgroundColor = vec3(0.07, 0.06, 0.06);
 
 vec3 BaseColor = vec3(.3,.3,.3);
 vec4 X = vec4(0.95, 0.64, 0.1, .9);
@@ -84,6 +86,7 @@ mat3 rotationMatrix;
 #define rotationAngle par[4].x  // { min=-5 max=5 step=.01}
 #define rotationQuat par[3]  // that is par[3].xyz and par[4].x
 
+#if 0
 double lengthd(dvec3 v) {  // wtf? why needed?
   return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
@@ -95,6 +98,7 @@ double lengthd2(dvec3 v) {  // wtf? why needed?
 dvec3 normalized(dvec3 v) {
   return v / lengthd(v);
 }
+#endif
 
 void init() {
   // compute couple of constants.
@@ -121,9 +125,12 @@ double de_mandelbox(dvec3 pos) {
   for (int i=0; i<iters; i++) {
 	p.xyz = rotationMatrix * p.xyz;
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
+
     double r2 = dot(p.xyz, p.xyz);
+
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + P0;
+
 	if (r2 > 100.0) break;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
@@ -137,7 +144,7 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
   dvec4 orbitTrap = dvec4(10000.0);
   int i = 0;
   for (; i<color_iters; i++) {
-    //p.xyz = rotationMatrix * p.xyz;
+    p.xyz = rotationMatrix * p.xyz;
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
 
     double r2 = dot(p.xyz, p.xyz);
@@ -149,12 +156,12 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
 	if (r2 > 100.0) break;
   }
 
-  orbitTrap.w = clamp(sqrt(orbitTrap.w)*float(iters)/float(i), 0.0, 1.0);
+  orbitTrap.w = clamp(sqrt(orbitTrap.w)*float(color_iters)/float(i), 0.0, 1.0);
   vec3 orbitColor =
-        X.xyz*X.w*orbitTrap.x +
+        X.xyz*X.w*(orbitTrap.x) +
 		Y.xyz*Y.w*orbitTrap.y +
-		Z.xyz*Z.w*orbitTrap.z
-		+R.xyz*R.w*orbitTrap.w
+		Z.xyz*Z.w*orbitTrap.z +
+		R.xyz*R.w*(orbitTrap.w)
 		;
   return mix(BaseColor, 3.0*orbitColor,  OrbitStrength);
 }
@@ -163,8 +170,8 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 dvec3 normal(dvec3 pos, double d_pos) {
-  dvec2 Eps = dvec2(0, 4.0*d_pos);
-  return normalized(
+  dvec2 Eps = dvec2(0, 3.0*d_pos);
+  return normalize(
      dvec3(-abs(d(pos-Eps.yxx))+abs(d(pos+Eps.yxx)),
            -abs(d(pos-Eps.xyx))+abs(d(pos+Eps.xyx)),
            -abs(d(pos-Eps.xxy))+abs(d(pos+Eps.xxy))
@@ -175,7 +182,7 @@ dvec3 normal(dvec3 pos, double d_pos) {
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
 // `normal`, `view` and `light` should be normalized.
 vec3 blinn_phong(dvec3 normal, dvec3 view, dvec3 light, vec3 diffuseColor) {
-  dvec3 halfLV = normalized(light + view);
+  dvec3 halfLV = normalize(light + view);
   float spe = pow(float(max(dot(normal, halfLV), 0.0)), 16.0);
   float dif = float(dot(normal, light)) * 0.5 + 0.75;
   return dif*diffuseColor + spe*specularColor;
@@ -201,27 +208,65 @@ float ambient_occlusion(dvec3 p, dvec3 n, double DistAtp) {
 float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
 uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
-void setup_stereo(inout dvec3 eye_in, inout dvec3 dp) {
+bool setup_stereo(inout dvec3 eye_in, inout dvec3 dp) {
 #if !defined(ST_NONE)
+#if defined ST_OCULUS
+  float halfx = xres / 2.0;
+
+  vec2 q;
+  if (sign(dspeed) < 0.0) {
+    // left. 45 pixel shift towards center. Eyeballed.
+    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
+  } else {
+    // right. 45 pixel shift towards center.
+    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
+  }
+  vec2 p = -1.0 + 2.0 * q;
+
+  // Oculus barrel distort parameters.
+  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
+  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
+  float r2 = dot(p, p);  // Radius squared, from center.
+  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
+  if (dot(p, p) > 0.15) { 
+    //discard;  // Don't waste time on pixels we can't see.
+    return false;
+  }
+
+  // Shift eye position, abs(speed) is half inter-occular distance.
+  dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4(dspeed, 0.0, 0.0, 0.0));
+  eye_in = deye + eye_d;
+
+  // Note: no asymmetric frustum for Rift.
+  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
+#else
 #if defined(ST_INTERLACED)
   dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(dspeed), 0, 0, 0));
 #else
   dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4(dspeed, 0, 0, 0));
 #endif
   eye_in = deye + eye_d;
-  dp = normalized(dir * (focus + 30.0) * abs(dspeed) - eye_d);
+  dp = normalize(dir * (focus + 30.0) * abs(dspeed) - eye_d);
+#endif  // ST_OCULUS
 #else  // ST_NONE
   eye_in = deye;
-  dp = normalized(dir);
+  dp = normalize(dir);
 #endif
+  return true;
 }
 
 void main() {
-  dvec3 eye_in, dp; setup_stereo(eye_in, dp);
+  dvec3 eye_in, dp;
+  
+  if (!setup_stereo(eye_in, dp)) {
+    gl_FragColor = vec4(0);
+	gl_FragDepth = 0;
+	return;
+  }
 
   init();
 
-  double m_zoom = zoom * .5 * sqrt(2)/ xres;
+  double m_zoom = zoom * .5 /* sqrt(2)*/ / xres;
 
   double noise = pnoise(gl_FragCoord.xy);
 
@@ -250,14 +295,16 @@ void main() {
   if (totalD < MAX_DIST) {
     col = c(p, totalD);
     dvec3 n = normal(p, m_dist/*abs(D)*/);
-    col = blinn_phong(n, -dp, normalized(eye_in+dp+dvec3(0,-1,0)), col);
+    col = blinn_phong(n, -dp, normalize(eye_in+dp+dvec3(0,-1,0)), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, 20.*m_dist));
 
+#if 0
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
- //   if (D > m_dist) {
- //     col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
- //   }
+    if (D > m_dist) {
+      col = mix(col, backgroundColor, clamp(sqrt(D/m_dist) * dist_to_color, 0.0, 1.0));
+    }
+#endif
   }
 
   // Glow is based on the number of steps.
