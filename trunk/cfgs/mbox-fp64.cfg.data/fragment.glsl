@@ -228,7 +228,7 @@ bool setup_stereo(inout dvec3 eye_in, inout dvec3 dp) {
   vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
   float r2 = dot(p, p);  // Radius squared, from center.
   p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.15) { 
+  if (dot(p, p) > 0.10) { 
     //discard;  // Don't waste time on pixels we can't see.
     return false;
   }
