@@ -24,40 +24,59 @@ void quat2mat(const double *q,double *m) {
 	zw = 2*q[2]*q[3];
 
 	m[0] = 1-y2-z2;
-	m[1] = xy+zw;
-	m[2] = xz-yw;
-	m[3] = 0;
+	m[4] = xy+zw;
+	m[8] = xz-yw;
+//	m[12] = 0;
 	
-	m[4] = xy-zw;
+	m[1] = xy-zw;
 	m[5] = 1-x2-z2;
-	m[6] = yz+xw;
-	m[7] = 0;
+	m[9] = yz+xw;
+//	m[13] = 0;
 
-	m[8] = xz+yw;
-	m[9] = yz-xw;
+	m[2] = xz+yw;
+	m[6] = yz-xw;
 	m[10] = 1-x2-y2;
-	m[11] = 0;
+//	m[14] = 0;
 
-	m[12] = 0;
-	m[13] = 0;
-	m[14] = 0;
-	m[15] = 1;
+	m[3] = 0;
+	m[7] = 0;
+	m[11] = 0;
+//	m[15] = 1;
 }
 
-void mat2quat(const double *m,double *q) {
+void mat2quat(const double *m1, double *q) {
 	int i,j,k;
 	double Tr;
 	double fd;
+	double m[16];
+
+	// From column major to row major. Only relevant entries are copied.
+	m[0] = m1[0];
+	m[1] = m1[4];
+	m[2] = m1[8];
+//	m[3] = 0;
+	m[4] = m1[1];
+	m[5] = m1[5];
+	m[6] = m1[9];
+//	m[7] = 0;
+	m[8] = m1[2];
+	m[9] = m1[6];
+	m[10] = m1[10];
+//	m[11] = 0;
+//	m[12] = m1[12];
+//	m[13] = m1[13];
+//	m[14] = m1[14];
+	m[15] = m1[15];
 
 	Tr = m[0] + m[5] + m[10] + m[15];
 	
 	if (Tr >= 1) {
-		fd = 2.0f*sqrt(Tr);
-		q[3] = fd/4.0f;
+		fd = 2.0 * sqrt(Tr);
+		q[3] = fd / 4.0f;
 		q[0] = (m[6]-m[9]) / fd;
 		q[1] = (m[8]-m[2]) / fd;
 		q[2] = (m[1]-m[4]) / fd;
-	}	else {
+	} else {
 		i=0;
 		if (m[5] > m[0]) {
 			i=1;
@@ -68,12 +87,36 @@ void mat2quat(const double *m,double *q) {
 		j = (i+1)%3;
 		k = (j+1)%3;
 		
-		fd = 2.0f*sqrt(1 + m[5*i] - m[5*j] - m[5*k]);
-		q[i] = fd/4;
-		q[j] = (m[i*4+j] + m[i+4*j])/(fd);
-		q[k] = (m[i*4+k] + m[i+4*k])/(fd);
-		q[3] = (m[k+4*j] - m[j+4*k])/fd;
+		fd = 2.0 * sqrt(1 + m[5*i] - m[5*j] - m[5*k]);
+		q[i] = fd / 4;
+		q[j] = (m[i*4+j] + m[i+4*j]) / fd;
+		q[k] = (m[i*4+k] + m[i+4*k]) / fd;
+		q[3] = (m[k+4*j] - m[j+4*k]) / fd;
 	}
+}
+
+void qmul(double* q1, const double* q2) {
+	double t[4];
+
+#define x 0
+#define y 1
+#define z 2
+#define w 3
+
+	t[x] = q1[w]*q2[x] + q1[x]*q2[w] + q1[y]*q2[z] - q1[z]*q2[y];
+	t[y] = q1[w]*q2[y] + q1[y]*q2[w] + q1[z]*q2[x] - q1[x]*q2[z];
+	t[z] = q1[w]*q2[z] + q1[z]*q2[w] + q1[x]*q2[y] - q1[y]*q2[x];
+	t[w] = q1[w]*q2[w] - q1[x]*q2[x] - q1[y]*q2[y] - q1[z]*q2[z];
+
+#undef w
+#undef z
+#undef y
+#undef x
+
+	q1[0] = t[0];
+	q1[1] = t[1];
+	q1[2] = t[2];
+	q1[3] = t[3];
 }
 
 void qslerp(const double *q1,const double *q2,double *qr,double t) {
@@ -92,8 +135,8 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 			q3[i] = q2[i];
 		}
 	}
-	if (dot > 0.99f) {
-    // Very close, just linear interpolate.
+	if (dot > 0.999f) {
+        // Very close, just linear interpolate.
 		for (i=0;i<4;i++) {
 			qr[i] = q1[i] + (q3[i]-q1[i])*t;
 		}
@@ -105,6 +148,17 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 		for (i=0;i<4;i++) {
 			qr[i] = (q1[i]*sinaomt+q3[i]*sinat)/sina;
 		}
+	}
+}
+
+void qnormalize(double* q) {
+	double mag = q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3];
+	if (fabs(mag) > .000001 && fabs(mag - 1.0) > .000001) {
+		double invMag = 1.0 / mag;
+		q[0] *= invMag;
+		q[1] *= invMag;
+		q[2] *= invMag;
+		q[3] *= invMag;
 	}
 }
 

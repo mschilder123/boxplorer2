@@ -19,13 +19,17 @@
 
 #else  // _WIN32
 
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#include <CommDlg.h>
 #include <direct.h>
-#define MKDIR(a) mkdir(a)
 
 #pragma warning(disable: 4996) // unsafe function
-
+#pragma warning(disable: 4244) // double / float conversion
+#pragma warning(disable: 4305) // double / float truncation
 #pragma warning(disable: 4800) // forcing value to bool
 
+#pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "SDL.lib")
 #pragma comment(lib, "SDLmain.lib")
 #pragma comment(lib, "opengl32.lib")
@@ -33,6 +37,9 @@
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
+
+#define MKDIR(a) mkdir(a)
+typedef SOCKET socket_t;
 
 #endif  // _WIN32
 
@@ -56,10 +63,6 @@ using namespace std;
 #include "interpolate.h"
 #include "TGA.h"
 
-#if defined(_WIN32)
-#include <CommDlg.h>
-#endif
-
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
@@ -71,10 +74,18 @@ using namespace std;
 #endif
 #define PI          3.14159265358979324
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), exit(-1), 1 )
+#ifndef ARRAYSIZE
 #define ARRAYSIZE(x) ( sizeof(x)/sizeof((x)[0]) )
+#endif
+
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
 
 #include "glsl.h"
-
 
 // Hackery to get the list of DE and COLORING funcs from the glsl.
 map<string, float (*)(GLSL::vec3)> DE_funcs;
@@ -353,11 +364,9 @@ int config_height;
 
 class KeyFrame {
   public:
-   // View matrix.
-   double v[16];
-
-   double q[4];  // quarterion orientation
-   double x[4];  // r4 splineable q
+   double v[16];  // view matrix
+   double q[4];   // quarterion orientation
+   double x[4];   // r4 splineable q
 
    // Declare fractal and other parameters.
    #define PROCESS(a,b,c,d) a b;
@@ -365,9 +374,9 @@ class KeyFrame {
    #undef PROCESS
 
    // Par[] parameter array.
-   float par[NUMPARS][3];  // min(this, glsl) gets sent to shader.
+   float par[NUMPARS][3];  // min(|this|, |glsl|) gets sent to shader.
 
-   bool isKey_;  // Whether this frame is actually a KeyFrame.
+   bool isKey_;  // Whether this frame is actually a defined KeyFrame.
 
    KeyFrame() { memset(this, 0, sizeof *this); }
 
@@ -426,6 +435,7 @@ class KeyFrame {
    // Rotate the camera by `deg` degrees around a normalized axis.
    // Behaves like `glRotate` without normalizing the axis.
    void rotate(double deg, double x, double y, double z) {
+	 quat2mat(this->q, this->v);
      double s = sin(deg*PI/180), c = cos(deg*PI/180), t = 1-c;
      double r[3][3] = {
       { x*x*t +   c, x*y*t + z*s, x*z*t - y*s },
@@ -438,6 +448,7 @@ class KeyFrame {
       for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
      }
      orthogonalize();
+	 mat2quat(this->v, this->q);
    }
 
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
@@ -563,6 +574,7 @@ class KeyFrame {
      if (dist_to_color <= 0) dist_to_color = 0.2;
 
      orthogonalize();
+	 mat2quat(this->v, this->q);
 
      // Don't do anything with user parameters - they must be
      // sanitized (clamped, ...) in the shader.
@@ -616,7 +628,7 @@ class KeyFrame {
      glUniform1f(glGetUniformLocation(program, "yres"), config_height);
 
      #if defined(GL_ARB_gpu_shader_fp64)
-     // Also pass in double precision values, if supported.
+     // Also pass in some double precision values, if supported.
      glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
      glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
      #endif
@@ -675,7 +687,34 @@ class KeyFrame {
          glRectf(0,-1,1,1);  // draw right half of screen
          break;
       }
-    }
+   }
+  void mixSensorOrientation(socket_t sock) {
+#if defined(_WIN32)
+    sockaddr_in SenderAddr;
+    int SenderAddrSize = sizeof (SenderAddr);
+
+    double q1[4];
+	bool gotData = false;
+
+	for(;;) {
+      float qf[4];  // receive Quatf
+      int r = recvfrom(sock, (char*)&qf, sizeof(qf), 0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
+      if (r == sizeof(qf)) {
+        for (int i = 0; i < 4; ++i) q1[i] = qf[i];
+		gotData = true;
+	  } else break;
+	}
+
+	if (gotData) {
+        q1[2] = -q1[2];  // We roll other way
+		qnormalize(q1);
+
+		// combine current view quat with sensor quat.
+		qmul(q1, this->q);
+        quat2mat(q1, this->v);
+	}
+#endif
+  }
 } camera,  // Active camera view
   config;  // Global configuration set
 
@@ -784,6 +823,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
         SPLINE(tmp.x[j], p0->x[j], p1->x[j], p2->x[j], p3->x[j]);
       }
       x2quat(tmp.x, tmp.q);  // convert back to quat
+	  qnormalize(tmp.q);
       quat2mat(tmp.q, tmp.v);  // convert quat to the splined rotation matrix
 
       // Spline position into tmp.v[12..15]
@@ -815,7 +855,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
       #undef PROCESS
       #undef SPLINE
 
-      //tmp.orthogonalize();  // this should be no-op given matrix came from quat
+      //tmp.orthogonalize();  // this should be no-op given matrix came from quat?
       output->push_back(tmp);
     }
   }
@@ -1398,6 +1438,16 @@ void initTwBar() {
 
   bar = TwNewBar("boxplorer");
 
+  if (stereoMode == ST_OCULUS) {
+	// Position HUD center for left eye.
+    char pos[100];
+	int x = config.width;
+	int y = config.height;
+	sprintf(pos, "boxplorer position='%d %d'", x/6, y/4);
+    TwDefine(pos);
+	TwDefine("GLOBAL fontsize=3");
+  }
+
   #define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
   PROCESS_CONFIG_PARAMS
   #undef PROCESS
@@ -1508,6 +1558,24 @@ int main(int argc, char **argv) {
 #endif
     die("Usage: boxplorer <configuration-file.cfg>\n");
   }
+
+#if defined(_WIN32)
+  WSADATA wsaData;
+  WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+  socket_t RecvSocket = INVALID_SOCKET;
+
+  if (stereoMode == ST_OCULUS) {
+    RecvSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    u_long nonblock = 1;
+    ioctlsocket(RecvSocket, FIONBIO, &nonblock);
+    sockaddr_in RecvAddr;
+    RecvAddr.sin_family = AF_INET;
+    RecvAddr.sin_port = htons(1337);
+    RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    bind(RecvSocket, (SOCKADDR *) & RecvAddr, sizeof (RecvAddr));
+  }
+#endif
 
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
@@ -1644,6 +1712,15 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
+	if (!rendering) {
+      // When not rendering a sequence, now mix in orientation (and translation)
+      // external sensors might have to add (e.g. Oculus orientation) into the view
+      // we are about to render.
+      if (stereoMode == ST_OCULUS) {
+	    camera.mixSensorOrientation(RecvSocket);
+	  }
+	}
+
     if (!rendering && (de_func || de_func_64)) {
       // Get a distance estimate, for navigation and eye separation.
       // Setup just the vars needed for DE. For now, iters and par[0..20]
@@ -1652,24 +1729,15 @@ int main(int argc, char **argv) {
       for (int i = 0; i < 20; ++i) {
         GLSL::par[i] = GLSL::vec3(camera.par[i]);
       }
-      // Sample along direction to sense clear space ahead.
-      GLSL::dvec3 pos(camera.pos());
-      double prev_de = 0.0, de = 0.0, first_de = 0.0;
-      bool first = true;
-      do {
-        prev_de = de;
-        pos += GLSL::dvec3(camera.ahead()) * de;
-        de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
-        if (first) first_de = de;
-        first = false;
-      } while (de > prev_de && de < 0.1);
 
-      if (first_de != last_de) {
-        printf("de=%12.12e, ahead=%12.12e\n", first_de, de);
-        camera.speed = first_de / 10.0;
-        //camera.speed = GLSL::clamp(first_de/10.0, DBL_EPSILON, last_de/9.0);
+      GLSL::dvec3 pos(camera.pos());
+	  double de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
+
+      if (de != last_de) {
+        printf("de=%12.12e\n", de);
+        camera.speed = de / 10.0;
+        last_de = de;
       }
-      last_de = first_de;
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -1986,8 +2054,9 @@ int main(int argc, char **argv) {
             config.height = 720; config.width = 1280;
           } else if (stereoMode == ST_OCULUS) {
             // Oculus Rift
-            config.height = 800; config.width = 1280;
-            config.fov_y = 90.0; config.fov_x = 90.0;
+            config.height = 800; config.width = 1280; // WTF? xfire fail on that rez
+            //config.height = 720; config.width = 1280;
+            config.fov_y = 110.0; config.fov_x = 90.0;
           } else if (stereoMode == ST_NONE) {
             config.height = 1600; config.width = 2560;  // 30"
 //            config.height = 1080; config.width = 1920;  // 27"
@@ -2294,5 +2363,11 @@ int main(int argc, char **argv) {
     // TODO: ask whether to save keyframes
   }
   camera.saveConfig("last.cfg", &defines);  // Save a config file on exit, just in case.
+
+#if defined(_WIN32)
+  closesocket(RecvSocket);
+  WSACleanup();
+#endif
+
   return 0;
 }
