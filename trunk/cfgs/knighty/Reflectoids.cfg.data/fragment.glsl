@@ -14,9 +14,11 @@
 	Have fun!
 */
 
-#define DIST_MULTIPLIER par[9].x
+#define DIST_MULTIPLIER par[9].x  // {min=.01 max=1 step=.01}
 #define DE_EPS 0.0001 //par[9].y
 #define MAX_DIST 10.0
+
+#define INOUT(a,b) inout a b
 
 // Camera position and direction.
 varying vec3 eye, dir;
@@ -24,6 +26,8 @@ varying vec3 eye, dir;
 // Interactive parameters.
 uniform vec3 par[10];
 uniform float speed;
+
+uniform float xres, yres;
 
 uniform float
   min_dist,           // Distance at which raymarching stops.
@@ -51,12 +55,16 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 
 // Compute the distance from `pos` to the PKlein basic shape.
 float d_PZshape(vec3 p) {
-   float rxy=sign(par[9].y)*(length(p.xy)-abs(par[9].y));
-#define TThickness par[5].x
-#define Zmult par[8].y
-#define Ziter int(par[8].x)
-   for(int i=0; i<Ziter; i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
-   return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+   float rxy = sign(par[9].y)*(length(p.xy)-abs(par[9].y));
+
+#define TThickness par[5].x //{min=-5 max=5 step=.01}
+#define Zmult par[8].y //{min=-5 max=5 step=.01}
+#define Ziter par[8].x  //{min=1 max=100 step=1}
+
+   for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
+
+//     return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+   return max(rxy,   (length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
 }
 
 // Compute the distance from `pos` to the PKlein.
@@ -64,20 +72,14 @@ float d_PKlein(vec3 p) {
    //Just scale=1 Julia box
 	float r2=dot(p,p);
 	float DEfactor=1.;
-	vec3 ap=p+vec3(1.);
+
 #define CSize vec3(par[1].y,par[1].x,par[2].y)
-#define Size par[0].y
+#define Size par[0].y //{min=-5 max=5 step=.01}
 #define C vec3(par[2].x,par[3].y,par[3].x)
 #define Offset vec3(par[4].y,par[4].x,par[5].y)
-#define DEoffset par[0].x
+#define DEoffset par[0].x //{min=-5 max=5 step=.01}
 
-
-#if 1
-//for low max iterations (<10) the fastest is using a constant max iterations
-//then uniform
-//then with early exit
-	for(int i=0;i<6/*iters /*&& ap!=p*/;i++){
-		ap=p;
+	for(int i=0;i<iters;i++){
 		//Box folding
 		p=2.*clamp(p, -CSize, CSize)-p;
 		//Inversion
@@ -87,37 +89,6 @@ float d_PKlein(vec3 p) {
 		//julia seed
 		p+=C;
 	}
-#else
-#define UNSIZ 4
-//this is faster with moderate to high max iterations
-	int UN=int(floor(float(iters)/float(UNSIZ)));
-	int FI=iters-UN*UNSIZ;
-	
-	for(int i=0;i<UN && ap!=p;i++){
-		for(int j=0;j<UNSIZ;j++){
-			ap=p;
-			//Box folding
-			p=2.*clamp(p, -CSize, CSize)-p;
-			//Inversion
-			r2=dot(p,p);
-			float k=max(Size/r2,1.);
-			p*=k;DEfactor*=k;
-			//julia seed
-			p+=C;
-		}
-	}
-	for(int j=0;j<FI && ap!=p;j++){
-		ap=p;
-		//Box folding
-		p=2.*clamp(p, -CSize, CSize)-p;
-		//Inversion
-		r2=dot(p,p);
-		float k=max(Size/r2,1.);
-		p*=k;DEfactor*=k;
-		//julia seed
-		p+=C;
-	}
-#endif
 	//Call basic shape and scale its DE
 	//Ok... not perfect because the inversion transformation is tricky
 	//but works Ok with this shape (maybe because of the "tube" along Z-axis
@@ -144,7 +115,8 @@ vec3 color_PKlein(vec3 p) {
 		p=p1;
 		//Inversion
 		r2=dot(p,p);
-		float k=max(Size/r2,1.);col.w+=abs(k-1.);
+		float k=max(Size/r2,1.);
+		col.w+=abs(k-1.);
 		p*=k;DEfactor*=k;
 		//julia seed
 		p+=C;
@@ -165,7 +137,7 @@ float normal_eps = 0.00001;
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
   //vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
-  vec2 Eps = vec2(0, d_pos);
+  vec2 Eps = vec2(0, max(d_pos, normal_eps));
   return normalize(vec3(
   // 2-tap forward differences, error = O(eps)
 //    -d_pos+d(pos+Eps.yxx),
@@ -233,30 +205,89 @@ float marche(inout vec3 p, in vec3 dp, inout float D, inout float totalD, in flo
 	return float(steps);
 }
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 15x speed.
-void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
+uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
+bool setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
 #if !defined(ST_NONE)
+#if defined ST_OCULUS
+  float halfx = xres / 2.0;
+
+  vec2 q;
+  if (sign(speed) < 0.0) {
+    // left. 45 pixel shift towards center. Eyeballed.
+    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
+  } else {
+    // right. 45 pixel shift towards center.
+    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
+  }
+  vec2 p = -1.0 + 2.0 * q;
+
+  // Oculus barrel distort parameters.
+  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
+  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
+  float r2 = dot(p, p);  // Radius squared, from center.
+  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
+  if (dot(p, p) > 0.10) { 
+    //discard;  // Don't waste time on pixels we can't see.
+    return false;
+  }
+
+  // Shift eye position, abs(speed) is half inter-occular distance.
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
+  eye_in = eye + eye_d;
+
+  // Note: no asymmetric frustum for Rift.
+  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
+#else
 #if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
 #else
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
 #endif
   eye_in = eye + eye_d;
-  dp = normalize(dir * (focus + 15.0) * abs(speed) - eye_d);
+  // Construct asymmetric frustum.
+  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
+#endif // ST_OCULUS
 #else  // ST_NONE
   eye_in = eye;
   dp = normalize(dir);
 #endif
+  return true;
+}
+
+float hash( float n ) {
+    return fract(sin(n)*5345.8621276);
+}
+
+float noise( in vec2 x ) {
+    vec2 p = floor(x);
+    vec2 f = fract(x);
+
+    f = f*f*(3.0-2.0*f);
+
+    float n = p.x + p.y*61.0;
+
+    float res = mix(mix( hash(n+  0.0), hash(n+  1.0),f.x),
+                    mix( hash(n+ 57.0), hash(n+ 58.0),f.x),f.y);
+
+    return fract(res);
 }
 
 void main() {
-  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  vec3 eye_in, dp; 
+
+  if (!setup_stereo(eye_in, dp)) {
+    gl_FragColor = vec4(0, 0, 0, 0);
+    gl_FragDepth = 0;
+	return;
+  }
+
+  float noise = noise(gl_FragCoord.xy / vec2(xres, yres));
 
   vec3 p = eye_in;
 
   float totalD = 0.0, D = d(p);
   float side = sign(D);
-  D = abs(D); 
+  D = noise * abs(D); 
   float MINDIST_MULT=1.0/(1.0+min_dist);
   D *= MINDIST_MULT;
 
@@ -285,7 +316,7 @@ while(i<int(REFITER) && cont){
 
 	p -= (totalD+D) * dp;
 //	D=2.*D1;
-	D = 10. * D1;
+	D = (9. + noise) * D1;
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
@@ -298,14 +329,14 @@ while(i<int(REFITER) && cont){
 	}
 
   // Glow is based on the number of steps.
-  col = mix(col, glowColor, steps/float(max_steps) * glow_strength);
+  col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
   finalcol+=refpart*col;
   refpart*=REFACTOR;
   i++;
 }
 
   float zNear = abs(speed);
-  float zFar = 65535.0 * speed;
+  float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
