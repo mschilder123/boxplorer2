@@ -385,6 +385,55 @@ vec3 c_mandelbox(vec3 pos) {
 }
 DECLARE_COLORING(c_mandelbox)
 
+// --- Refectoids DE, imported here so boxplorer.cc can haz DE; more fun to fly around with.
+// --- note in refectoids.cfg, add d d_PKlein to let .exe know which DE to use.
+// Compute the distance from `pos` to the PKlein basic shape.
+float d_PZshape(vec3 p) {
+   float rxy = sign(par[9].y)*(length(p.xy)-abs(par[9].y));
+
+ float TThickness = par[5].x;
+ float Zmult = par[8].y;
+ float Ziter = par[8].x;
+
+   for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
+
+// This creates the nice holes but also causes banding..
+//     return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+   return max(rxy,   (length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+}
+
+// Compute the distance from `pos` to the PKlein.
+float d_PKlein(vec3 p) {
+   //Just scale=1 Julia box
+	float r2=dot(p,p);
+	float DEfactor=1.;
+
+ float rDIST_MULTIPLIER = par[9].x;
+ vec3 CSize = vec3(par[1].y,par[1].x,par[2].y);
+ float Size = par[0].y;
+ vec3 C = vec3(par[2].x,par[3].y,par[3].x);
+ vec3 Offset = vec3(par[4].y,par[4].x,par[5].y);
+ float DEoffset = par[0].x;
+
+	for(int i=0;i<iters;i++){
+		//Box folding
+		p=clamp(p, -CSize, CSize) * 2.0 -p;
+		//Inversion
+		r2=dot(p,p);
+		float k=max(Size/r2,1.);
+		p*=k;DEfactor*=k;
+		//julia seed
+		p+=C;
+	}
+	//Call basic shape and scale its DE
+	//Ok... not perfect because the inversion transformation is tricky
+	//but works Ok with this shape (maybe because of the "tube" along Z-axis
+	//You may need to adjust DIST_MULTIPLIER (par[9].x) especialy with non zero Julia seed
+	return (rDIST_MULTIPLIER*d_PZshape(p-Offset)/abs(DEfactor)-DEoffset);
+}
+DECLARE_DE(d_PKlein)
+// -- end of Reflectoids DE
+
 const float normal_eps = 0.00001;
 
 // Compute the normal at `pos`.
@@ -537,7 +586,7 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
 }
 
 uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
-void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
+bool setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
 #if !defined(ST_NONE)
 #if defined ST_OCULUS
   float halfx = xres / 2.0;
@@ -557,7 +606,10 @@ void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
   vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
   float r2 = dot(p, p);  // Radius squared, from center.
   p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.15) discard;  // Don't waste time on pixels we can't see.
+  if (dot(p, p) > 0.10) { 
+    //discard;  // Don't waste time on pixels we can't see.
+    return false;
+  }
 
   // Shift eye position, abs(speed) is half inter-occular distance.
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
@@ -579,6 +631,7 @@ void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
   eye_in = eye;
   dp = normalize(dir);
 #endif
+  return true;
 }
 
 #if 0
@@ -644,10 +697,16 @@ float snoise(vec3 v) {
 #endif
 
 // ytalinflusa's noise [0..1>
-float pnoise(vec2 pt){ return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
+float pnoise(vec2 pt){ return fract(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547); }
 
 void main() {
-  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  vec3 eye_in, dp; 
+
+  if (!setup_stereo(eye_in, dp)) {
+    gl_FragColor = vec4(0, 0, 0, 0);
+    gl_FragDepth = 0;
+	return;
+  }
 
   float m_zoom = zoom * .5 / xres;  // screen error at dist 1.
   float noise = pnoise(gl_FragCoord.xy);

@@ -219,6 +219,7 @@ float length(const vec3& a) { return sqrt(dot(a, a)); }
 double length(const dvec3& a) { return sqrt(dot(a, a)); }
 float length(const vec2& a) { return sqrt(dot(a, a)); }
 float abs(float a) { return fabs(a); }
+float fract(float a) { return fabs(a - floor(a)); }
 double abs(double a) { return fabs(a); }
 vec3 abs(const vec3& a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
 float clamp(float v, float l, float h) { if (v < l) return l; if (v > h) return h; return v; }
