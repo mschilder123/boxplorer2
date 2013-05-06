@@ -688,8 +688,8 @@ class KeyFrame {
          break;
       }
    }
-  void mixSensorOrientation(socket_t sock) {
 #if defined(_WIN32)
+  void mixSensorOrientation(socket_t sock) {
     sockaddr_in SenderAddr;
     int SenderAddrSize = sizeof (SenderAddr);
 
@@ -713,8 +713,8 @@ class KeyFrame {
 		qmul(q1, this->q);
         quat2mat(q1, this->v);
 	}
-#endif
   }
+#endif
 } camera,  // Active camera view
   config;  // Global configuration set
 
@@ -1716,9 +1716,11 @@ int main(int argc, char **argv) {
       // When not rendering a sequence, now mix in orientation (and translation)
       // external sensors might have to add (e.g. Oculus orientation) into the view
       // we are about to render.
+#ifdef _WIN32
       if (stereoMode == ST_OCULUS) {
 	    camera.mixSensorOrientation(RecvSocket);
 	  }
+#endif
 	}
 
     if (!rendering && (de_func || de_func_64)) {
