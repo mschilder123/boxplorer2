@@ -276,8 +276,8 @@ void main() {
   vec3 eye_in, dp; 
 
   if (!setup_stereo(eye_in, dp)) {
-    gl_FragColor = vec4(0, 0, 0, 0);
-    gl_FragDepth = 0;
+    gl_FragColor = vec4(0.0);
+    gl_FragDepth = 0.0;
 	return;
   }
 
