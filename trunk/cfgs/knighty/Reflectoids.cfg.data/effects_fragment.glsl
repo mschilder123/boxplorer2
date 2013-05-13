@@ -1,10 +1,11 @@
 #extension GL_ARB_shader_texture_lod : enable
+//#extension GL_ARB_gpu_shader_fp64 : enable
 
 // FXAA shader, GLSL code adapted from:
 // http://horde3d.org/wiki/index.php5?title=Shading_Technique_-_FXAA
 // Whitepaper describing the technique:
 // http://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
-// alpha depth mipmap DoF added by marius.
+// alpha depth mipmap DoF added by marius
 
 uniform sampler2D my_texture;
 
@@ -16,17 +17,14 @@ uniform float speed;
 
 varying vec2 texture_coordinate;
 
-float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0);}
-
 // Fetch texel from mipmap, depth clue in alpha layer 0.
 vec4 texture2Dx(sampler2D text, vec2 coord) {
   float z = texture2D(text, coord).w;
   float z_near = abs(speed);
-  float z_far = 65535.0 * speed;
+  float z_far = 65535.0 * z_near;
   float dist = -z_far * z_near / (z * (z_far - z_near) - z_far);
-  float lod = abs(log(1.0 + dist / (abs(speed) * (30.0 + dof_scale))) - .5 + dof_offset);
-  //vec2 dv = vec2(((pnoise(gl_FragCoord.xy)-.5)*lod*lod)/xres, ((pnoise(gl_FragCoord.yx)-.5)*lod*lod)/yres);
-  //return vec4(texture2DLod(text, coord + dv, lod).xyz, lod);
+  float d = dist / (z_near * (30.0 + dof_scale));
+  float lod = abs(log(1.0 + float(d)) - .5 + dof_offset);
   return vec4(texture2DLod(text, coord, lod).xyz, lod);
 }
 
@@ -40,11 +38,12 @@ void main() {
   float FXAA_REDUCE_MUL = 1.0/8.0;
   float FXAA_REDUCE_MIN = (1.0/128.0);
 
+  float z = texture2D(my_texture, texture_coordinate.xy).w;  // save z
+  vec4 rgbM  = texture2Dx(my_texture, texture_coordinate.xy).xyzw;
   vec3 rgbNW = texture2Dx(my_texture, texture_coordinate.xy + (vec2(-1.0, -1.0) * texcoordOffset)).xyz;
   vec3 rgbNE = texture2Dx(my_texture, texture_coordinate.xy + (vec2(+1.0, -1.0) * texcoordOffset)).xyz;
   vec3 rgbSW = texture2Dx(my_texture, texture_coordinate.xy + (vec2(-1.0, +1.0) * texcoordOffset)).xyz;
   vec3 rgbSE = texture2Dx(my_texture, texture_coordinate.xy + (vec2(+1.0, +1.0) * texcoordOffset)).xyz;
-  vec4 rgbM  = texture2Dx(my_texture, texture_coordinate.xy).xyzw;
 	
   vec3 luma = vec3(0.299, 0.587, 0.114);
   float lumaNW = (dot(rgbNW, luma));
@@ -76,8 +75,9 @@ void main() {
   float lumaB = (dot(rgbB, luma));
 
   if((lumaB < lumaMin) || (lumaB > lumaMax)){
-    gl_FragColor.xyz=rgbA;
+    gl_FragColor=vec4(rgbA,z);
   } else {
-    gl_FragColor.xyz=rgbB;
+    gl_FragColor=vec4(rgbB,z);
   }
+  gl_FragDepth = z;
 }
