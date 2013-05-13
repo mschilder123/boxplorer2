@@ -86,20 +86,6 @@ mat3 rotationMatrix;
 #define rotationAngle par[4].x  // { min=-5 max=5 step=.01}
 #define rotationQuat par[3]  // that is par[3].xyz and par[4].x
 
-#if 0
-double lengthd(dvec3 v) {  // wtf? why needed?
-  return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-}
-
-double lengthd2(dvec3 v) {  // wtf? why needed?
-  return max(abs(v.x), max(abs(v.y), abs(v.z)));
-}
-
-dvec3 normalized(dvec3 v) {
-  return v / lengthd(v);
-}
-#endif
-
 void init() {
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
