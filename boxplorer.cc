@@ -496,7 +496,7 @@ class Camera : public KeyFrame {
 
 	   // Write common parameters.
 #define PROCESS(type, name, nameString, doSpline) \
-	   fprintf(f, #type " " nameString " %g\n", (double)name);
+	   fprintf(f, nameString " %g\n", (double)name);
        PROCESS_COMMON_PARAMS
 #undef PROCESS
 
@@ -504,7 +504,7 @@ class Camera : public KeyFrame {
        fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
        fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
        for (size_t i=0; i<ARRAYSIZE(par); i++) {
-         fprintf(f, "vec3 par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
+         fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
        }
        fclose(f);
        printf(__FUNCTION__ " : wrote '%s'\n", configFile);
