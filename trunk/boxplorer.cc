@@ -1753,8 +1753,6 @@ int main(int argc, char **argv) {
 
     glUseProgram(0);
 
-    glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
-
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -1763,12 +1761,13 @@ int main(int argc, char **argv) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       glEnable(GL_TEXTURE_2D);
-      glActiveTexture(GL_TEXTURE1);
+      glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture[frameno&0]);
+      glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
 
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
 
-      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 1);
+      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
       glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
                   camera.dof_scale);
       glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
