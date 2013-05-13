@@ -6,12 +6,13 @@ LDFLAGS=-framework SDL -framework OpenGL -framework Cocoa
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o
 
-boxplorer: boxplorer.o Makefile.osx $(TW_OBJS) interpolate.o
-	g++ boxplorer.o SDLmain.m $(TW_OBJS) interpolate.o \
+boxplorer: boxplorer.o Makefile.osx $(TW_OBJS) interpolate.o camera.o uniforms.o
+	g++ boxplorer.o SDLmain.m $(TW_OBJS) interpolate.o camera.o uniforms.o \
 		-o boxplorer $(LDFLAGS)
 
 boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.osx \
-             TGA.h
+             TGA.h cfgs/menger.cfg.data/fragment.glsl interpolate.h camera.h \
+	     uniforms.h
 	g++ -c $(CFLAGS) boxplorer.cc
 
 shadershrink: shadershrink.cc shadershrink.h Makefile.osx
@@ -20,11 +21,17 @@ shadershrink: shadershrink.cc shadershrink.h Makefile.osx
 edit-cfg: edit-cfg.cc Makefile.osx
 	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
 
-glsl: glsl.cc glsl.h TGA.h Makefile.osx cfgs/menger.cfg.data/fragment.glsl
+glsl: glsl.cc glsl.h TGA.h Makefile.osx
 	g++ $(CFLAGS) glsl.cc -o glsl
 
-interpolate.o: interpolate.c
-	g++ -c $(CFLAGS) $<
+camera.o: camera.cc camera.h
+	g++ -c $(CFLAGS) camera.cc
+
+interpolate.o: interpolate.cc interpolate.h
+	g++ -c $(CFLAGS) interpolate.cc
+
+uniforms.o: uniforms.cc uniforms.h
+	g++ -c $(CFLAGS) uniforms.cc
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CFLAGS) $<

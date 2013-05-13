@@ -18,7 +18,8 @@ namespace {
 		           string* name,
 		           string* attr) {
 	  istringstream is(line);
-	  is >> string();  // drop "uniform"
+	  string uniform;
+	  is >> uniform;  // drop "uniform"
 	  is >> *type;
 	  is >> *name;
 	  size_t semi = name->find(';');
@@ -103,6 +104,7 @@ private:
 	string attr_;
 };
 
+#if defined(GL_ARB_gpu_shader_fp64)
 class DoubleUniform : public iUniform {
  public:
 	 DoubleUniform(const string& line, KeyFrame* kf) : adr_(NULL) {
@@ -136,6 +138,7 @@ private:
 	string type_;
 	string attr_;
 };
+#endif
 
 class Vec3Uniform : public iUniform {
  public:
@@ -192,8 +195,10 @@ iUniformPtr link_uniform(const string& line, KeyFrame* kf) {
 		return iUniformPtr(new IntUniform(line, kf));
 	} else if (type.compare("float") == 0) {
 		return iUniformPtr(new FloatUniform(line, kf));
+#if defined(GL_ARB_gpu_shader_fp64)
 	} else if (type.compare("double") == 0) {
 		return iUniformPtr(new DoubleUniform(line, kf));
+#endif
 	} else if (type.compare("vec3") == 0) {
 		return iUniformPtr(new Vec3Uniform(line, kf));
 	}
