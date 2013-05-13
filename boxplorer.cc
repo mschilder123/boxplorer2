@@ -38,6 +38,12 @@
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
 
+#if defined(HYDRA)
+#include <sixense.h>
+#pragma comment(lib, "sixense.lib")
+#pragma comment(lib, "sixense_utils.lib")
+#endif
+
 #define MKDIR(a) mkdir(a)
 typedef SOCKET socket_t;
 
@@ -46,6 +52,11 @@ typedef SOCKET socket_t;
 #include <vector>
 #include <string>
 #include <map>
+#include <hash_map>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <utility>
 
 using namespace std;
 
@@ -63,16 +74,15 @@ using namespace std;
 #include "interpolate.h"
 #include "TGA.h"
 
+#include "uniforms.h"
+#include "camera.h"
+
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
 #define EFFECTS_VERTEX_SHADER_FILE   "effects_vertex.glsl"
 #define EFFECTS_FRAGMENT_SHADER_FILE "effects_fragment.glsl"
 
-#ifdef PI
-  #undef PI
-#endif
-#define PI          3.14159265358979324
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), exit(-1), 1 )
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(x) ( sizeof(x)/sizeof((x)[0]) )
@@ -235,17 +245,6 @@ SDL_Joystick *joystick;
 ////////////////////////////////////////////////////////////////
 // Helper functions
 
-// Compute the dot product of two vectors.
-double dot(const double x[3], const double y[3]) {
-  return x[0]*y[0] + x[1]*y[1] + x[2]*y[2];
-}
-
-// Normalize a vector. If it was zero, return 0.
-int normalize(double x[3]) {
-  double len = dot(x, x); if (len == 0) return 0;
-  len = 1/sqrt(len); x[0] *= len; x[1] *= len; x[2] *= len;
-  return 1;
-}
 
 // Allocate a char[] and read a text file into it. Return 0 on error.
 char* readFile(char const* name) {
@@ -320,135 +319,22 @@ float getFPS(void) {
   return fps;
 }
 
-
 ////////////////////////////////////////////////////////////////
 // Current logical state of the program.
 
-// Configuration parameters.
-// [type, variable name, config name, spline]
-#define PROCESS_CONFIG_PARAMS \
-  PROCESS(int, width, "width", false) \
-  PROCESS(int, height, "height", false) \
-  PROCESS(int, fullscreen, "fullscreen", false) \
-  PROCESS(int, multisamples, "multisamples", false) \
-  PROCESS(float, keyb_rot_speed, "keyb_rot_speed", false) \
-  PROCESS(float, mouse_rot_speed, "mouse_rot_speed", false) \
-  PROCESS(float, fov_x, "fov_x", true) \
-  PROCESS(float, fov_y, "fov_y", true) \
-  PROCESS(double, speed, "speed", true) \
-  PROCESS(float, min_dist, "min_dist", true) \
-  PROCESS(int, max_steps, "max_steps", true) \
-  PROCESS(int, iters, "iters", true) \
-  PROCESS(int, color_iters, "color_iters", true) \
-  PROCESS(int, loop, "loop", false) \
-  PROCESS(float, ao_eps, "ao_eps", true) \
-  PROCESS(float, ao_strength, "ao_strength", true) \
-  PROCESS(float, glow_strength, "glow_strength", true) \
-  PROCESS(float, dist_to_color, "dist_to_color", true) \
-  PROCESS(double, delta_time, "delta_time", false) \
-  PROCESS(double, time, "time", true) \
-  PROCESS(float, fps, "fps", false) \
-  PROCESS(int, depth_size, "depth_size", false) \
-  PROCESS(float, dof_scale, "dof_scale", true) \
-  PROCESS(float, dof_offset, "dof_offset", true) \
-  PROCESS(int, enable_dof, "enable_dof", false) \
-  PROCESS(int, no_spline, "no_spline", false) \
-  PROCESS(float, focus, "focus", true) \
-  PROCESS(int, nrays, "nrays", true)
-
-#define NUMPARS 20
-char* parName[NUMPARS][3];
+#include "params.h"
 
 int config_width;
 int config_height;
 
-class KeyFrame {
+class Camera : public KeyFrame {
+  private:
+	hash_map<string, iUniformPtr> uniforms;
+
   public:
-   double v[16];  // view matrix
-   double q[4];   // quarterion orientation
-   double x[4];   // r4 splineable q
-
-   // Declare fractal and other parameters.
-   #define PROCESS(a,b,c,d) a b;
-   PROCESS_CONFIG_PARAMS
-   #undef PROCESS
-
-   // Par[] parameter array.
-   float par[NUMPARS][3];  // min(|this|, |glsl|) gets sent to shader.
-
-   bool isKey_;  // Whether this frame is actually a defined KeyFrame.
-
-   KeyFrame() { memset(this, 0, sizeof *this); }
-
-   double distanceTo(const KeyFrame& other) const {
-      double delta[3] = { v[12]-other.v[12],
-                          v[13]-other.v[13],
-                          v[14]-other.v[14] };
-      return sqrt(dot(delta, delta));
-   }
-   double* right() { return &v[0]; }
-   double* up() { return &v[4]; }
-   double* ahead() { return &v[8]; }
-   double* pos() { return &v[12]; }
-
-   void setKey(bool key) { isKey_ = key; }
-   bool isKey() const { return isKey_; }
-
-   void orthogonalize() {
-      if (!normalize(ahead())) { ahead()[0]=ahead()[1]=0; ahead()[2]=1; }
-      if (!normalize(up())) {  // Error? Make upDirection.z = 0.
-         up()[2] = 0;
-         if (fabs(ahead()[2]) == 1) {
-            up()[0] = 0;
-            up()[1] = 1;
-         } else {
-            up()[0] = -ahead()[1];
-            up()[1] = ahead()[0];
-            normalize(up());
-         }
-      }
-      double l = dot(ahead(), up());
-      for (int i=0; i<3; i++) up()[i] -= l*ahead()[i];
-      // Compute rightDirection as a cross product of upDirection and direction.
-      for (int i=0; i<3; i++) {
-         int j = (i+1)%3, k = (i+2)%3;
-         right()[i] = up()[j]*ahead()[k] - up()[k]*ahead()[j];
-      }
-      right()[3] = 0; up()[3] = 0; ahead()[3] = 0; pos()[3] = 1;
-   }
-
-   // Move camera in a direction relative to the view direction.
-   // Behaves like `glTranslate`.
-   void move(double x, double y, double z) {
-      for (int i=0; i<3; i++) {
-         pos()[i] += right()[i]*x + up()[i]*y + ahead()[i]*z;
-      }
-   }
-
-   // Move camera in the normalized absolute direction `dir` by `len` units.
-   void moveAbsolute(double* dir, double len) {
-      for (int i=0; i<3; i++) {
-         pos()[i] += len * dir[i];
-      }
-   }
-
-   // Rotate the camera by `deg` degrees around a normalized axis.
-   // Behaves like `glRotate` without normalizing the axis.
-   void rotate(double deg, double x, double y, double z) {
-	 quat2mat(this->q, this->v);
-     double s = sin(deg*PI/180), c = cos(deg*PI/180), t = 1-c;
-     double r[3][3] = {
-      { x*x*t +   c, x*y*t + z*s, x*z*t - y*s },
-      { y*x*t - z*s, y*y*t +   c, y*z*t + x*s },
-      { z*x*t + y*s, z*y*t - x*s, z*z*t +   c }
-     };
-     for (int i=0; i<3; i++) {
-      double c[3];
-      for (int j=0; j<3; j++) c[j] = v[i+j*4];
-      for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
-     }
-     orthogonalize();
-	 mat2quat(this->v, this->q);
+   Camera& operator=(const KeyFrame& other) {
+	  *((KeyFrame*)this) = other;
+	  return *this;
    }
 
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
@@ -515,10 +401,11 @@ class KeyFrame {
         if (!strcmp(s, "direction")) { v=fscanf(f, " %lf %lf %lf", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
         if (!strcmp(s, "upDirection")) { v=fscanf(f, " %lf %lf %lf", &up()[0], &up()[1], &up()[2]); continue; }
 
-        #define PROCESS(type, name, nameString, doSpline) \
+		// Parse common parameters.
+#define PROCESS(type, name, nameString, doSpline) \
          if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
-        PROCESS_CONFIG_PARAMS
-        #undef PROCESS
+        PROCESS_COMMON_PARAMS
+#undef PROCESS
 
         for (i=0; i<ARRAYSIZE(par); i++) {
          char p[256];
@@ -537,6 +424,26 @@ class KeyFrame {
      }
      if (result) sanitizeParameters();
      return result;
+   }
+
+   bool parseUniforms(const string& glsl) {
+	   istringstream in(glsl);
+	   string line;
+	   while (getline(in, line)) {
+		   iUniformPtr uni = link_uniform(line, this);
+		   if (uni.ok()) {
+			   cout << "UNI: " << uni->toString() << endl;
+		       uniforms.insert(make_pair(uni->name(), uni));
+		   }
+	   }
+	   return true;
+   }
+
+   void register_vars(TwBar* bar) {
+	   for (hash_map<string, iUniformPtr>::iterator it =
+		   uniforms.begin(); it != uniforms.end(); ++it) {
+			   it->second->twVar(bar);
+	   }
    }
 
    // Make sure parameters are OK.
@@ -586,16 +493,18 @@ class KeyFrame {
      if ((f = fopen(configFile, "w")) != 0) {
        if (defines != NULL)
          fprintf(f, "%s", defines->c_str());
-       #define PROCESS(type, name, nameString, doSpline) \
-         fprintf(f, nameString " %g\n", (double)name);
-       PROCESS_CONFIG_PARAMS
-       #undef PROCESS
+
+	   // Write common parameters.
+#define PROCESS(type, name, nameString, doSpline) \
+	   fprintf(f, #type " " nameString " %g\n", (double)name);
+       PROCESS_COMMON_PARAMS
+#undef PROCESS
 
        fprintf(f, "position %12.12e %12.12e %12.12e\n", pos()[0], pos()[1], pos()[2]);
        fprintf(f, "direction %g %g %g\n", ahead()[0], ahead()[1], ahead()[2]);
        fprintf(f, "upDirection %g %g %g\n", up()[0], up()[1], up()[2]);
        for (size_t i=0; i<ARRAYSIZE(par); i++) {
-         fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
+         fprintf(f, "vec3 par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
        }
        fclose(f);
        printf(__FUNCTION__ " : wrote '%s'\n", configFile);
@@ -688,7 +597,18 @@ class KeyFrame {
          break;
       }
    }
-#if defined(_WIN32)
+
+#if defined(HYDRA)
+  void mixHydraOrientation(float* quat) {
+	  double q[4];
+	  q[0] = quat[0];
+	  q[1] = quat[1];
+	  q[2] = quat[2];
+	  q[3] = quat[3];
+	  qnormalize(q);
+	  qmul(q, this->q);
+	  quat2mat(q, this->v);
+  }
   void mixSensorOrientation(socket_t sock) {
     sockaddr_in SenderAddr;
     int SenderAddrSize = sizeof (SenderAddr);
@@ -715,8 +635,9 @@ class KeyFrame {
 	}
   }
 #endif
-} camera,  // Active camera view
-  config;  // Global configuration set
+
+} camera,  // Active camera view.
+  config;  // Global configuration set.
 
 vector<KeyFrame> keyframes;  // Keyframes
 
@@ -848,11 +769,12 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
                p0->par[j][2], p1->par[j][2], p2->par[j][2], p3->par[j][2]);
       }
 
-      // Spline all other params. Some are non-sensical.
-      #define PROCESS(a,b,c,doSpline) \
-        if (doSpline) SPLINE(tmp.b, p0->b, p1->b, p2->b, p3->b);
-      PROCESS_CONFIG_PARAMS
-      #undef PROCESS
+      // Spline common params, if marked as such.
+#define PROCESS(a,b,c,doSpline) \
+	    if (doSpline) { SPLINE(tmp.b, p0->b, p1->b, p2->b, p3->b); }
+      PROCESS_COMMON_PARAMS
+#undef PROCESS
+
       #undef SPLINE
 
       //tmp.orthogonalize();  // this should be no-op given matrix came from quat?
@@ -898,8 +820,8 @@ char* printController(char* s, Controller c) {
     default: {
       char x[8],y[8]; sprintf(x, "par%dx", c); sprintf(y, "par%dy", c);
       sprintf(s, "%s %.3f %s %.3f",
-        parName[c][1] ? parName[c][1] : y, camera.par[c][1],
-        parName[c][0] ? parName[c][0] : x, camera.par[c][0]
+        y, camera.par[c][1],
+        x, camera.par[c][0]
       );
     } break;
     case CTL_FOV: sprintf(s, "Fov %.3g %.3g", camera.fov_x, camera.fov_y); break;
@@ -1079,6 +1001,30 @@ int setupShaders(void) {
 
   glGetProgramInfoLog(p, sizeof(log), &logLength, log);
   if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+
+  {
+	// Dump active uniforms
+	GLint nUniforms = 0, maxLen = 0;
+	glGetProgramiv(p, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLen);
+	glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nUniforms);
+
+	GLchar* name = (GLchar*)malloc(maxLen);
+
+	GLint size, location;
+	GLsizei written;
+	GLenum type;
+
+	printf(" Location | Type | Name\n");
+	printf("------------------------------------------------\n");
+	for( int i = 0; i < nUniforms; ++i ) {
+		glGetActiveUniform( p, i, maxLen, &written,
+						  &size, &type, name );
+		location = glGetUniformLocation(p, name);
+		printf(" %-8d | %-6x %s\n", location, type, name);
+	}
+
+	free(name);
+  }
 
   if (vs != default_vs) free((char*)vs);
   if (fs != default_fs) free((char*)fs);
@@ -1448,9 +1394,14 @@ void initTwBar() {
 	TwDefine("GLOBAL fontsize=3");
   }
 
-  #define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
-  PROCESS_CONFIG_PARAMS
-  #undef PROCESS
+#if 0
+  // Add TW UI for common parameters.
+#define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
+  PROCESS_COMMON_PARAMS
+#undef PROCESS
+#else
+  camera.register_vars(bar);
+#endif
 
   initTwParDefines();
 }
@@ -1459,7 +1410,7 @@ void LoadKeyFrames(bool fixedFov) {
   char filename[256];
   for (int i = 0; ; ++i) {
     sprintf(filename, "%s-%u.cfg", kKEYFRAME, i);
-    KeyFrame tmp;
+    Camera tmp;
     if (!tmp.loadConfig(filename)) break;
     if (fixedFov) {
       tmp.width = config.width;
@@ -1471,14 +1422,6 @@ void LoadKeyFrames(bool fixedFov) {
   }
   printf(__FUNCTION__ " : loaded %lu keyframes\n",
       (unsigned long)keyframes.size());
-}
-
-void SaveKeyFrames() {
-  char filename[256];
-  for (size_t i = 0; i < keyframes.size(); ++i) {
-    sprintf(filename, "%s-%lu.cfg", kKEYFRAME, (unsigned long)i);
-    keyframes[i].saveConfig(filename);
-  }
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1534,6 +1477,8 @@ int main(int argc, char **argv) {
 
   const char* configFile = (argc>=2 ? argv[1] : DEFAULT_CONFIG_FILE);
 
+  char* configData = readFile(configFile);
+ 
   // Load configuration.
   if (config.loadConfig(configFile, &defines)) {
     changeWorkingDirectory(configFile);
@@ -1559,7 +1504,8 @@ int main(int argc, char **argv) {
     die("Usage: boxplorer <configuration-file.cfg>\n");
   }
 
-#if defined(_WIN32)
+#if defined(HYDRA)
+  // Listen on UDP:1337 for quat sent from Oculus SensorBox
   WSADATA wsaData;
   WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -1574,6 +1520,25 @@ int main(int argc, char **argv) {
     RecvAddr.sin_port = htons(1337);
     RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     bind(RecvSocket, (SOCKADDR *) & RecvAddr, sizeof (RecvAddr));
+  }
+
+  if (sixenseInit() != SIXENSE_SUCCESS) {
+	  die("sixenseInit() fail!");
+  }
+
+  sixenseSetFilterEnabled(1);
+  if (sixenseSetFilterParams(0.0, 0.0, 1000.0, 1.0) != SIXENSE_SUCCESS) {
+	  die("SetFilterParams() fail!");
+  }
+
+  if (sixenseSetActiveBase(0) != SIXENSE_SUCCESS) {
+	  die("sixenseSetActiveBase() fail!");
+  }
+
+  sixenseAllControllerData ssdata;
+
+  if (sixenseIsControllerEnabled(0) != SIXENSE_SUCCESS) {
+	  die("controller(0) not enabled!");
   }
 #endif
 
@@ -1593,8 +1558,8 @@ int main(int argc, char **argv) {
   int savedWidth = config.width;
   int savedHeight = config.height;
 
-  bool keyframesChanged = false;
   LoadKeyFrames(fixedFov);
+
   LoadBackground();
 
   // Initialize SDL and OpenGL graphics.
@@ -1613,6 +1578,7 @@ int main(int argc, char **argv) {
 
    // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics();
+  camera.parseUniforms(glsl_source);
   initTwBar();
   initFPS(FPS_FRAMES_TO_AVERAGE);
 
@@ -1640,7 +1606,7 @@ int main(int argc, char **argv) {
   bool dragging = false;
 
   if (rendering) {
-    // Rendering a sequence to disk. Spline the keyframes.
+    // Rendering a sequence to disk. Spline the keyframes now.
     CatmullRom(keyframes, &splines, config.loop);
   }
 
@@ -1712,16 +1678,17 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
+#if defined(HYDRA)
 	if (!rendering) {
       // When not rendering a sequence, now mix in orientation (and translation)
       // external sensors might have to add (e.g. Oculus orientation) into the view
       // we are about to render.
-#ifdef _WIN32
       if (stereoMode == ST_OCULUS) {
 	    camera.mixSensorOrientation(RecvSocket);
 	  }
-#endif
+	  //camera.mixHydraOrientation(ssdata.controllers[0].rot_quat);
 	}
+#endif
 
     if (!rendering && (de_func || de_func_64)) {
       // Get a distance estimate, for navigation and eye separation.
@@ -2043,7 +2010,7 @@ int main(int argc, char **argv) {
          } else done |= 1;
       } break;
 
-      // Switch fullscreen mode (loses the whole OpenGL context in Windows).
+      // Switch fullscreen mode (drops the whole OpenGL context in Windows).
       case SDLK_RETURN: case SDLK_KP_ENTER: {
         config.fullscreen ^= 1; grabbedInput = 1;
         if (config.fullscreen) {
@@ -2356,19 +2323,35 @@ int main(int argc, char **argv) {
       if (keystate[SDLK_UP])    { ctlYChanged = 1; updateControllerY(ctl,  ++consecutiveChanges, hasAlt); }
     }
 
+#if defined(HYDRA)
+	// Sixense Hydra
+    if (sixenseGetAllNewestData(&ssdata) != SIXENSE_SUCCESS) {
+	  die("sixenseGetAllNewestData() fail!");
+    }
+//	printf("%f %f %f %f\n", ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
+
+	camera.move(0, 0, camera.speed *   ssdata.controllers[0].joystick_y);
+	m_rotateX2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_x);
+	m_rotateY2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_y);
+	m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
+
+//	printf("%08x, %f\n", ssdata.controllers[0].buttons, ssdata.controllers[0].trigger);
+//	printf("%f %f %f\n", ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
+#endif
+
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
   }
 
   TwTerminate();
 
-  if (!rendering && keyframesChanged) {
-    // TODO: ask whether to save keyframes
-  }
+  camera.width = savedWidth; camera.height = savedHeight;
   camera.saveConfig("last.cfg", &defines);  // Save a config file on exit, just in case.
 
-#if defined(_WIN32)
+#if defined(HYDRA)
   closesocket(RecvSocket);
   WSACleanup();
+
+  sixenseExit();
 #endif
 
   return 0;

@@ -1,28 +1,37 @@
 all: boxplorer.exe shadershrink.exe edit-cfg.exe glsl.exe
 
-CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
-LDFLAGS=/link /LIBPATH:SDL /SUBSYSTEM:console /nologo
+CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
+LDFLAGS=/link /LIBPATH:SDL /LIBPATH:sixense /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj TwEventWin.obj \
 	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj
 
-boxplorer.exe: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 $(TW_OBJS) \
-               cfgs\menger.cfg.data\fragment.glsl glsl.h interpolate.obj
-	cl -c $(CFLAGS) boxplorer.cc
-	link $(LDFLAGS) boxplorer.obj  $(TW_OBJS) interpolate.obj
+boxplorer.exe: boxplorer.obj Makefile.win32 $(TW_OBJS) \
+               interpolate.obj uniforms.obj camera.obj
+	link $(LDFLAGS) boxplorer.obj $(TW_OBJS) interpolate.obj uniforms.obj camera.obj
 
 shadershrink.exe: shadershrink.cc Makefile.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
 
-glsl.exe: glsl.cc TGA.h glsl.h Makefile.win32 cfgs\menger.cfg.data\fragment.glsl
+glsl.exe: glsl.cc TGA.h glsl.h Makefile.win32
         cl $(CFLAGS) glsl.cc $(LDFLAGS)
 
 edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
-interpolate.obj: interpolate.c
-	cl -c $(CFLAGS) $**
+boxplorer.obj: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 \
+        glsl.h interpolate.h uniforms.h camera.h cfgs\menger.cfg.data\fragment.glsl 
+	cl -c $(CFLAGS) boxplorer.cc
+
+interpolate.obj: interpolate.cc interpolate.h
+	cl -c $(CFLAGS) interpolate.cc
+
+uniforms.obj: uniforms.cc uniforms.h
+	cl -c $(CFLAGS) uniforms.cc
+
+camera.obj: camera.cc camera.h
+	cl -c $(CFLAGS) camera.cc
 
 TwBar.obj: AntTweakBar\src\TwBar.cpp
 	cl -c $(CFLAGS) $**
