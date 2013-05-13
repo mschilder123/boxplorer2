@@ -32,20 +32,22 @@
 #endif
 
 // Camera position and direction.
-varying vec3 eye, dir;
+varying vec3 eye;
+varying vec3 dir;
 varying float zoom;
-uniform float xres, yres;
+
+uniform float xres;
+uniform float yres;
 uniform float time;
 
 // Interactive parameters.
 uniform vec3 par[20];
 
-uniform float
-  min_dist,           // Distance at which raymarching stops.
-  ao_eps,             // Base distance at which ambient occlusion is estimated.
-  ao_strength,        // Strength of ambient occlusion.
-  glow_strength,      // How much glow is applied after max_steps.
-  dist_to_color;      // How is background mixed with the surface color after max_steps.
+uniform float min_dist;           // Distance at which raymarching stops.
+uniform float ao_eps;             // Base distance at which ambient occlusion is estimated.
+uniform float ao_strength;        // Strength of ambient occlusion.
+uniform float glow_strength;      // How much glow is applied after max_steps.
+uniform float dist_to_color;      // How is background mixed with the surface color after max_steps.
 
 uniform float speed;  // eye separation really.
 
@@ -397,9 +399,10 @@ float d_PZshape(vec3 p) {
 
    for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
 
-// This creates the nice holes but also causes banding..
-//     return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
-   return max(rxy,   (length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+// This abs() creates the nice holes but also causes banding.
+// For movement-only DE, holes are just what we want ;-)
+     return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+ //  return max(rxy,   -(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
 }
 
 // Compute the distance from `pos` to the PKlein.
@@ -574,7 +577,7 @@ vec4 lightBulb(vec3 x2, vec3 dp, float totalD) {
     clamp(3.0*delta, 0.0, 0.99 /*1.0 causes artifacts.. dunno why*/));
 }
 
-// Get base color at p, plus Blinn_phing and ambient occulusion.
+// Get base color at p, plus Blinn_Phong and ambient occulusion.
 vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, float m_zoom) {
   vec3 col = c(p);
   col = blinn_phong(n, -dp, normalize(vec3(1.0,.6,0.7)+dp), col,

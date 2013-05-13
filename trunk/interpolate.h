@@ -1,6 +1,16 @@
-#ifdef __cplusplus
-extern "C" {
+#ifndef _F_INTERPOLATE_H_
+#define _F_INTERPOLATE_H_
+
+#ifdef PI
+  #undef PI
 #endif
+#define PI          3.14159265358979324
+
+// Compute the dot product of two vectors.
+double dot(const double x[3], const double y[3]);
+
+// Normalize a vector. If it was zero, return false.
+bool normalize(double x[3]);
 
 // SLERP 2 OpenGL matrices
 void mslerp(const double *m1,const double *m2,double *mr,double t);
@@ -23,6 +33,4 @@ void qnormalize(double* q);
 // q1 *= q2
 void qmul(double* q1, const double* q2);
 
-#ifdef __cplusplus
-}
 #endif

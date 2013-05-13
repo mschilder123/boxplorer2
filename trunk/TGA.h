@@ -1,6 +1,4 @@
-/*
- * Simple TGA handler. Only knows about 24bpp.
- */
+// Simple TGA handler. Only knows about 24bpp.
 
 #ifndef _F_INCLUDE_TGA_H__
 #define _F_INCLUDE_TGA_H__

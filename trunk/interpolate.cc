@@ -3,6 +3,18 @@
 #include <math.h>
 #include "interpolate.h"
 
+// Compute the dot product of two vectors.
+double dot(const double x[3], const double y[3]) {
+  return x[0]*y[0] + x[1]*y[1] + x[2]*y[2];
+}
+
+// Normalize a vector. If it was zero, return false.
+bool normalize(double x[3]) {
+  double len = dot(x, x); if (len == 0) return false;
+  len = 1/sqrt(len); x[0] *= len; x[1] *= len; x[2] *= len;
+  return true;
+}
+
 void mslerp(const double *m1,const double *m2,double *mr,double t) {
 	double q1[4],q2[4],qr[4];
 	mat2quat(m1,q1);
