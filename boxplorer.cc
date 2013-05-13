@@ -52,7 +52,21 @@ typedef SOCKET socket_t;
 #include <vector>
 #include <string>
 #include <map>
-#include <hash_map>
+#if defined(__GNUC__) || defined(__APPLE__)
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+namespace __gnu_cxx {
+        template<> struct hash< std::string >
+        {
+                size_t operator()( const std::string& x ) const
+                {
+                        return hash< const char* >()( x.c_str() );
+                }
+        };
+}
+#else
+#includ <hash_map>
+#endif
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -329,7 +343,11 @@ int config_height;
 
 class Camera : public KeyFrame {
   private:
+#if defined(__GNUC__) || defined(__APPLE__)
+	hash_map<string, iUniformPtr, hash<string> > uniforms;
+#else
 	hash_map<string, iUniformPtr> uniforms;
+#endif
 
   public:
    Camera& operator=(const KeyFrame& other) {

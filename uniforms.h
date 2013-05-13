@@ -21,23 +21,25 @@ class iUniform {
 // Can be used safely in hash_map<>
 class iUniformPtr {
  public:
-	 iUniformPtr() : ptr_(NULL) {}
-	 explicit iUniformPtr(iUniform* ptr) : ptr_(ptr) {}
-	 // Copy constructor needs to Clone() ptr_.
-	 iUniformPtr(const iUniformPtr& other) : ptr_(NULL) {
-		if (other.ptr_) ptr_ = other.ptr_->Clone();
-	 }
-	 // Assignment operator also needs to Clone() ptr_.
-	 iUniformPtr& operator=(const iUniformPtr& other) {
-		 if (ptr_) { delete ptr_; ptr_ = NULL; }
-		 if (other.ptr_) ptr_ = other.ptr_->Clone();
-		 return *this;
-	 }
-	 iUniform* operator->(void) { return ptr_; }
-	 ~iUniformPtr() { delete ptr_; }
-	 bool ok() { return ptr_ != NULL && ptr_->ok(); }
+  iUniformPtr() : ptr_(NULL) {}
+  explicit iUniformPtr(iUniform* ptr) : ptr_(ptr) {}
+  // Copy constructor needs to Clone() ptr_.
+  iUniformPtr(const iUniformPtr& other) : ptr_(NULL) {
+    if (other.ptr_) ptr_ = other.ptr_->Clone();
+  }
+  // Assignment operator also needs to Clone() ptr_.
+  iUniformPtr& operator=(const iUniformPtr& other) {
+    if (ptr_) { delete ptr_; ptr_ = NULL; }
+    if (other.ptr_) ptr_ = other.ptr_->Clone();
+    return *this;
+  }
+  iUniform* operator->(void) { return ptr_; }
+  ~iUniformPtr() { delete ptr_; }
+  bool ok() { return ptr_ != NULL && ptr_->ok(); }
  private:
-	 iUniform* ptr_;
+  bool operator==(const iUniformPtr& other);
+  bool operator<(const iUniformPtr& other);
+  iUniform* ptr_;
 };
 
 // Map a uniform var to local storage backed by kf.
