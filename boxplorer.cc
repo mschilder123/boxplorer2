@@ -65,7 +65,7 @@ namespace __gnu_cxx {
         };
 }
 #else
-#includ <hash_map>
+#include <hash_map>
 #endif
 #include <iostream>
 #include <fstream>
