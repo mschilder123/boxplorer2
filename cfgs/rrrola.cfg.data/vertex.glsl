@@ -18,14 +18,20 @@ float fov2scale(float fov) { return tan(radians(fov/2.0)); }
 // Get camera position and interpolated directions from the modelview matrix.
 void main() {
   gl_Position = gl_Vertex;
-
-  zoom = min(x_scale*fov2scale(fov_x), y_scale*fov2scale(fov_y));  // dps at dist 1
-
   eye = vec3(gl_ModelViewMatrix[3]);
+  zoom = fov2scale(fov_x);  // min delta ray at dist 1
+
+#if defined(ST_OCULUS)
+  // For the Rift, do not interpolate dir from the vertexes.
+  // Instead we'll compute ray deviation from straight ahead in fragment shader,
+  // so we can pre-distort for the Rift as we ray-march.
+  dir = vec3(gl_ModelViewMatrix * vec4(0, 0, 1, 0));
+#else
   dir = vec3(gl_ModelViewMatrix *
     vec4(
       fov2scale(fov_x)*(x_scale*gl_Vertex.x + x_offset),
       fov2scale(fov_y)*(y_scale*gl_Vertex.y + y_offset),
       1,
       0));
+#endif
 }
