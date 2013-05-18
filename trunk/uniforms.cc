@@ -7,7 +7,7 @@
 #include <AntTweakBar.h>
 #include "camera.h"
 
-#define GL_NO_DECLARE
+#define GL_DECLARE_ONLY
 #include "shader_procs.h"
 
 using namespace std;

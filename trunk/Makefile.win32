@@ -7,9 +7,10 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj TwEventWin.obj \
 	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj
 
-boxplorer.exe: boxplorer.obj Makefile.win32 $(TW_OBJS) \
-               interpolate.obj uniforms.obj camera.obj
-	link $(LDFLAGS) boxplorer.obj $(TW_OBJS) interpolate.obj uniforms.obj camera.obj
+BX_OBJS=boxplorer.obj interpolate.obj uniforms.obj camera.obj shader.obj
+
+boxplorer.exe: $(BX_OBJS) $(TW_OBJS)
+	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
 
 shadershrink.exe: shadershrink.cc Makefile.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
@@ -21,11 +22,14 @@ edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
 boxplorer.obj: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 \
-        glsl.h interpolate.h uniforms.h camera.h cfgs\menger.cfg.data\fragment.glsl 
+        glsl.h interpolate.h uniforms.h camera.h shader.h cfgs\menger.cfg.data\fragment.glsl 
 	cl -c $(CFLAGS) boxplorer.cc
 
 interpolate.obj: interpolate.cc interpolate.h
 	cl -c $(CFLAGS) interpolate.cc
+
+shader.obj: shader.cc shader.h
+	cl -c $(CFLAGS) shader.cc
 
 uniforms.obj: uniforms.cc uniforms.h
 	cl -c $(CFLAGS) uniforms.cc

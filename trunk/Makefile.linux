@@ -7,8 +7,10 @@ LDFLAGS=-lm -lGL -lSDL -lX11
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o
 
-boxplorer: boxplorer.o Makefile.linux $(TW_OBJS) interpolate.o uniforms.o camera.o
-	g++ boxplorer.o $(TW_OBJS) interpolate.o uniforms.o camera.o -o boxplorer $(LDFLAGS)
+BX_OBJS=boxplorer.o interpolate.o uniforms.o camera.o shader.o
+
+boxplorer: $(BX_OBJS) $(TW_OBJS)
+	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer $(LDFLAGS)
 
 boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h TGA.h \
 	camera.h interpolate.h uniforms.h Makefile.linux \
@@ -26,6 +28,9 @@ glsl: glsl.cc TGA.h glsl.h Makefile.linux cfgs/menger.cfg.data/fragment.glsl
 
 interpolate.o: interpolate.cc interpolate.h
 	g++ -c $(CFLAGS) interpolate.cc
+
+shader.o: shader.cc shader.h
+	g++ -c $(CFLAGS) shader.cc
 
 camera.o: camera.cc camera.h
 	g++ -c $(CFLAGS) camera.cc
