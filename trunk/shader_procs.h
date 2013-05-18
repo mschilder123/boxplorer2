@@ -19,6 +19,7 @@ bool enableShaderProcs(void);
 #error "Unknown target"
 #endif
 
+#if !(defined __APPLE__)
 #include "GL/glext.h"
 
 #if defined(GL_DECLARE_ONLY)
@@ -72,6 +73,8 @@ DECLARE_GL_PROC(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 #endif
 
 #undef DECLARE_GL_PROC
+
+#endif  //!__APPLE__
 
 #ifndef GL_DECLARE_ONLY
 bool enableShaderProcs(void) {

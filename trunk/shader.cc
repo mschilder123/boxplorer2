@@ -9,7 +9,7 @@ void Shader::clear() {
   if (glIsProgram(program_)) {
     GLuint shaders[2];
     GLsizei count = 2;   
-	glGetAttachedShaders(program_, count, &count, shaders);
+    glGetAttachedShaders(program_, count, &count, shaders);
     for (GLsizei i = 0; i < count; ++i) {
       glDetachShader(program_, shaders[i]);
       glDeleteShader(shaders[i]);
@@ -22,8 +22,8 @@ void Shader::clear() {
 }
 
 bool Shader::compile(const string& defines,
-	                 const string& vertex_shader,
-					 const string& fragment_shader) {
+                     const string& vertex_shader,
+                     const string& fragment_shader) {
   clear();
 
   GLuint p = glCreateProgram();
@@ -39,7 +39,10 @@ bool Shader::compile(const string& defines,
   int logLength;
 
   glGetShaderInfoLog(v, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+  if (logLength) {
+    log_.append("--vertex:\n");
+    log_.append(log);
+  }
 
   GLuint f = glCreateShader(GL_FRAGMENT_SHADER);
   {
@@ -49,37 +52,43 @@ bool Shader::compile(const string& defines,
   }
 
   glGetShaderInfoLog(f, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+  if (logLength) {
+    log_.append("--fragment:\n");
+    log_.append(log);
+  }
 
   glAttachShader(p, v);
   glAttachShader(p, f);
   glLinkProgram(p);
 
   glGetProgramInfoLog(p, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
+  if (logLength) {
+    log_.append("--link:\n");
+    log_.append(log);
+  }
 
   {
-	// Dump active uniforms
-	GLint nUniforms = 0, maxLen = 0;
-	glGetProgramiv(p, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLen);
-	glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nUniforms);
+  // Dump active uniforms
+  GLint nUniforms = 0, maxLen = 0;
+  glGetProgramiv(p, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLen);
+  glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nUniforms);
 
-	GLchar* name = (GLchar*)malloc(maxLen);
+  GLchar* name = (GLchar*)malloc(maxLen);
 
-	GLint size, location;
-	GLsizei written;
-	GLenum type;
+  GLint size, location;
+  GLsizei written;
+  GLenum type;
 
-	printf(" Location | Type | Name\n");
-	printf("------------------------------------------------\n");
-	for( int i = 0; i < nUniforms; ++i ) {
-		glGetActiveUniform(p, i, maxLen, &written,
-						   &size, &type, name );
-		location = glGetUniformLocation(p, name);
-		printf(" %-8d | %-6x %s\n", location, type, name);
-	}
+  printf(" Location | Type | Name\n");
+  printf("------------------------------------------------\n");
+  for( int i = 0; i < nUniforms; ++i ) {
+    glGetActiveUniform(p, i, maxLen, &written,
+               &size, &type, name );
+    location = glGetUniformLocation(p, name);
+    printf(" %-8d | %-6x %s\n", location, type, name);
+  }
 
-	free(name);
+  free(name);
   }
 
   program_ = p;

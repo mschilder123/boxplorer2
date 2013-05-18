@@ -70,7 +70,7 @@ void init() {
 
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
   
   float s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
   for (int i=0; i<iters; i++) s*= ds;

@@ -1105,7 +1105,7 @@ void initGraphics() {
       die("This program needs support for GLSL shaders.\n");
 
   (setupShaders()) ||
-      die("Error in GLSL fractal shader compilation (see stderr.txt for details).\n");
+      die("Error in GLSL fractal shader compilation:\n%s\n", fractal.log().c_str());
 
   if (background.data() != NULL) {
     // Load background image into texture
@@ -1133,7 +1133,7 @@ void initGraphics() {
     // Compile DoF shader, setup FBO as render target.
 
     (setupShaders2()) ||
-        die("Error in GLSL effects shader compilation (see stderr.txt for details).\n");
+        die("Error in GLSL effects shader compilation:\n%s\n", effects.log().c_str());
 
     // Create depth buffer(s)
     glDeleteRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);  // free existing
