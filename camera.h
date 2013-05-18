@@ -57,7 +57,7 @@ class KeyFrame {
     }
   }
 
-  // Map a uniform name to a float array of size n.
+  // Map a uniform name to a address within this.
   // Returns NULL on fail.
   void* map_address(const std::string& type, const std::string& name, int n);
 };

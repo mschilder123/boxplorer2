@@ -52,6 +52,7 @@ typedef SOCKET socket_t;
 #include <vector>
 #include <string>
 #include <map>
+
 #if defined(__GNUC__) || defined(__APPLE__)
 #include <ext/hash_map>
 using namespace __gnu_cxx;
@@ -67,6 +68,7 @@ namespace __gnu_cxx {
 #else
 #include <hash_map>
 #endif
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -85,11 +87,12 @@ using namespace std;
 #include "shader_procs.h"
 #include "default_shaders.h"
 
-#include "interpolate.h"
 #include "TGA.h"
 
+#include "interpolate.h"
 #include "uniforms.h"
 #include "camera.h"
+#include "shader.h"
 
 #define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
 #define VERTEX_SHADER_FILE   "vertex.glsl"
@@ -220,8 +223,6 @@ static SDL_Cursor *init_system_cursor(const char *image[]) {
 SDL_Cursor* arrow_cursor;
 SDL_Cursor* hand_cursor;
 
-// The shader program handle.
-int program;
 // Our SDL handle.
 SDL_Surface* screen;
 // Optional #defines for glsl compilation from .cfg file.
@@ -244,8 +245,8 @@ GLuint texture[1];
 // depth buffer attached to fbo
 GLuint depthBuffer[1];
 
-// the dof/fxaa mipmapper effects program
-int dof_program;
+Shader fractal;
+Shader effects;
 
 // texture holding background image
 GLuint background_texture;
@@ -279,6 +280,14 @@ char* readFile(char const* name) {
 
   readFileError2: fclose(f);
   readFileError1: return s;
+}
+
+bool readFile(const char*name, string* content) {
+	char* s = readFile(name);
+	if (!s) return false;
+	content->assign(s);
+	free(s);
+	return true;
 }
 
 
@@ -539,6 +548,8 @@ class Camera : public KeyFrame {
        glUniform3fv(glGetUniformLocation(program, #name), ARRAYSIZE(name), (float*)name);
      #define glSetUniformi(name) \
        glUniform1i(glGetUniformLocation(program, #name), name);
+
+	 GLuint program = fractal.program();
 
      glSetUniformf(fov_x); glSetUniformf(fov_y);
      glSetUniformi(max_steps); glSetUniformf(min_dist);
@@ -968,153 +979,29 @@ string glsl_source;
 
 // Compile and activate shader programs. Return the program handle.
 int setupShaders(void) {
-  char const* vs;
-  char const* fs;
-  GLuint v,f,p;
-  char log[2048]; int logLength;
+	string vertex(default_vs);
+	string fragment(default_fs);
 
-  (vs = readFile(VERTEX_SHADER_FILE)) || ( vs = default_vs );
-  (fs = readFile(FRAGMENT_SHADER_FILE)) || ( fs = default_fs );
+	readFile(VERTEX_SHADER_FILE, &vertex);
+	readFile(FRAGMENT_SHADER_FILE, &fragment);
 
-  if (fs != default_fs) {
-     printf(__FUNCTION__ " : read shader from %s\n", FRAGMENT_SHADER_FILE);
-  } else {
-     printf(__FUNCTION__ " : using default shader\n");
-  }
-  if (vs != default_vs) {
-     printf(__FUNCTION__ " : read vertex shader from %s\n", VERTEX_SHADER_FILE);
-  } else {
-     printf(__FUNCTION__ " : using default vertex shader\n");
-  }
+	glsl_source.assign(defines + fragment);
 
-  glsl_source.assign(defines + fs);
-
-  p = glCreateProgram();
-
-  v = glCreateShader(GL_VERTEX_SHADER);
-  if (!defines.empty()) {
-    const char* srcs[2] = {defines.c_str(), vs};
-    glShaderSource(v, 2, srcs, 0);
-  } else {
-    glShaderSource(v, 1, &vs, 0);
-  }
-  glCompileShader(v);
-  glGetShaderInfoLog(v, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
-
-  f = glCreateShader(GL_FRAGMENT_SHADER);
-  if (!defines.empty()) {
-    const char* srcs[2] = {defines.c_str(), fs};
-    glShaderSource(f, 2, srcs, 0);
-  } else {
-    glShaderSource(f, 1, &fs, 0);
-  }
-  glCompileShader(f);
-  glGetShaderInfoLog(f, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
-
-  glAttachShader(p, v);
-  glAttachShader(p, f);
-  glLinkProgram(p);
-
-  glGetProgramInfoLog(p, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
-
-  {
-	// Dump active uniforms
-	GLint nUniforms = 0, maxLen = 0;
-	glGetProgramiv(p, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLen);
-	glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nUniforms);
-
-	GLchar* name = (GLchar*)malloc(maxLen);
-
-	GLint size, location;
-	GLsizei written;
-	GLenum type;
-
-	printf(" Location | Type | Name\n");
-	printf("------------------------------------------------\n");
-	for( int i = 0; i < nUniforms; ++i ) {
-		glGetActiveUniform( p, i, maxLen, &written,
-						  &size, &type, name );
-		location = glGetUniformLocation(p, name);
-		printf(" %-8d | %-6x %s\n", location, type, name);
-	}
-
-	free(name);
-  }
-
-  if (vs != default_vs) free((char*)vs);
-  if (fs != default_fs) free((char*)fs);
-
-  GLint status;
-  glGetProgramiv(p, GL_LINK_STATUS, &status);
-  if (status != GL_TRUE) die("setupShaders() fails\n");
-
-  return p>0?p:0;
+	return fractal.compile(defines, vertex, fragment);
 }
 
 // Compile and activate shader programs for frame buffer manipulation.
 // Return the program handle.
 int setupShaders2(void) {
-  char const* vs;
-  char const* fs;
-  GLuint v,f,p;
-  char log[2048]; int logLength;
+	string vertex(effects_default_vs);
+	string fragment(effects_default_fs);
 
-  (vs = readFile(EFFECTS_VERTEX_SHADER_FILE)) || ( vs = effects_default_vs );
-  (fs = readFile(EFFECTS_FRAGMENT_SHADER_FILE)) || ( fs = effects_default_fs );
+	readFile(EFFECTS_VERTEX_SHADER_FILE, &vertex);
+	readFile(EFFECTS_FRAGMENT_SHADER_FILE, &fragment);
 
-  if (fs != effects_default_fs) {
-     printf(__FUNCTION__ " : read effects shader from %s\n", EFFECTS_FRAGMENT_SHADER_FILE);
-  } else {
-     printf(__FUNCTION__ " : using default effects shader\n");
-  }
+	glsl_source.append(fragment);
 
-  glsl_source.append(fs);
-
-  p = glCreateProgram();
-
-  v = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(v, 1, &vs, 0);
-  glCompileShader(v);
-  glGetShaderInfoLog(v, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
-
-  f = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(f, 1, &fs, 0);
-  glCompileShader(f);
-  glGetShaderInfoLog(f, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
-
-  glAttachShader(p, v);
-  glAttachShader(p, f);
-  glLinkProgram(p);
-
-  glGetProgramInfoLog(p, sizeof(log), &logLength, log);
-  if (logLength) fprintf(stderr, __FUNCTION__ " : %s\n", log);
-
-  if (vs != effects_default_vs) free((char*)vs);
-  if (fs != effects_default_fs) free((char*)fs);
-
-  GLint status;
-  glGetProgramiv(p, GL_LINK_STATUS, &status);
-  if (status != GL_TRUE) die("setupShaders2() fails\n");
-
-  return p>0?p:0;
-}
-
-// Detach & delete any shaders, delete program.
-void cleanupShaders(int p) {
-  GLuint shaders[2];
-  GLsizei count = 2;
-  if (!glIsProgram(p)) return;
-  glGetAttachedShaders(p, count, &count, shaders);
-  for (GLsizei i = 0; i < count; ++i) {
-    glDetachShader(p, shaders[i]);
-    glDeleteShader(shaders[i]);
-  }
-  glDeleteProgram(p);
+	return effects.compile(defines, vertex, fragment);
 }
 
 void changeWorkingDirectory(const char* configFile) {
@@ -1217,11 +1104,8 @@ void initGraphics() {
   enableShaderProcs() ||
       die("This program needs support for GLSL shaders.\n");
 
-  cleanupShaders(program);
-  cleanupShaders(dof_program);
-
-  (program = setupShaders()) ||
-      die("Error in GLSL shader compilation (see stderr.txt for details).\n");
+  (setupShaders()) ||
+      die("Error in GLSL fractal shader compilation (see stderr.txt for details).\n");
 
   if (background.data() != NULL) {
     // Load background image into texture
@@ -1248,8 +1132,8 @@ void initGraphics() {
   if (config.enable_dof) {
     // Compile DoF shader, setup FBO as render target.
 
-    (dof_program = setupShaders2()) ||
-        die("Error in GLSL shader compilation (see stderr.txt for details).\n");
+    (setupShaders2()) ||
+        die("Error in GLSL effects shader compilation (see stderr.txt for details).\n");
 
     // Create depth buffer(s)
     glDeleteRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);  // free existing
@@ -1494,8 +1378,6 @@ int main(int argc, char **argv) {
   if (stereoMode == ST_NONE) defines.append("#define ST_NONE\n");
 
   const char* configFile = (argc>=2 ? argv[1] : DEFAULT_CONFIG_FILE);
-
-  char* configData = readFile(configFile);
  
   // Load configuration.
   if (config.loadConfig(configFile, &defines)) {
@@ -1597,6 +1479,7 @@ int main(int argc, char **argv) {
    // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics();
   camera.parseUniforms(glsl_source);
+
   initTwBar();
   initFPS(FPS_FRAMES_TO_AVERAGE);
 
@@ -1735,6 +1618,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, background_texture);
     }
 
+	GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
 
     glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
@@ -1765,6 +1649,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, texture[frameno&0]);
       glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
 
+	  GLuint dof_program = effects.program();
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
 
       glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
@@ -1790,7 +1675,7 @@ int main(int argc, char **argv) {
       glLoadIdentity();
 
       // Draw our texture covering entire screen, running the frame shader.
-      glColor4f(1,1,1,1);
+	  // Top half
       glBegin(GL_QUADS);
         glTexCoord2f(0,1);
         glVertex2f(0,0);
@@ -1802,6 +1687,7 @@ int main(int argc, char **argv) {
         glVertex2f(config.width,0);
       glEnd();
 
+	  // Bottom half
       glBegin(GL_QUADS);
         glTexCoord2f(0,0.5);
         glVertex2f(0,config.height/2);
