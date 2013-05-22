@@ -2,6 +2,21 @@
 #define _F_UNIFORMS_H_
 
 #include <string>
+#if defined(__GNUC__) || defined(__APPLE__)
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+namespace __gnu_cxx {
+        template<> struct hash< std::string >
+        {
+                size_t operator()( const std::string& x ) const
+                {
+                        return hash< const char* >()( x.c_str() );
+                }
+        };
+}
+#else
+#include <hash_map>
+#endif
 
 class KeyFrame;
 
@@ -11,8 +26,10 @@ class iUniform {
   virtual ~iUniform(){}
   virtual const std::string& name() = 0;
   virtual std::string toString() = 0;
+  virtual bool parse(const std::string& line) = 0;
   virtual void send(int prog) = 0;  // send to shader
-  virtual void twVar(void* bar) = 0;  // register tw var
+  virtual void bindToUI(void* bar) = 0;  // register as tw var
+  virtual bool link(KeyFrame* kf) = 0;  // link to storage within keyframe.
   virtual iUniform* Clone() = 0;
   virtual bool ok() = 0;
 };
@@ -42,7 +59,28 @@ class iUniformPtr {
   iUniform* ptr_;
 };
 
-// Map a uniform var to local storage backed by kf.
-iUniformPtr link_uniform(const std::string& line, KeyFrame* kf);
+// Our active uniforms.
+class Uniforms {
+ public:
+  // Try parse declared uniforms from GLSL source,
+  // including UI attributes from comment.
+  bool parseFromGlsl(const std::string& glsl);
 
+  // Map a uniform var to local storage backed by kf.
+  void link(KeyFrame* kf);
+
+  // Register linked vars with UI.
+  void bindToUI(void* bar);
+
+private:
+  bool parseLine(const std::string& line, iUniformPtr* uni);
+
+#if defined(__GNUC__) || defined(__APPLE__)
+  std::hash_map<std::string, iUniformPtr, hash<string> > uniforms;
+#else
+  std::hash_map<std::string, iUniformPtr> uniforms;
 #endif
+};
+
+#endif  // F_UNIFORMS_H_
+
