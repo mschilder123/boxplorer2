@@ -76,7 +76,7 @@ private:
   bool parseLine(const std::string& line, iUniformPtr* uni);
 
 #if defined(__GNUC__) || defined(__APPLE__)
-  std::hash_map<std::string, iUniformPtr, hash<string> > uniforms;
+  hash_map<std::string, iUniformPtr, hash<std::string> > uniforms;
 #else
   std::hash_map<std::string, iUniformPtr> uniforms;
 #endif
