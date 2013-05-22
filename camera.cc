@@ -75,12 +75,17 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
 void* KeyFrame::map_address(const string& type, const string& name, int n) {
 //  cerr << __FUNCTION__ << ": looking for " << type << " " << name << endl;
 
-#define PROCESS(a,b,c,d) if (name.compare(c) == 0) { \
-  if (!d) return NULL; \
-  if (type.compare(#a) == 0) return &this->b; \
-  return NULL; \
-  }
-    PROCESS_COMMON_PARAMS
+#define PROCESS(a,b,c,d) \
+	if (name.compare(c) == 0) { \
+      if (!d) return NULL; \
+      if (type.compare(#a) == 0) return &this->b; \
+      return NULL; \
+    }
+  PROCESS_COMMON_PARAMS
 #undef PROCESS
+
+  // TODO: for non-predefined uniforms, map them into couple of arrays,
+  //       so we'd get automagic uniform discovery and linkage.
+
   return NULL;
 }

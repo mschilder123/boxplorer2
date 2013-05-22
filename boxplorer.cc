@@ -53,22 +53,6 @@ typedef SOCKET socket_t;
 #include <string>
 #include <map>
 
-#if defined(__GNUC__) || defined(__APPLE__)
-#include <ext/hash_map>
-using namespace __gnu_cxx;
-namespace __gnu_cxx {
-        template<> struct hash< std::string >
-        {
-                size_t operator()( const std::string& x ) const
-                {
-                        return hash< const char* >()( x.c_str() );
-                }
-        };
-}
-#else
-#include <hash_map>
-#endif
-
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -248,6 +232,8 @@ GLuint depthBuffer[1];
 Shader fractal;
 Shader effects;
 
+Uniforms uniforms;
+
 // texture holding background image
 GLuint background_texture;
 
@@ -352,11 +338,7 @@ int config_height;
 
 class Camera : public KeyFrame {
   private:
-#if defined(__GNUC__) || defined(__APPLE__)
-	hash_map<string, iUniformPtr, hash<string> > uniforms;
-#else
-	hash_map<string, iUniformPtr> uniforms;
-#endif
+
 
   public:
    Camera& operator=(const KeyFrame& other) {
@@ -398,80 +380,62 @@ class Camera : public KeyFrame {
      bool result = false;
      FILE* f;
      if ((f = fopen(configFile, "r")) != 0) {
-      size_t i;
-      char s[32768];  // max line length
-      while (fscanf(f, " %s", s) == 1) {  // read word
-        if (s[0] == 0 || s[0] == '#') continue;
+       size_t i;
+       char s[32768];  // max line length
+       while (fscanf(f, " %s", s) == 1) {  // read word
+         if (s[0] == 0 || s[0] == '#') continue;
 
-        int v;
+         int v;
 
-        // Parse #defines out of config.cfg to prepend to .glsl
-        if (defines) {
-          if (!strcmp(s, "d") || !strcmp(s, "c")) {
-            string a(s);
-            v = fscanf(f, " %s", s);
-            if (v == 1) {
-              string define = "#define " + a + " " + s + "\n";
-              printf(__FUNCTION__ " : %s", define.c_str());
-              defines->append(define);
-              if (!a.compare("d")) {
-                de_func_name.assign(s);
-                printf(__FUNCTION__" : de_func %s\n", de_func_name.c_str());
-              }
-            }
-          }
-        }
+         // Parse #defines out of config.cfg to prepend to .glsl
+         if (defines) {
+           if (!strcmp(s, "d") || !strcmp(s, "c")) {
+             string a(s);
+             v = fscanf(f, " %s", s);
+             if (v == 1) {
+               string define = "#define " + a + " " + s + "\n";
+               printf(__FUNCTION__ " : %s", define.c_str());
+               defines->append(define);
+               if (!a.compare("d")) {
+                 de_func_name.assign(s);
+                 printf(__FUNCTION__" : de_func %s\n", de_func_name.c_str());
+               }
+             }
+           }
+         }
 
-        double val;
+         double val;
 
-        if (!strcmp(s, "position")) { v=fscanf(f, " %lf %lf %lf", &pos()[0], &pos()[1], &pos()[2]); continue; }
-        if (!strcmp(s, "direction")) { v=fscanf(f, " %lf %lf %lf", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
-        if (!strcmp(s, "upDirection")) { v=fscanf(f, " %lf %lf %lf", &up()[0], &up()[1], &up()[2]); continue; }
+         if (!strcmp(s, "position")) { v=fscanf(f, " %lf %lf %lf", &pos()[0], &pos()[1], &pos()[2]); continue; }
+         if (!strcmp(s, "direction")) { v=fscanf(f, " %lf %lf %lf", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
+         if (!strcmp(s, "upDirection")) { v=fscanf(f, " %lf %lf %lf", &up()[0], &up()[1], &up()[2]); continue; }
 
-		// Parse common parameters.
+		 // Parse common parameters.
 #define PROCESS(type, name, nameString, doSpline) \
-         if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
-        PROCESS_COMMON_PARAMS
+           if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
+         PROCESS_COMMON_PARAMS
 #undef PROCESS
 
-        for (i=0; i<ARRAYSIZE(par); i++) {
-         char p[256];
-         sprintf(p, "par%lu", (unsigned long)i);
-         if (!strcmp(s, p)) {
-           v=fscanf(f, " %f %f %f", &par[i][0], &par[i][1], &par[i][2]);
-           break;
+         for (i=0; i<ARRAYSIZE(par); i++) {
+           char p[256];
+           sprintf(p, "par%lu", (unsigned long)i);
+           if (!strcmp(s, p)) {
+             v=fscanf(f, " %f %f %f", &par[i][0], &par[i][1], &par[i][2]);
+             break;
+           }
          }
-        }
-      }
-      fclose(f);
-      printf(__FUNCTION__ " : read '%s'\n", configFile);
-      result = true;
+       }
+       fclose(f);
+       printf(__FUNCTION__ " : read '%s'\n", configFile);
+       result = true;
      } else {
-        printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
+       printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
      }
      if (result) sanitizeParameters();
      return result;
    }
 
-   bool parseUniforms(const string& glsl) {
-	   istringstream in(glsl);
-	   string line;
-	   while (getline(in, line)) {
-		   iUniformPtr uni = link_uniform(line, this);
-		   if (uni.ok()) {
-			   cout << "UNI: " << uni->toString() << endl;
-		       uniforms.insert(make_pair(uni->name(), uni));
-		   }
-	   }
-	   return true;
-   }
 
-   void register_vars(TwBar* bar) {
-	   for (hash_map<string, iUniformPtr>::iterator it =
-		   uniforms.begin(); it != uniforms.end(); ++it) {
-			   it->second->twVar(bar);
-	   }
-   }
 
    // Make sure parameters are OK.
    void sanitizeParameters(void) {
@@ -1302,7 +1266,7 @@ void initTwBar() {
   PROCESS_COMMON_PARAMS
 #undef PROCESS
 #else
-  camera.register_vars(bar);
+  uniforms.bindToUI(bar);
 #endif
 
   initTwParDefines();
@@ -1478,7 +1442,14 @@ int main(int argc, char **argv) {
 
    // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics();
-  camera.parseUniforms(glsl_source);
+
+  // Parse as many uniforms from glsl source as we can find.
+  uniforms.parseFromGlsl(glsl_source);
+
+  // TODO: prune uniforms to just those reported active by shader compiler.
+
+  // Bind as many uniforms as we can find a match for to camera.
+  uniforms.link(&camera);
 
   initTwBar();
   initFPS(FPS_FRAMES_TO_AVERAGE);
