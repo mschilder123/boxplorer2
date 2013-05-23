@@ -8,6 +8,7 @@ Boxplorer2 understands the following commandline parameters to tell it how to re
   * _--xeyed_ : full width, right eye on left. Good for free viewing.
   * _--interlaced_ : horizontal interlaced. Compatible with Zalman and LG D2342P-PN like devices.
   * _--quadbuffer_ : quad buffer. Press the p key to switch L/R polarity. Tested on Radeon 7970 + HD600X-LV and nVidia Titan.
+  * _--oculus_: Oculus Rift demo kit compatible output.
 
 = Details =
 
