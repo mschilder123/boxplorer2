@@ -1412,6 +1412,8 @@ int main(int argc, char **argv) {
   if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER) config.enable_dof = 0;  // mipmapping does not work for interlaced.
   if (stereoMode == ST_OCULUS) {
     config.width = 1280; config.height = 800;  // Fix rez. Otherwise mirrored screen drops Rift?
+	config.fov_y = 110; config.fov_x = 90.0;
+	fixedFov = true;
   }
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
