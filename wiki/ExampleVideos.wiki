@@ -18,7 +18,7 @@
  `./boxplorer cfgs/knighty/Reflectoids/ --render --fixedfov --overunder` to regenerate.
 
  * [http://www.youtube.com/watch?v=z3oguDRThpE]
- `./boxplorer cfgs/menger.cfg --render --fixedfov --overunder --time` to regenerate.
+ `./boxplorer cfgs/menger.cfg.data/ --render --fixedfov --overunder --time` to regenerate.
 
  * [http://www.youtube.com/watch?v=20xv8U-B-G8]
  `./boxplorer cfgs/menger.cfg.data/ionized-0.cfg --kf=ionized --time --loop --render` to regenerate.
