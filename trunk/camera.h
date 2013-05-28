@@ -20,6 +20,12 @@ class KeyFrame {
   // Par[] parameter array.
   float par[NUMPARS][3];  // min(|this|, |glsl|) gets sent to shader.
 
+  // Shader other uniforms.
+  int iunis[NUMPARS];
+  float funis[NUMPARS];
+
+  int n_iunis;
+  int n_funis;
   bool isKey_;  // Whether this frame is actually a defined KeyFrame.
 
   KeyFrame();

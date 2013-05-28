@@ -11,7 +11,6 @@
 
 #include <float.h>
 #include <unistd.h>
-#define MKDIR(a) mkdir((a), 0755)
 
 #define _strdup strdup
 #define __FUNCTION__ "boxplorer"
@@ -44,7 +43,6 @@
 #pragma comment(lib, "sixense_utils.lib")
 #endif
 
-#define MKDIR(a) mkdir(a)
 typedef SOCKET socket_t;
 
 #endif  // _WIN32
@@ -78,7 +76,8 @@ using namespace std;
 #include "camera.h"
 #include "shader.h"
 
-#define DEFAULT_CONFIG_FILE  "boxplorer.cfg"
+#define DEFAULT_CONFIG_FILE "default.cfg"
+#define DEFAULT_CONFIG  "cfgs/rrrola/" DEFAULT_CONFIG_FILE
 #define VERTEX_SHADER_FILE   "vertex.glsl"
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
 #define EFFECTS_VERTEX_SHADER_FILE   "effects_vertex.glsl"
@@ -141,7 +140,9 @@ vec3 (*c)(vec3);
 #define ST_NONE
 #include "cfgs/menger.cfg.data/fragment.glsl"
 #undef ST_NONE
-};
+
+}  // namespace GLSL
+
 
 #pragma warning(disable: 4244) // conversion loss
 #pragma warning(disable: 4305) // truncation
@@ -209,6 +210,7 @@ SDL_Cursor* hand_cursor;
 
 // Our SDL handle.
 SDL_Surface* screen;
+
 // Optional #defines for glsl compilation from .cfg file.
 string defines;
 
@@ -229,6 +231,10 @@ GLuint texture[1];
 // depth buffer attached to fbo
 GLuint depthBuffer[1];
 
+string BaseDir;     // Where our executable and include dirs live.
+string WorkingDir;  // Where current fractal code & data lives.
+string BaseFile;     // Initial argument filename.
+
 Shader fractal;
 Shader effects;
 
@@ -237,8 +243,8 @@ Uniforms uniforms;
 // texture holding background image
 GLuint background_texture;
 
-// DLP-Link L/R polarity
-double polarity=1;
+// DLP-Link L/R or interlaced polarity
+int polarity=1;
 
 int kJOYSTICK;
 SDL_Joystick *joystick;
@@ -248,7 +254,7 @@ SDL_Joystick *joystick;
 
 
 // Allocate a char[] and read a text file into it. Return 0 on error.
-char* readFile(char const* name) {
+char* _readFile(char const* name) {
   FILE* f;
   int len;
   char* s = 0;
@@ -268,8 +274,9 @@ char* readFile(char const* name) {
   readFileError1: return s;
 }
 
-bool readFile(const char*name, string* content) {
-	char* s = readFile(name);
+bool readFile(const string& name, string* content) {
+	string filename(WorkingDir + name);
+	char* s = _readFile(filename.c_str());
 	if (!s) return false;
 	content->assign(s);
 	free(s);
@@ -376,10 +383,11 @@ class Camera : public KeyFrame {
    }
 
    // Load configuration.
-   bool loadConfig(char const* configFile, string* defines = NULL) {
+   bool loadConfig(const string& configFile, string* defines = NULL) {
      bool result = false;
+	 string filename(WorkingDir + configFile);
      FILE* f;
-     if ((f = fopen(configFile, "r")) != 0) {
+     if ((f = fopen(filename.c_str(), "r")) != 0) {
        size_t i;
        char s[32768];  // max line length
        while (fscanf(f, " %s", s) == 1) {  // read word
@@ -426,16 +434,14 @@ class Camera : public KeyFrame {
          }
        }
        fclose(f);
-       printf(__FUNCTION__ " : read '%s'\n", configFile);
+       printf(__FUNCTION__ " : read '%s'\n", configFile.c_str());
        result = true;
      } else {
-       printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
+       printf(__FUNCTION__ " : failed to open '%s'\n", configFile.c_str());
      }
      if (result) sanitizeParameters();
      return result;
    }
-
-
 
    // Make sure parameters are OK.
    void sanitizeParameters(void) {
@@ -479,9 +485,10 @@ class Camera : public KeyFrame {
    }
 
    // Save configuration.
-   void saveConfig(char const* configFile, string* defines = NULL) {
+   void saveConfig(const string& configFile, string* defines = NULL) {
      FILE* f;
-     if ((f = fopen(configFile, "w")) != 0) {
+	 string filename(WorkingDir + configFile);
+     if ((f = fopen(filename.c_str(), "w")) != 0) {
        if (defines != NULL)
          fprintf(f, "%s", defines->c_str());
 
@@ -498,7 +505,7 @@ class Camera : public KeyFrame {
          fprintf(f, "par%lu %g %g %g\n", (unsigned long)i, par[i][0], par[i][1], par[i][2]);
        }
        fclose(f);
-       printf(__FUNCTION__ " : wrote '%s'\n", configFile);
+       printf(__FUNCTION__ " : wrote '%s'\n", filename.c_str());
      }
    }
 
@@ -515,15 +522,21 @@ class Camera : public KeyFrame {
 
 	 GLuint program = fractal.program();
 
-     glSetUniformf(fov_x); glSetUniformf(fov_y);
+	 // These might be dupes w/ uniforms.send() below.
+	 // Leave for now until all .cfg got updated.
      glSetUniformi(max_steps); glSetUniformf(min_dist);
      glSetUniformi(iters); glSetUniformi(color_iters);
      glSetUniformf(ao_eps); glSetUniformf(ao_strength);
      glSetUniformf(glow_strength); glSetUniformf(dist_to_color);
+	 glSetUniformi(nrays); glSetUniformf(focus);
+
+	 // Non-user uniforms.
+     glSetUniformf(fov_x); glSetUniformf(fov_y);
+
      glSetUniformf(x_scale); glSetUniformf(x_offset);
      glSetUniformf(y_scale); glSetUniformf(y_offset);
-     glSetUniformi(nrays);
-     glSetUniformf(time); glSetUniformf(focus);
+
+     glSetUniformf(time);
 
      glUniform1f(glGetUniformLocation(program, "speed"), spd);
      glUniform1f(glGetUniformLocation(program, "xres"), config_width);
@@ -535,11 +548,15 @@ class Camera : public KeyFrame {
      glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
      #endif
 
+	 // Old-style par[] list.
      glSetUniformfv(par);
 
      #undef glSetUniformf
      #undef glSetUniformfv
      #undef glUniform1i
+
+	 // New-style discovered && active uniforms only.
+	 uniforms.send(program);
    }
 
    void render(enum StereoMode stereo) {
@@ -578,7 +595,7 @@ class Camera : public KeyFrame {
          glRects(0,-1,1,1);  // draw right half
          break;
        case ST_INTERLACED:
-         setUniforms(1.0, 0.0, 1.0, 0.0, speed);
+         setUniforms(1.0, 0.0, 1.0, 0.0, speed*polarity);
          glRects(-1,-1,0,1);  // draw left half
          glRects(0,-1,1,1);  // draw right half
          break;
@@ -762,6 +779,11 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
                p0->par[j][2], p1->par[j][2], p2->par[j][2], p3->par[j][2]);
       }
 
+	  // Spline generic float uniform array.
+	  for (int j = 0; j < tmp.n_funis; ++j) {
+		  SPLINE(tmp.funis[j], p0->funis[j], p1->funis[j], p2->funis[j], p3->funis[j]);
+	  }
+
       // Spline common params, if marked as such.
 #define PROCESS(a,b,c,doSpline) \
 	    if (doSpline) { SPLINE(tmp.b, p0->b, p1->b, p2->b, p3->b); }
@@ -910,16 +932,18 @@ int grabbedInput = 1;
 void saveScreenshot(char const* tgaFile) {
   TGA tga;
   tga.readFramebuffer(config.width, config.height, viewportOffset);
-  if (tga.writeFile(tgaFile))
-    printf(__FUNCTION__ " : wrote %s\n", tgaFile);
+  string filename(WorkingDir + tgaFile);
+  if (tga.writeFile(filename.c_str()))
+    printf(__FUNCTION__ " : wrote %s\n", filename.c_str());
   else
-    printf(__FUNCTION__ " : failed to write %s\n", tgaFile);
+    printf(__FUNCTION__ " : failed to write %s\n", filename.c_str());
 }
 
 TGA background;
 
 void LoadBackground() {
-  background.readFile("background.tga");
+  string filename(WorkingDir + "background.tga");
+  background.readFile(filename.c_str());
   if (background.data()) {
     printf(__FUNCTION__ " : loaded background image from '%s'\n", "background.tga");
   }
@@ -968,20 +992,42 @@ int setupShaders2(void) {
 	return effects.compile(defines, vertex, fragment);
 }
 
-void changeWorkingDirectory(const char* configFile) {
+bool setupDirectories(const char* configFile) {
   char dirName[MAX_PATH];
+  BaseFile.clear();
+
+#if defined(_WIN32)
+  GetModuleFileName(NULL, dirName, MAX_PATH);
+  BaseDir.assign(dirName);
+  size_t slash = BaseDir.rfind('\\');
+  if (slash != string::npos) BaseDir.erase(slash + 1);
+
+  char* fileName = NULL;
+  DWORD result = GetFullPathName(configFile, MAX_PATH, dirName, &fileName);
+  if (result) {
+	  if (fileName) {
+		  BaseFile.assign(fileName);
+		  *fileName = '\0';
+	  }
+	  WorkingDir.assign(dirName);
+  }
+#else
   strncpy(dirName, configFile, sizeof dirName);
   dirName[sizeof dirName - 1] = 0;
-  if (strstr(configFile, ".cfg.data") == NULL) {
-    strncat(dirName, ".data", sizeof dirName);
-    MKDIR(dirName);
-  } else {
-    // Already have a .cfg.data in path, chdir to it.
-    int i = strlen(dirName);
-    while (i > 0 && strchr("/\\", dirName[--i]) == NULL);
-    dirName[i] = 0;
-  }
-  if (!chdir(dirName)) printf(__FUNCTION__ " : chdir '%s'\n", dirName);
+  int i = strlen(dirName);
+  while (i > 0 && strchr("/", dirName[i - 1]) == NULL) --i;
+  dirName[i] = 0;
+  BaseDir.clear();  // Assume relative to cwd.
+  WorkingDir.assign(dirName);
+#endif
+
+  if (BaseFile.empty()) BaseFile.assign(DEFAULT_CONFIG_FILE);
+
+  cout << __FUNCTION__ << ": " << BaseDir
+	                   << ", " << WorkingDir
+					   << ", " << BaseFile << endl;
+
+  return true;
 }
 
 // Initializes the video mode, OpenGL state, shaders, camera and shader parameters.
@@ -1276,15 +1322,16 @@ void LoadKeyFrames(bool fixedFov) {
   char filename[256];
   for (int i = 0; ; ++i) {
     sprintf(filename, "%s-%u.cfg", kKEYFRAME, i);
-    Camera tmp;
-    if (!tmp.loadConfig(filename)) break;
+	// We load into global camera since that's where
+	// the uniforms are bound to.
+    if (!camera.loadConfig(filename)) break;
     if (fixedFov) {
-      tmp.width = config.width;
-      tmp.height = config.height;
-      tmp.fov_x = config.fov_x;
-      tmp.fov_y = config.fov_y;
+      camera.width = config.width;
+      camera.height = config.height;
+      camera.fov_x = config.fov_x;
+      camera.fov_y = config.fov_y;
     }
-    keyframes.push_back(tmp);
+    keyframes.push_back(camera);
   }
   printf(__FUNCTION__ " : loaded %lu keyframes\n",
       (unsigned long)keyframes.size());
@@ -1341,11 +1388,11 @@ int main(int argc, char **argv) {
 
   if (stereoMode == ST_NONE) defines.append("#define ST_NONE\n");
 
-  const char* configFile = (argc>=2 ? argv[1] : DEFAULT_CONFIG_FILE);
- 
+  const char* configFile = (argc>=2 ? argv[1] : DEFAULT_CONFIG);
+
   // Load configuration.
-  if (config.loadConfig(configFile, &defines)) {
-    changeWorkingDirectory(configFile);
+  if (setupDirectories(configFile) &&
+	  config.loadConfig(BaseFile, &defines)) {
   } else {
 #if defined(_WIN32)
     // For windows users that don't specify an argument, offer a dialog.
@@ -1361,8 +1408,9 @@ int main(int argc, char **argv) {
     opf.lpstrDefExt = "cfg";
     opf.Flags = OFN_PATHMUSTEXIST | OFN_READONLY;
     opf.lStructSize = sizeof(OPENFILENAME);
-    if (GetOpenFileName(&opf) && config.loadConfig(opf.lpstrFile, &defines)) {
-      changeWorkingDirectory(opf.lpstrFile);
+    if (GetOpenFileName(&opf) &&
+		setupDirectories(opf.lpstrFile) &&
+		config.loadConfig(BaseFile, &defines)) {
     } else
 #endif
     die("Usage: boxplorer <configuration-file.cfg>\n");
@@ -1419,12 +1467,8 @@ int main(int argc, char **argv) {
   if (config.depth_size < 16) config.depth_size = 16;
   if (stereoMode == ST_XEYED) config.width *= 2;
 
-  camera = config;
-
   int savedWidth = config.width;
   int savedHeight = config.height;
-
-  LoadKeyFrames(fixedFov);
 
   LoadBackground();
 
@@ -1449,9 +1493,16 @@ int main(int argc, char **argv) {
   uniforms.parseFromGlsl(glsl_source);
 
   // TODO: prune uniforms to just those reported active by shader compiler.
+  cout << fractal.uniforms();
 
   // Bind as many uniforms as we can find a match for to camera.
   uniforms.link(&camera);
+
+  // Load key frames, if any. Clobbers camera.
+  LoadKeyFrames(fixedFov);
+
+  // Load initial camera; sets all known, linked uniforms.
+  camera.loadConfig(BaseFile);
 
   initTwBar();
   initFPS(FPS_FRAMES_TO_AVERAGE);

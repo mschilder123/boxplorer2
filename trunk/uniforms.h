@@ -72,6 +72,9 @@ class Uniforms {
   // Register linked vars with UI.
   void bindToUI(void* bar);
 
+  // Send to shader.
+  void send(int program);
+
 private:
   bool parseLine(const std::string& line, iUniformPtr* uni);
 
