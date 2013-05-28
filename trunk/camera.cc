@@ -77,10 +77,13 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
 }
 
 void* KeyFrame::map_address(const string& type, const string& name, int n) {
-//  cerr << __FUNCTION__ << ": looking for " << type << " " << name << endl;
+  //cerr << __FUNCTION__ << ": looking for " << type << " " << name << endl;
+
+  // TODO: handle arrays
+  if (name.find("[") != string::npos) return NULL;
 
 #define PROCESS(a,b,c,d) \
-	if (name.compare(c) == 0) { \
+  if (name.compare(c) == 0) { \
       if (!d) return NULL; \
       if (type.compare(#a) == 0) return &this->b; \
       return NULL; \
@@ -92,19 +95,19 @@ void* KeyFrame::map_address(const string& type, const string& name, int n) {
   // for non-predefined uniforms, map them into couple of arrays,
   // so we'd get automagic uniform discovery and linkage.
   if (type.compare("float") == 0) {
-	  if (n_funis < NUMPARS - 1) {
-		  return &this->funis[n_funis++];
-	  }
+    if (n_funis < NUMPARS - 1) {
+      return &this->funis[n_funis++];
+    }
   } else if (type.compare("int") == 0) {
-	  if (n_iunis < NUMPARS - 1) {
-		  return &this->iunis[n_iunis++];
-	  }
+    if (n_iunis < NUMPARS - 1) {
+      return &this->iunis[n_iunis++];
+    }
   } else if (type.compare("vec3") == 0) {
-	  if (n_funis <= NUMPARS - 3) {
-		  float* adr = &this->funis[n_funis];
-		  n_funis += 3;
-		  return adr;
-	  }
+    if (n_funis <= NUMPARS - 3) {
+      float* adr = &this->funis[n_funis];
+      n_funis += 3;
+      return adr;
+    }
   }
 
   return NULL;

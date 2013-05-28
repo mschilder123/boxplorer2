@@ -275,12 +275,13 @@ char* _readFile(char const* name) {
 }
 
 bool readFile(const string& name, string* content) {
-	string filename(WorkingDir + name);
-	char* s = _readFile(filename.c_str());
-	if (!s) return false;
-	content->assign(s);
-	free(s);
-	return true;
+  string filename(WorkingDir + name);
+  char* s = _readFile(filename.c_str());
+  if (!s) return false;
+  content->assign(s);
+  free(s);
+  printf(__FUNCTION__ " : read '%s'\n", filename.c_str());
+  return true;
 }
 
 
@@ -349,8 +350,8 @@ class Camera : public KeyFrame {
 
   public:
    Camera& operator=(const KeyFrame& other) {
-	  *((KeyFrame*)this) = other;
-	  return *this;
+    *((KeyFrame*)this) = other;
+    return *this;
    }
 
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
@@ -385,7 +386,7 @@ class Camera : public KeyFrame {
    // Load configuration.
    bool loadConfig(const string& configFile, string* defines = NULL) {
      bool result = false;
-	 string filename(WorkingDir + configFile);
+   string filename(WorkingDir + configFile);
      FILE* f;
      if ((f = fopen(filename.c_str(), "r")) != 0) {
        size_t i;
@@ -418,7 +419,7 @@ class Camera : public KeyFrame {
          if (!strcmp(s, "direction")) { v=fscanf(f, " %lf %lf %lf", &ahead()[0], &ahead()[1], &ahead()[2]); continue; }
          if (!strcmp(s, "upDirection")) { v=fscanf(f, " %lf %lf %lf", &up()[0], &up()[1], &up()[2]); continue; }
 
-		 // Parse common parameters.
+     // Parse common parameters.
 #define PROCESS(type, name, nameString, doSpline) \
            if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
          PROCESS_COMMON_PARAMS
@@ -478,7 +479,7 @@ class Camera : public KeyFrame {
      if (dist_to_color <= 0) dist_to_color = 0.2;
 
      orthogonalize();
-	 mat2quat(this->v, this->q);
+   mat2quat(this->v, this->q);
 
      // Don't do anything with user parameters - they must be
      // sanitized (clamped, ...) in the shader.
@@ -487,14 +488,14 @@ class Camera : public KeyFrame {
    // Save configuration.
    void saveConfig(const string& configFile, string* defines = NULL) {
      FILE* f;
-	 string filename(WorkingDir + configFile);
+   string filename(WorkingDir + configFile);
      if ((f = fopen(filename.c_str(), "w")) != 0) {
        if (defines != NULL)
          fprintf(f, "%s", defines->c_str());
 
-	   // Write common parameters.
+     // Write common parameters.
 #define PROCESS(type, name, nameString, doSpline) \
-	   fprintf(f, nameString " %g\n", (double)name);
+     fprintf(f, nameString " %g\n", (double)name);
        PROCESS_COMMON_PARAMS
 #undef PROCESS
 
@@ -520,17 +521,17 @@ class Camera : public KeyFrame {
      #define glSetUniformi(name) \
        glUniform1i(glGetUniformLocation(program, #name), name);
 
-	 GLuint program = fractal.program();
+   GLuint program = fractal.program();
 
-	 // These might be dupes w/ uniforms.send() below.
-	 // Leave for now until all .cfg got updated.
+   // These might be dupes w/ uniforms.send() below.
+   // Leave for now until all .cfg got updated.
      glSetUniformi(max_steps); glSetUniformf(min_dist);
      glSetUniformi(iters); glSetUniformi(color_iters);
      glSetUniformf(ao_eps); glSetUniformf(ao_strength);
      glSetUniformf(glow_strength); glSetUniformf(dist_to_color);
-	 glSetUniformi(nrays); glSetUniformf(focus);
+   glSetUniformi(nrays); glSetUniformf(focus);
 
-	 // Non-user uniforms.
+   // Non-user uniforms.
      glSetUniformf(fov_x); glSetUniformf(fov_y);
 
      glSetUniformf(x_scale); glSetUniformf(x_offset);
@@ -548,15 +549,15 @@ class Camera : public KeyFrame {
      glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
      #endif
 
-	 // Old-style par[] list.
+   // Old-style par[] list.
      glSetUniformfv(par);
 
      #undef glSetUniformf
      #undef glSetUniformfv
      #undef glUniform1i
 
-	 // New-style discovered && active uniforms only.
-	 uniforms.send(program);
+   // New-style discovered && active uniforms only.
+   uniforms.send(program);
    }
 
    void render(enum StereoMode stereo) {
@@ -610,39 +611,39 @@ class Camera : public KeyFrame {
 
 #if defined(HYDRA)
   void mixHydraOrientation(float* quat) {
-	  double q[4];
-	  q[0] = quat[0];
-	  q[1] = quat[1];
-	  q[2] = quat[2];
-	  q[3] = quat[3];
-	  qnormalize(q);
-	  qmul(q, this->q);
-	  quat2mat(q, this->v);
+    double q[4];
+    q[0] = quat[0];
+    q[1] = quat[1];
+    q[2] = quat[2];
+    q[3] = quat[3];
+    qnormalize(q);
+    qmul(q, this->q);
+    quat2mat(q, this->v);
   }
   void mixSensorOrientation(socket_t sock) {
     sockaddr_in SenderAddr;
     int SenderAddrSize = sizeof (SenderAddr);
 
     double q1[4];
-	bool gotData = false;
+  bool gotData = false;
 
-	for(;;) {
+  for(;;) {
       float qf[4];  // receive Quatf
       int r = recvfrom(sock, (char*)&qf, sizeof(qf), 0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
       if (r == sizeof(qf)) {
         for (int i = 0; i < 4; ++i) q1[i] = qf[i];
-		gotData = true;
-	  } else break;
-	}
+    gotData = true;
+    } else break;
+  }
 
-	if (gotData) {
+  if (gotData) {
         q1[2] = -q1[2];  // We roll other way
-		qnormalize(q1);
+    qnormalize(q1);
 
-		// combine current view quat with sensor quat.
-		qmul(q1, this->q);
+    // combine current view quat with sensor quat.
+    qmul(q1, this->q);
         quat2mat(q1, this->v);
-	}
+  }
   }
 #endif
 
@@ -754,7 +755,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
         SPLINE(tmp.x[j], p0->x[j], p1->x[j], p2->x[j], p3->x[j]);
       }
       x2quat(tmp.x, tmp.q);  // convert back to quat
-	  qnormalize(tmp.q);
+    qnormalize(tmp.q);
       quat2mat(tmp.q, tmp.v);  // convert quat to the splined rotation matrix
 
       // Spline position into tmp.v[12..15]
@@ -779,14 +780,14 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
                p0->par[j][2], p1->par[j][2], p2->par[j][2], p3->par[j][2]);
       }
 
-	  // Spline generic float uniform array.
-	  for (int j = 0; j < tmp.n_funis; ++j) {
-		  SPLINE(tmp.funis[j], p0->funis[j], p1->funis[j], p2->funis[j], p3->funis[j]);
-	  }
+    // Spline generic float uniform array.
+    for (int j = 0; j < tmp.n_funis; ++j) {
+      SPLINE(tmp.funis[j], p0->funis[j], p1->funis[j], p2->funis[j], p3->funis[j]);
+    }
 
       // Spline common params, if marked as such.
 #define PROCESS(a,b,c,doSpline) \
-	    if (doSpline) { SPLINE(tmp.b, p0->b, p1->b, p2->b, p3->b); }
+      if (doSpline) { SPLINE(tmp.b, p0->b, p1->b, p2->b, p3->b); }
       PROCESS_COMMON_PARAMS
 #undef PROCESS
 
@@ -945,7 +946,8 @@ void LoadBackground() {
   string filename(WorkingDir + "background.tga");
   background.readFile(filename.c_str());
   if (background.data()) {
-    printf(__FUNCTION__ " : loaded background image from '%s'\n", "background.tga");
+    printf(__FUNCTION__ " : loaded background image from '%s'\n",
+           filename.c_str());
   }
 }
 
@@ -967,35 +969,37 @@ string glsl_source;
 
 // Compile and activate shader programs. Return the program handle.
 int setupShaders(void) {
-	string vertex(default_vs);
-	string fragment(default_fs);
+  string vertex(default_vs);
+  string fragment(default_fs);
 
-	readFile(VERTEX_SHADER_FILE, &vertex);
-	readFile(FRAGMENT_SHADER_FILE, &fragment);
+  readFile(VERTEX_SHADER_FILE, &vertex);
+  readFile(FRAGMENT_SHADER_FILE, &fragment);
 
-	glsl_source.assign(defines + fragment);
+  glsl_source.assign(defines + fragment);
 
-	return fractal.compile(defines, vertex, fragment);
+  return fractal.compile(defines, vertex, fragment);
 }
 
 // Compile and activate shader programs for frame buffer manipulation.
 // Return the program handle.
 int setupShaders2(void) {
-	string vertex(effects_default_vs);
-	string fragment(effects_default_fs);
+  string vertex(effects_default_vs);
+  string fragment(effects_default_fs);
 
-	readFile(EFFECTS_VERTEX_SHADER_FILE, &vertex);
-	readFile(EFFECTS_FRAGMENT_SHADER_FILE, &fragment);
+  readFile(EFFECTS_VERTEX_SHADER_FILE, &vertex);
+  readFile(EFFECTS_FRAGMENT_SHADER_FILE, &fragment);
 
-	glsl_source.append(fragment);
+  glsl_source.append(fragment);
 
-	return effects.compile(defines, vertex, fragment);
+  return effects.compile(defines, vertex, fragment);
 }
 
 bool setupDirectories(const char* configFile) {
-  char dirName[MAX_PATH];
   BaseFile.clear();
+  BaseDir.clear();
+  WorkingDir.clear();
 
+  char dirName[MAX_PATH];
 #if defined(_WIN32)
   GetModuleFileName(NULL, dirName, MAX_PATH);
   BaseDir.assign(dirName);
@@ -1005,27 +1009,28 @@ bool setupDirectories(const char* configFile) {
   char* fileName = NULL;
   DWORD result = GetFullPathName(configFile, MAX_PATH, dirName, &fileName);
   if (result) {
-	  if (fileName) {
-		  BaseFile.assign(fileName);
-		  *fileName = '\0';
-	  }
-	  WorkingDir.assign(dirName);
+    if (fileName) {
+      BaseFile.assign(fileName);
+      *fileName = '\0';
+    }
+    WorkingDir.assign(dirName);
   }
 #else
   strncpy(dirName, configFile, sizeof dirName);
   dirName[sizeof dirName - 1] = 0;
   int i = strlen(dirName);
   while (i > 0 && strchr("/", dirName[i - 1]) == NULL) --i;
+  BaseFile.assign(&dirName[i]);
   dirName[i] = 0;
-  BaseDir.clear();  // Assume relative to cwd.
+  BaseDir.assign("./");  // Assume relative to cwd.
   WorkingDir.assign(dirName);
 #endif
 
   if (BaseFile.empty()) BaseFile.assign(DEFAULT_CONFIG_FILE);
 
-  cout << __FUNCTION__ << ": " << BaseDir
-	                   << ", " << WorkingDir
-					   << ", " << BaseFile << endl;
+  cout << __FUNCTION__ << " : " << BaseDir
+                       << ", " << WorkingDir
+                       << ", " << BaseFile << endl;
 
   return true;
 }
@@ -1297,13 +1302,13 @@ void initTwBar() {
   bar = TwNewBar("boxplorer");
 
   if (stereoMode == ST_OCULUS) {
-	// Position HUD center for left eye.
+  // Position HUD center for left eye.
     char pos[100];
-	int x = config.width;
-	int y = config.height;
-	sprintf(pos, "boxplorer position='%d %d'", x/6, y/4);
+  int x = config.width;
+  int y = config.height;
+  sprintf(pos, "boxplorer position='%d %d'", x/6, y/4);
     TwDefine(pos);
-	TwDefine("GLOBAL fontsize=3");
+  TwDefine("GLOBAL fontsize=3");
   }
 
 #if 0
@@ -1322,8 +1327,8 @@ void LoadKeyFrames(bool fixedFov) {
   char filename[256];
   for (int i = 0; ; ++i) {
     sprintf(filename, "%s-%u.cfg", kKEYFRAME, i);
-	// We load into global camera since that's where
-	// the uniforms are bound to.
+  // We load into global camera since that's where
+  // the uniforms are bound to.
     if (!camera.loadConfig(filename)) break;
     if (fixedFov) {
       camera.width = config.width;
@@ -1392,7 +1397,7 @@ int main(int argc, char **argv) {
 
   // Load configuration.
   if (setupDirectories(configFile) &&
-	  config.loadConfig(BaseFile, &defines)) {
+    config.loadConfig(BaseFile, &defines)) {
   } else {
 #if defined(_WIN32)
     // For windows users that don't specify an argument, offer a dialog.
@@ -1409,8 +1414,8 @@ int main(int argc, char **argv) {
     opf.Flags = OFN_PATHMUSTEXIST | OFN_READONLY;
     opf.lStructSize = sizeof(OPENFILENAME);
     if (GetOpenFileName(&opf) &&
-		setupDirectories(opf.lpstrFile) &&
-		config.loadConfig(BaseFile, &defines)) {
+    setupDirectories(opf.lpstrFile) &&
+    config.loadConfig(BaseFile, &defines)) {
     } else
 #endif
     die("Usage: boxplorer <configuration-file.cfg>\n");
@@ -1435,22 +1440,22 @@ int main(int argc, char **argv) {
   }
 
   if (sixenseInit() != SIXENSE_SUCCESS) {
-	  die("sixenseInit() fail!");
+    die("sixenseInit() fail!");
   }
 
   sixenseSetFilterEnabled(1);
   if (sixenseSetFilterParams(0.0, 0.0, 1000.0, 1.0) != SIXENSE_SUCCESS) {
-	  die("SetFilterParams() fail!");
+    die("SetFilterParams() fail!");
   }
 
   if (sixenseSetActiveBase(0) != SIXENSE_SUCCESS) {
-	  die("sixenseSetActiveBase() fail!");
+    die("sixenseSetActiveBase() fail!");
   }
 
   sixenseAllControllerData ssdata;
 
   if (sixenseIsControllerEnabled(0) != SIXENSE_SUCCESS) {
-	  die("controller(0) not enabled!");
+    die("controller(0) not enabled!");
   }
 #endif
 
@@ -1460,8 +1465,8 @@ int main(int argc, char **argv) {
   if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER) config.enable_dof = 0;  // mipmapping does not work for interlaced.
   if (stereoMode == ST_OCULUS) {
     config.width = 1280; config.height = 800;  // Fix rez. Otherwise mirrored screen drops Rift?
-	config.fov_y = 110; config.fov_x = 90.0;
-	fixedFov = true;
+  config.fov_y = 110; config.fov_x = 90.0;
+  fixedFov = true;
   }
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
@@ -1479,11 +1484,11 @@ int main(int argc, char **argv) {
 
   if(kJOYSTICK) {
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-    for(int i=0; i < SDL_NumJoysticks(); i++) printf(__FUNCTION__ ": JoystickName %i: '%s'\n", i+1, SDL_JoystickName(i));
+    for(int i=0; i < SDL_NumJoysticks(); i++) printf(__FUNCTION__ " : JoystickName %i: '%s'\n", i+1, SDL_JoystickName(i));
     joystick = SDL_JoystickOpen(kJOYSTICK-1);
-    printf(__FUNCTION__ ": JoystickNumAxes   : %i\n", SDL_JoystickNumAxes(joystick));
-    printf(__FUNCTION__ ": JoystickNumButtons: %i\n", SDL_JoystickNumButtons(joystick));
-    printf(__FUNCTION__ ": JoystickNumHats   : %i\n", SDL_JoystickNumHats(joystick));
+    printf(__FUNCTION__ " : JoystickNumAxes   : %i\n", SDL_JoystickNumAxes(joystick));
+    printf(__FUNCTION__ " : JoystickNumButtons: %i\n", SDL_JoystickNumButtons(joystick));
+    printf(__FUNCTION__ " : JoystickNumHats   : %i\n", SDL_JoystickNumHats(joystick));
   }
 
    // Set up the video mode, OpenGL state, shaders and shader parameters.
@@ -1546,7 +1551,7 @@ int main(int argc, char **argv) {
       // Next pick float version.
       de_func = DE_funcs[de_func_name];
     } else {
-      printf(__FUNCTION__ ": unknown DE %s\n", de_func_name.c_str());
+      printf(__FUNCTION__ " : unknown DE %s\n", de_func_name.c_str());
       de_func_name.clear();
     }
   }
@@ -1604,15 +1609,15 @@ int main(int argc, char **argv) {
     }
 
 #if defined(HYDRA)
-	if (!rendering) {
+  if (!rendering) {
       // When not rendering a sequence, now mix in orientation (and translation)
       // external sensors might have to add (e.g. Oculus orientation) into the view
       // we are about to render.
       if (stereoMode == ST_OCULUS) {
-	    camera.mixSensorOrientation(RecvSocket);
-	  }
-	  //camera.mixHydraOrientation(ssdata.controllers[0].rot_quat);
-	}
+      camera.mixSensorOrientation(RecvSocket);
+    }
+    //camera.mixHydraOrientation(ssdata.controllers[0].rot_quat);
+  }
 #endif
 
     if (!rendering && (de_func || de_func_64)) {
@@ -1625,7 +1630,7 @@ int main(int argc, char **argv) {
       }
 
       GLSL::dvec3 pos(camera.pos());
-	  double de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
+    double de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
 
       if (de != last_de) {
         printf("de=%12.12e\n", de);
@@ -1642,7 +1647,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, background_texture);
     }
 
-	GLuint program = fractal.program();
+  GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
 
     glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
@@ -1673,7 +1678,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, texture[frameno&0]);
       glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
 
-	  GLuint dof_program = effects.program();
+    GLuint dof_program = effects.program();
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
 
       glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
@@ -1699,7 +1704,7 @@ int main(int argc, char **argv) {
       glLoadIdentity();
 
       // Draw our texture covering entire screen, running the frame shader.
-	  // Top half
+    // Top half
       glBegin(GL_QUADS);
         glTexCoord2f(0,1);
         glVertex2f(0,0);
@@ -1711,7 +1716,7 @@ int main(int argc, char **argv) {
         glVertex2f(config.width,0);
       glEnd();
 
-	  // Bottom half
+    // Bottom half
       glBegin(GL_QUADS);
         glTexCoord2f(0,0.5);
         glVertex2f(0,config.height/2);
@@ -2251,19 +2256,19 @@ int main(int argc, char **argv) {
     }
 
 #if defined(HYDRA)
-	// Sixense Hydra
+  // Sixense Hydra
     if (sixenseGetAllNewestData(&ssdata) != SIXENSE_SUCCESS) {
-	  die("sixenseGetAllNewestData() fail!");
+    die("sixenseGetAllNewestData() fail!");
     }
-//	printf("%f %f %f %f\n", ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
+//  printf("%f %f %f %f\n", ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
 
-	camera.move(0, 0, camera.speed *   ssdata.controllers[0].joystick_y);
-	m_rotateX2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_x);
-	m_rotateY2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_y);
-	m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
+  camera.move(0, 0, camera.speed *   ssdata.controllers[0].joystick_y);
+  m_rotateX2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_x);
+  m_rotateY2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_y);
+  m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
 
-//	printf("%08x, %f\n", ssdata.controllers[0].buttons, ssdata.controllers[0].trigger);
-//	printf("%f %f %f\n", ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
+//  printf("%08x, %f\n", ssdata.controllers[0].buttons, ssdata.controllers[0].trigger);
+//  printf("%f %f %f\n", ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
 #endif
 
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
