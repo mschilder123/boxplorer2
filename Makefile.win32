@@ -22,7 +22,7 @@ edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
 boxplorer.obj: boxplorer.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 \
-        glsl.h interpolate.h uniforms.h camera.h shader.h cfgs\menger.cfg.data\fragment.glsl 
+        glsl.h interpolate.h uniforms.h camera.h shader.h params.h cfgs\menger.cfg.data\fragment.glsl 
 	cl -c $(CFLAGS) boxplorer.cc
 
 interpolate.obj: interpolate.cc interpolate.h
@@ -34,7 +34,7 @@ shader.obj: shader.cc shader.h
 uniforms.obj: uniforms.cc uniforms.h
 	cl -c $(CFLAGS) uniforms.cc
 
-camera.obj: camera.cc camera.h
+camera.obj: camera.cc camera.h params.h
 	cl -c $(CFLAGS) camera.cc
 
 TwBar.obj: AntTweakBar\src\TwBar.cpp

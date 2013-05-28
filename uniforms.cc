@@ -263,3 +263,11 @@ void Uniforms::bindToUI(void* bar) {
 				it->second->bindToUI(bar);
 	}
 }
+
+void Uniforms::send(int program) {
+	for (hash_map<string, iUniformPtr>::iterator it =
+		uniforms.begin(); it != uniforms.end(); ++it) {
+			if (it->second->ok())
+				it->second->send(program);
+	}
+}

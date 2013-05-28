@@ -20,6 +20,10 @@ KeyFrame::KeyFrame() {
   PROCESS_COMMON_PARAMS
 #undef PROCESS
   memset(par, 0, sizeof(par));
+  memset(iunis, 0, sizeof(iunis));
+  memset(funis, 0, sizeof(funis));
+  n_iunis = 0;
+  n_funis = 0;
   isKey_ = false;
 }
 
@@ -84,8 +88,24 @@ void* KeyFrame::map_address(const string& type, const string& name, int n) {
   PROCESS_COMMON_PARAMS
 #undef PROCESS
 
-  // TODO: for non-predefined uniforms, map them into couple of arrays,
-  //       so we'd get automagic uniform discovery and linkage.
+
+  // for non-predefined uniforms, map them into couple of arrays,
+  // so we'd get automagic uniform discovery and linkage.
+  if (type.compare("float") == 0) {
+	  if (n_funis < NUMPARS - 1) {
+		  return &this->funis[n_funis++];
+	  }
+  } else if (type.compare("int") == 0) {
+	  if (n_iunis < NUMPARS - 1) {
+		  return &this->iunis[n_iunis++];
+	  }
+  } else if (type.compare("vec3") == 0) {
+	  if (n_funis <= NUMPARS - 3) {
+		  float* adr = &this->funis[n_funis];
+		  n_funis += 3;
+		  return adr;
+	  }
+  }
 
   return NULL;
 }

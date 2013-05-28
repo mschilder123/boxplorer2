@@ -20,11 +20,13 @@ public:
 
   const std::string& source() const { return source_; }
   const std::string& log() const { return log_; }
+  const std::string& uniforms() const { return uniforms_; }
 
 private:
   std::string source_;
   unsigned int program_;
   std::string log_;
+  std::string uniforms_;
 };
 
 #endif  // _F_SHADER_H_
