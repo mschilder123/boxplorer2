@@ -24,7 +24,7 @@ You can control _speed_ and _focus_ manually by selecting the view controller wi
 
 Not all configuration files have been updated to do 3d the proper way yet, but for a nice selection of 3d views of the mandelbox try:
 {{{
-boxplorer cfgs/rrrola.cfg --xeyed
+boxplorer cfgs/rrrola/ --xeyed
 }}}
 Use the tab key to flip forward through the various scenes and the backspace key to flip backwards. Move around in a scene using your mouse and w,a,s,d keys. Adjust the _--xeyed_ to match your preferred 3d output method.
 
