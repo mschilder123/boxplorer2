@@ -15,7 +15,7 @@
  `./boxplorer cfgs/knighty/SpendFuelRods.cfg --render -fixedfov -overunder --time` to regenerate.
 
  * [http://www.youtube.com/watch?v=I0ilmEcsj8c]
- `./boxplorer cfgs/knighty/Reflectoids.cfg --render --fixedfov --overunder` to regenerate.
+ `./boxplorer cfgs/knighty/Reflectoids/ --render --fixedfov --overunder` to regenerate.
 
  * [http://www.youtube.com/watch?v=z3oguDRThpE]
  `./boxplorer cfgs/menger.cfg --render --fixedfov --overunder --time` to regenerate.
