@@ -8,7 +8,7 @@ using namespace std;
 void Shader::clear() {
   if (glIsProgram(program_)) {
     GLuint shaders[2];
-    GLsizei count = 2;   
+    GLsizei count = 2;
     glGetAttachedShaders(program_, count, &count, shaders);
     for (GLsizei i = 0; i < count; ++i) {
       glDetachShader(program_, shaders[i]);
@@ -69,48 +69,48 @@ bool Shader::compile(const string& defines,
   }
 
   {
-	  // Capture active uniforms
-	  GLint nUniforms = 0, maxLen = 0;
-	  glGetProgramiv(p, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLen);
-	  glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nUniforms);
+    // Capture active uniforms
+    GLint nUniforms = 0, maxLen = 0;
+    glGetProgramiv(p, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLen);
+    glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nUniforms);
 
-	  GLchar* name = (GLchar*)malloc(maxLen);
+    GLchar* name = (GLchar*)malloc(maxLen);
 
-	  GLint size, location;
-	  GLsizei written;
-	  GLenum type;
+    GLint size, location;
+    GLsizei written;
+    GLenum type;
 
-	  printf(" Location | Type | Name\n");
-	  printf("------------------------------------------------\n");
-	  for( int i = 0; i < nUniforms; ++i ) {
-		glGetActiveUniform(p, i, maxLen, &written,
-				   &size, &type, name );
-		location = glGetUniformLocation(p, name);
-		printf(" %-8d | %-5x| %s\n", location, type, name);
+    printf(" Location | Type | Name\n");
+    printf("------------------------------------------------\n");
+    for( int i = 0; i < nUniforms; ++i ) {
+      glGetActiveUniform(p, i, maxLen, &written,
+                         &size, &type, name );
+      location = glGetUniformLocation(p, name);
+      printf(" %-8d | %-5x| %s\n", location, type, name);
 
-		string sname(name);
-		string stype;
-		switch (type) {
-			case 0x1404: stype.assign("int"); break;
-			case 0x1406: stype.assign("float"); break;
-			case 0x140a: stype.assign("double"); break;
-			case 0x8b50: stype.assign("vec2"); break;
-			case 0x8b51: stype.assign("vec3"); break;
-			case 0x8b52: stype.assign("vec4"); break;
-			case 0x8b53: stype.assign("ivec2"); break;
-			case 0x8b54: stype.assign("ivec3"); break;
-			case 0x8b55: stype.assign("ivec4"); break;
-			case 0x8ffc: stype.assign("dvec2"); break;
-			case 0x8ffd: stype.assign("dvec3"); break;
-			case 0x8ffe: stype.assign("dvec4"); break;
-			case 0x8b5e: stype.assign("sampler2d"); break;
-		}
-		if (!stype.empty() && sname.find("[") == string::npos) {
-			uniforms_.append("uniform " + stype + " " + sname + ";\n");
-		}
-	  }
+      string sname(name);
+      string stype;
+      switch (type) {
+        case 0x1404: stype.assign("int"); break;
+        case 0x1406: stype.assign("float"); break;
+        case 0x140a: stype.assign("double"); break;
+        case 0x8b50: stype.assign("vec2"); break;
+        case 0x8b51: stype.assign("vec3"); break;
+        case 0x8b52: stype.assign("vec4"); break;
+        case 0x8b53: stype.assign("ivec2"); break;
+        case 0x8b54: stype.assign("ivec3"); break;
+        case 0x8b55: stype.assign("ivec4"); break;
+        case 0x8ffc: stype.assign("dvec2"); break;
+        case 0x8ffd: stype.assign("dvec3"); break;
+        case 0x8ffe: stype.assign("dvec4"); break;
+        case 0x8b5e: stype.assign("sampler2d"); break;
+      }
+      if (!stype.empty() && sname.find("[") == string::npos) {
+        uniforms_.append("uniform " + stype + " " + sname + ";\n");
+      }
+    }
 
-	  free(name);
+    free(name);
   }
 
   program_ = p;

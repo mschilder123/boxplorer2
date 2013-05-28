@@ -33,7 +33,10 @@
   PROCESS(int, enable_dof, "enable_dof", false) \
   PROCESS(int, no_spline, "no_spline", false) \
   PROCESS(float, focus, "focus", true) \
-  PROCESS(int, nrays, "nrays", true)
+  PROCESS(int, nrays, "nrays", true) \
+  PROCESS(int, xres, "xres", false) \
+  PROCESS(int, yres, "yres", false) \
+  PROCESS(int, use_bg_texture, "use_bg_texture", false)
 
 #define NUMPARS 20
 

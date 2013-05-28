@@ -13,7 +13,7 @@ boxplorer: $(BX_OBJS) $(TW_OBJS)
 
 boxplorer.o: boxplorer.cc default_shaders.h shader_procs.h Makefile.osx \
              TGA.h cfgs/menger.cfg.data/fragment.glsl interpolate.h camera.h \
-	     uniforms.h shader.h
+	     uniforms.h shader.h params.h
 	g++ -c $(CFLAGS) boxplorer.cc
 
 shadershrink: shadershrink.cc shadershrink.h Makefile.osx
@@ -28,7 +28,7 @@ glsl: glsl.cc glsl.h TGA.h Makefile.osx
 shader.o: shader.cc shader.h
 	g++ -c $(CFLAGS) shader.cc
 
-camera.o: camera.cc camera.h
+camera.o: camera.cc camera.h params.h
 	g++ -c $(CFLAGS) camera.cc
 
 interpolate.o: interpolate.cc interpolate.h

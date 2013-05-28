@@ -36,9 +36,7 @@ varying vec3 eye;
 varying vec3 dir;
 varying float zoom;
 
-uniform float xres;
-uniform float yres;
-uniform float time;
+uniform float xres, yres, time, speed;
 
 // Interactive parameters.
 uniform vec3 par[20];
@@ -48,8 +46,6 @@ uniform float ao_eps;             // Base distance at which ambient occlusion is
 uniform float ao_strength;        // Strength of ambient occlusion.
 uniform float glow_strength;      // How much glow is applied after max_steps.
 uniform float dist_to_color;      // How is background mixed with the surface color after max_steps.
-
-uniform float speed;  // eye separation really.
 
 uniform int iters;        // {min=1 max=1000} Number of fractal iterations.
 uniform int color_iters;  // {min=0 max=1000} Coloration iterations.
