@@ -529,7 +529,7 @@ class Camera : public KeyFrame {
      glSetUniformi(iters); glSetUniformi(color_iters);
      glSetUniformf(ao_eps); glSetUniformf(ao_strength);
      glSetUniformf(glow_strength); glSetUniformf(dist_to_color);
-   glSetUniformi(nrays); glSetUniformf(focus);
+     glSetUniformi(nrays); glSetUniformf(focus);
 
    // Non-user uniforms.
      glSetUniformf(fov_x); glSetUniformf(fov_y);
@@ -556,8 +556,8 @@ class Camera : public KeyFrame {
      #undef glSetUniformfv
      #undef glUniform1i
 
-   // New-style discovered && active uniforms only.
-   uniforms.send(program);
+     // New-style discovered && active uniforms only.
+     uniforms.send(program);
    }
 
    void render(enum StereoMode stereo) {
@@ -625,25 +625,26 @@ class Camera : public KeyFrame {
     int SenderAddrSize = sizeof (SenderAddr);
 
     double q1[4];
-  bool gotData = false;
+    bool gotData = false;
 
-  for(;;) {
+    for(;;) {
       float qf[4];  // receive Quatf
-      int r = recvfrom(sock, (char*)&qf, sizeof(qf), 0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
+      int r = recvfrom(sock, (char*)&qf, sizeof(qf), 0,
+                       (SOCKADDR*)&SenderAddr, &SenderAddrSize);
       if (r == sizeof(qf)) {
         for (int i = 0; i < 4; ++i) q1[i] = qf[i];
-    gotData = true;
-    } else break;
-  }
+        gotData = true;
+      } else break;
+    }
 
-  if (gotData) {
-        q1[2] = -q1[2];  // We roll other way
-    qnormalize(q1);
+    if (gotData) {
+      q1[2] = -q1[2];  // We roll other way
+      qnormalize(q1);
 
-    // combine current view quat with sensor quat.
-    qmul(q1, this->q);
-        quat2mat(q1, this->v);
-  }
+      // combine current view quat with sensor quat.
+      qmul(q1, this->q);
+      quat2mat(q1, this->v);
+    }
   }
 #endif
 
@@ -755,7 +756,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
         SPLINE(tmp.x[j], p0->x[j], p1->x[j], p2->x[j], p3->x[j]);
       }
       x2quat(tmp.x, tmp.q);  // convert back to quat
-    qnormalize(tmp.q);
+      qnormalize(tmp.q);
       quat2mat(tmp.q, tmp.v);  // convert quat to the splined rotation matrix
 
       // Spline position into tmp.v[12..15]
@@ -1127,7 +1128,7 @@ void initGraphics() {
     glDeleteTextures(1, &background_texture);  // free existing
     glGenTextures(1, &background_texture);
     glEnable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, background_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -1149,76 +1150,84 @@ void initGraphics() {
     // Compile DoF shader, setup FBO as render target.
 
     (setupShaders2()) ||
-        die("Error in GLSL effects shader compilation:\n%s\n", effects.log().c_str());
+        die("Error in GLSL effects shader compilation:\n%s\n",
+            effects.log().c_str());
 
     // Create depth buffer(s)
-    glDeleteRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);  // free existing
+    glDeleteRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);
     glGenRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);
 
     // Create textures to render to
-    glDeleteTextures(ARRAYSIZE(texture), texture);  // free existing
+    glDeleteTextures(ARRAYSIZE(texture), texture);
     glGenTextures(ARRAYSIZE(texture), texture);
 
     // Create framebuffers
-    glDeleteFramebuffers(ARRAYSIZE(fbo), fbo);  // free existing
+    glDeleteFramebuffers(ARRAYSIZE(fbo), fbo);
     glGenFramebuffers(ARRAYSIZE(fbo), fbo);
 
-  for (int i = 0; i < ARRAYSIZE(fbo); ++i) {
-    glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer[i]);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
-                          config.width, config.height);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    for (int i = 0; i < ARRAYSIZE(fbo); ++i) {
+      glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer[i]);
+      glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
+                            config.width, config.height);
+      glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-    if ((status = glGetError()) != GL_NO_ERROR)
-      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      if ((status = glGetError()) != GL_NO_ERROR)
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-	glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture[i]);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, texture[i]);
 
-	GLint clamp = config.backbuffer ? GL_REPEAT : GL_CLAMP_TO_EDGE;
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                    GL_LINEAR_MIPMAP_LINEAR);
+      GLint clamp = config.backbuffer ? GL_REPEAT:GL_CLAMP_TO_EDGE;
+      GLint minfilter = config.backbuffer ? GL_NEAREST:GL_LINEAR_MIPMAP_LINEAR;
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
     // Allocate storage, float rgba if available. Pick max alpha width.
 #ifdef GL_RGBA32F
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
-                 0, GL_BGRA, GL_FLOAT, NULL);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
+                   0, GL_BGRA, GL_FLOAT, NULL);
 #else
 #ifdef GL_RGBA16
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
-                 0, GL_BGRA, GL_UNSIGNED_SHORT, NULL);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
+                   0, GL_BGRA, GL_UNSIGNED_SHORT, NULL);
 #else
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, config.width, config.height,
-                 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    fprintf(stderr, __FUNCTION__ " : 8 bit alpha, very granular DoF experience ahead..\n");
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, config.width, config.height,
+                   0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+      fprintf(stderr, __FUNCTION__ " : 8 bit alpha, "
+                                   "very granular DoF experience ahead..\n");
 #endif
 #endif
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+      glBindTexture(GL_TEXTURE_2D, 0);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
 
-    // Attach texture to framebuffer as colorbuffer
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           texture[i], 0);
+      // Attach texture to framebuffer as colorbuffer
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                             GL_TEXTURE_2D, texture[i], 0);
 
-    // Attach depthbuffer to framebuffer
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                              GL_RENDERBUFFER, depthBuffer[i]);
+      if ((status = glGetError()) != GL_NO_ERROR)
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-    if ((status = glGetError()) != GL_NO_ERROR)
-      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      // Attach depthbuffer to framebuffer
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                GL_RENDERBUFFER, depthBuffer[i]);
 
-    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE)
-      die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
+      if ((status = glGetError()) != GL_NO_ERROR)
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-    // Back to normal framebuffer.
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  }
+      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+      if (status != GL_FRAMEBUFFER_COMPLETE)
+        die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      // Back to normal framebuffer.
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
     if ((status = glGetError()) != GL_NO_ERROR)
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1465,11 +1474,13 @@ int main(int argc, char **argv) {
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
-  if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER) config.enable_dof = 0;  // mipmapping does not work for interlaced.
+  if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER)
+    config.enable_dof = 0;  // mipmapping does not work for interlaced.
   if (stereoMode == ST_OCULUS) {
-    config.width = 1280; config.height = 800;  // Fix rez. Otherwise mirrored screen drops Rift?
-  config.fov_y = 110; config.fov_x = 90.0;
-  fixedFov = true;
+    // Fix rez. Otherwise mirrored screen drops Rift?
+    config.width = 1280; config.height = 800;
+    config.fov_y = 110; config.fov_x = 90.0;
+    fixedFov = true;
   }
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
@@ -1485,13 +1496,19 @@ int main(int argc, char **argv) {
       die("SDL initialization failed: %s\n", SDL_GetError());
   atexit(SDL_Quit);
 
-  if(kJOYSTICK) {
+  if (kJOYSTICK) {
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-    for(int i=0; i < SDL_NumJoysticks(); i++) printf(__FUNCTION__ " : JoystickName %i: '%s'\n", i+1, SDL_JoystickName(i));
+    for(int i=0; i < SDL_NumJoysticks(); i++) {
+      printf(__FUNCTION__ " : JoystickName %i: '%s'\n", i+1,
+             SDL_JoystickName(i));
+    }
     joystick = SDL_JoystickOpen(kJOYSTICK-1);
-    printf(__FUNCTION__ " : JoystickNumAxes   : %i\n", SDL_JoystickNumAxes(joystick));
-    printf(__FUNCTION__ " : JoystickNumButtons: %i\n", SDL_JoystickNumButtons(joystick));
-    printf(__FUNCTION__ " : JoystickNumHats   : %i\n", SDL_JoystickNumHats(joystick));
+    printf(__FUNCTION__ " : JoystickNumAxes   : %i\n",
+           SDL_JoystickNumAxes(joystick));
+    printf(__FUNCTION__ " : JoystickNumButtons: %i\n",
+           SDL_JoystickNumButtons(joystick));
+    printf(__FUNCTION__ " : JoystickNumHats   : %i\n",
+           SDL_JoystickNumHats(joystick));
   }
 
    // Set up the video mode, OpenGL state, shaders and shader parameters.
@@ -1647,9 +1664,9 @@ int main(int argc, char **argv) {
 
     if (background_texture || config.backbuffer) {
       glActiveTexture(GL_TEXTURE0);
-	  if (background_texture)
+      if (background_texture)
         glBindTexture(GL_TEXTURE_2D, background_texture);
-	  else if (config.backbuffer)
+      else if (config.backbuffer)
         glBindTexture(GL_TEXTURE_2D, texture[(frameno-1)&1]);
     }
 
@@ -1682,9 +1699,8 @@ int main(int argc, char **argv) {
       glEnable(GL_TEXTURE_2D);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture[frameno&1]);
-	  if (!config.backbuffer) {
+      if (!config.backbuffer)
         glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
-	  }
 
       GLuint dof_program = effects.program();
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
@@ -1712,28 +1728,15 @@ int main(int argc, char **argv) {
       glLoadIdentity();
 
       // Draw our texture covering entire screen, running the frame shader.
-    // Top half
       glBegin(GL_QUADS);
         glTexCoord2f(0,1);
         glVertex2f(0,0);
-        glTexCoord2f(0,0.5);
-        glVertex2f(0,config.height/2);
-        glTexCoord2f(1,0.5);
-        glVertex2f(config.width,config.height/2);
-        glTexCoord2f(1,1);
-        glVertex2f(config.width,0);
-      glEnd();
-
-    // Bottom half
-      glBegin(GL_QUADS);
-        glTexCoord2f(0,0.5);
-        glVertex2f(0,config.height/2);
         glTexCoord2f(0,0);
         glVertex2f(0,config.height);
         glTexCoord2f(1,0);
         glVertex2f(config.width,config.height);
-        glTexCoord2f(1,0.5);
-        glVertex2f(config.width,config.height/2);
+        glTexCoord2f(1,1);
+        glVertex2f(config.width,0);
       glEnd();
 
       glUseProgram(0);
