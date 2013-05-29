@@ -1175,19 +1175,12 @@ void initGraphics() {
 	glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture[i]);
 
-	if (!config.backbuffer) {
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                      GL_LINEAR_MIPMAP_LINEAR);
-	} else {
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                      GL_LINEAR_MIPMAP_LINEAR);
-	}
+	GLint clamp = config.backbuffer ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
 
     // Allocate storage, float rgba if available. Pick max alpha width.
 #ifdef GL_RGBA32F
@@ -1689,8 +1682,9 @@ int main(int argc, char **argv) {
       glEnable(GL_TEXTURE_2D);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture[frameno&1]);
-	  if (!config.backbuffer)
+	  if (!config.backbuffer) {
         glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
+	  }
 
       GLuint dof_program = effects.program();
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
