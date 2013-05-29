@@ -36,7 +36,8 @@
   PROCESS(int, nrays, "nrays", true) \
   PROCESS(int, xres, "xres", false) \
   PROCESS(int, yres, "yres", false) \
-  PROCESS(int, use_bg_texture, "use_bg_texture", false)
+  PROCESS(int, use_bg_texture, "use_bg_texture", false) \
+  PROCESS(int, backbuffer, "backbuffer", false)
 
 #define NUMPARS 20
 

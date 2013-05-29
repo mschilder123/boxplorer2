@@ -225,11 +225,11 @@ enum StereoMode { ST_NONE=0,
 } stereoMode = ST_NONE;
 
 // ogl framebuffer object, one for each eye.
-GLuint fbo[1];
+GLuint fbo[2];
 // texture that frame got rendered to
-GLuint texture[1];
+GLuint texture[2];
 // depth buffer attached to fbo
-GLuint depthBuffer[1];
+GLuint depthBuffer[2];
 
 string BaseDir;     // Where our executable and include dirs live.
 string WorkingDir;  // Where current fractal code & data lives.
@@ -1127,6 +1127,7 @@ void initGraphics() {
     glDeleteTextures(1, &background_texture);  // free existing
     glGenTextures(1, &background_texture);
     glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, background_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -1144,7 +1145,7 @@ void initGraphics() {
   if ((status = glGetError()) != GL_NO_ERROR)
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
-  if (config.enable_dof) {
+  if (config.enable_dof || config.backbuffer) {
     // Compile DoF shader, setup FBO as render target.
 
     (setupShaders2()) ||
@@ -1171,13 +1172,22 @@ void initGraphics() {
     if ((status = glGetError()) != GL_NO_ERROR)
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
 
+	glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture[i]);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                    GL_LINEAR_MIPMAP_LINEAR);
+	if (!config.backbuffer) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                      GL_LINEAR_MIPMAP_LINEAR);
+	} else {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                      GL_LINEAR_MIPMAP_LINEAR);
+	}
 
     // Allocate storage, float rgba if available. Pick max alpha width.
 #ifdef GL_RGBA32F
@@ -1642,22 +1652,25 @@ int main(int argc, char **argv) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
 
-    if (background_texture) {
+    if (background_texture || config.backbuffer) {
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, background_texture);
+	  if (background_texture)
+        glBindTexture(GL_TEXTURE_2D, background_texture);
+	  else if (config.backbuffer)
+        glBindTexture(GL_TEXTURE_2D, texture[(frameno-1)&1]);
     }
 
-  GLuint program = fractal.program();
+    GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
 
     glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
     glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
                 background_texture);
 
-   if (config.enable_dof && camera.dof_scale != 0) {
+   if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
       // Render to different back buffer to compute DoF effects later,
       // using alpha as depth channel.
-      glBindFramebuffer(GL_FRAMEBUFFER, fbo[frameno&0]);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo[frameno&1]);
     }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1670,15 +1683,16 @@ int main(int argc, char **argv) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // If we're rendering some DoF effects, draw from buffer to screen.
-    if (config.enable_dof && camera.dof_scale != 0) {
+    if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       glEnable(GL_TEXTURE_2D);
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, texture[frameno&0]);
-      glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
+      glBindTexture(GL_TEXTURE_2D, texture[frameno&1]);
+	  if (!config.backbuffer)
+        glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
 
-    GLuint dof_program = effects.program();
+      GLuint dof_program = effects.program();
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
 
       glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
@@ -1812,12 +1826,12 @@ int main(int argc, char **argv) {
     }
 
     SDL_GL_SwapBuffers();
+    ++frameno;
 
     if (rendering && !splines.empty()) {
       // If we're playing a sequence back, save every frame to disk.
       char filename[256];
       sprintf(filename, "frame-%05d.tga", frameno);
-      ++frameno;
       saveScreenshot(filename);
     }
 
