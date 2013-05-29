@@ -1,5 +1,7 @@
 // syntopia's Fragmentarium Life
 
+varying vec3 dir;
+
 uniform sampler2D bg_texture;
 uniform float xres, yres, time;
 
@@ -49,6 +51,7 @@ vec3 color(vec2 z) {
 
 void main() {
   position = gl_FragCoord.xy * pixelSize;  // [0..1>
-  vec2 z = -1.0 + 2.0 * position;            // <-1..1>
+  vec2 z = -1.0 + 2.0 * position;          // <-1..1>
+  z -= dir.xy;
   gl_FragColor = vec4(color(z), 1.0);
 }
