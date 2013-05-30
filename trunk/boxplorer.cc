@@ -1363,6 +1363,7 @@ int main(int argc, char **argv) {
   bool useTime = false;
   bool configSpeed = false;
   bool fixedFov = false;
+  char* lifeform_file = NULL;
   int enableDof = 0;
 
   // Peel known options off the back..
@@ -1399,6 +1400,8 @@ int main(int argc, char **argv) {
       kKEYFRAME = argv[argc-1] + 5;
     } else if (!strncmp(argv[argc-1], "--joystick=", 11)) {
       kJOYSTICK = atoi(argv[argc-1] + 11);
+    } else if (!strncmp(argv[argc-1], "--lifeform=", 11)) {
+      lifeform_file = argv[argc-1] + 11;
     } else break;
     --argc;
   }
@@ -1576,6 +1579,41 @@ int main(int argc, char **argv) {
     }
   }
 
+  // draw backbuffer w/ starting lifeform.
+  if (config.backbuffer && lifeform_file) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo[(frameno-1)&1]);
+    // Ortho projection, entire screen in regular pixel coordinates.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, config.width, config.height, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glPointSize(1);
+    glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
+    glColor4f(1,1,1,1);
+    glBegin(GL_POINTS);
+
+    {
+      string lifeform;
+      readFile(lifeform_file, &lifeform);
+      istringstream in(lifeform);
+      string line;
+      while (getline(in, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        istringstream is(line);
+        int x,y;
+        is >> x;
+        is >> y;
+        glVertex2f(.5 + config.width / 2 + x, .5 + config.height / 2 + y);
+      }
+    }
+
+    glEnd();
+    glFinish();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+
   while (!done) {
     int ctlXChanged = 0, ctlYChanged = 0;
 
@@ -1662,22 +1700,25 @@ int main(int argc, char **argv) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
 
-    if (background_texture || config.backbuffer) {
-      glActiveTexture(GL_TEXTURE0);
-      if (background_texture)
-        glBindTexture(GL_TEXTURE_2D, background_texture);
-      else if (config.backbuffer)
-        glBindTexture(GL_TEXTURE_2D, texture[(frameno-1)&1]);
-    }
-
     GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
 
-    glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
-    glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
-                background_texture);
+    if (background_texture || config.backbuffer) {
+      glActiveTexture(GL_TEXTURE0);
+      if (background_texture) {
+        glBindTexture(GL_TEXTURE_2D, background_texture);
+        glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
+                    background_texture);
+      } else if (config.backbuffer) {
+        glBindTexture(GL_TEXTURE_2D, texture[(frameno-1)&1]);
+        glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
+                    lifeform_file != NULL);
+      }
+    }
 
-   if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
+    glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
+
+    if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
       // Render to different back buffer to compute DoF effects later,
       // using alpha as depth channel.
       glBindFramebuffer(GL_FRAMEBUFFER, fbo[frameno&1]);
@@ -1732,11 +1773,11 @@ int main(int argc, char **argv) {
         glTexCoord2f(0,1);
         glVertex2f(0,0);
         glTexCoord2f(0,0);
-        glVertex2f(0,config.height);
+        glVertex2f(0,config.height-1);
         glTexCoord2f(1,0);
-        glVertex2f(config.width,config.height);
+        glVertex2f(config.width-1,config.height-1);
         glTexCoord2f(1,1);
-        glVertex2f(config.width,0);
+        glVertex2f(config.width-1,0);
       glEnd();
 
       glUseProgram(0);
