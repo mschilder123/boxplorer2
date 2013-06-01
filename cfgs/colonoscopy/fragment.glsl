@@ -249,8 +249,8 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0*speed;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
