@@ -8,12 +8,12 @@
 #define SCALE par[0].y
 #define MINRAD2 par[0].x
 
-#define MENGER_SIZ par[1].y
-#define MENGER_SX par[2].y
-#define MENGER_SY par[2].x
-#define MENGER_SZ par[3].y
+#define MENGER_SIZ par[1].y  //{min=0 max=10 step=.01}
+#define MENGER_SX par[2].y  //{min=0 max=10 step=.01}
+#define MENGER_SY par[2].x  //{min=0 max=10 step=.01}
+#define MENGER_SZ par[3].y  //{min=0 max=10 step=.01}
 
-#define DIST_MULTIPLIER par[9].x
+#define DIST_MULTIPLIER par[9].x //{min=0 max=10 step=.01}
 #define DE_EPS 0.0001 //par[9].y
 #define MAX_DIST 10.0
 
@@ -53,7 +53,7 @@ float AbsScaleRaisedTo1mIters = pow(abs(SCALE), float(1-iters));
 
 //Fuctions to call.
 #define d d_MengerInterMandelBox //d_Mengersphere //d_Menger2 //d_mandelBox//d_MengerInterMandelBox//d_MengerIntersphere //
-#define color color_Menger //color_mandelBox//
+#define color color_mandelBox//
 
 // Compute the distance from `pos` to the sphere.
 float d_sphere(vec3 pos) {
@@ -111,10 +111,6 @@ float d_Mengersphere(vec3 pos) {
    return mix(d_Menger(pos),d_sphere(pos),par[4].y)/max(1.0,2.0*abs(par[4].y-0.5));
 }
 
-// Compute the distance from `pos` to the intersection of Menger sponge and sphere.
-float d_MengerIntersphere(vec3 pos) {
-   return min(d_Menger(pos),d_sphere(pos));
-}
 
 // Compute the distance from `pos` to the Mandelbulb.
 float d_mandelBulb(vec3 pos) {
@@ -170,6 +166,11 @@ vec3 color_mandelBox(vec3 pos) {
 // Compute the distance from `pos` to the intersection of Menger sponge and Mandelbox.
 float d_MengerInterMandelBox(vec3 pos) {
    return min(d_Menger(pos),d_mandelBox(pos));
+}
+
+// Compute the distance from `pos` to the intersection of Menger sponge and sphere.
+float d_MengerIntersphere(vec3 pos) {
+   return min(d_mandelBox(pos),d_sphere(pos));
 }
 
 
@@ -228,13 +229,28 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side) {
   return clamp(ao, 0.0, 1.0);
 }
 
+// ytalinflusa's noise [0..1>
+float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
+
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
+void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
+#endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
 
 void main() {
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
-
-  vec3 p = eye_in, dp = normalize(dir);
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 1000.0, extraD = 0.0, lastD;
   D = d(p + totalD * dp);
@@ -260,7 +276,7 @@ void main() {
     D = max(D, max(DE_EPS*totalD,0.0000152587890625));
     vec3 n = side * normal(p, D);
     col = color(p);
-    col = blinn_phong(n, -dp, normalize(eye_in+vec3(1.0,0.5,0.7)+dp), col);
+    col = blinn_phong(n, -dp, normalize(/*eye_in+*/vec3(1.0,0.5,0.7)+dp), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, D, side));
 
     // We've gone through all steps, but we haven't hit anything.
@@ -273,8 +289,8 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
