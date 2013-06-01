@@ -17,18 +17,17 @@ varying vec3 eye, dir;
 // Interactive parameters.
 uniform vec3 par[10];
 
-uniform float
-  min_dist,           // Distance at which raymarching stops.
-  ao_eps,             // Base distance at which ambient occlusion is estimated.
+uniform float min_dist;           // {min=1e-6 max=.01 step=1e-6} Distance at which raymarching stops.
+uniform float ao_eps,             // Base distance at which ambient occlusion is estimated.
   ao_strength,        // Strength of ambient occlusion.
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
 
 uniform float speed;
 
-uniform int iters,    // Number of fractal iterations.
-  color_iters,        // Number of fractal iterations for coloring.
-  max_steps;          // Maximum raymarching steps.
+uniform int iters;    // {min=1 max=1000 step=1} Number of fractal iterations.
+uniform int color_iters;        // Number of fractal iterations for coloring.
+uniform int max_steps;          // Maximum raymarching steps.
 
 // Colors. Can be negative or >1 for interestiong effects.
 vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
@@ -49,6 +48,7 @@ float Mandel(vec3 pos) {
 	vec2 z=pos.xy;
 	vec2 z0=z;
 	float r2=dot(z,z);
+#if 0
 	vec2 dz=vec2(1.,0.);
 	int i=0;
 	for(i=0;i<iters && r2<BAILOUT;i++){
@@ -60,9 +60,24 @@ float Mandel(vec3 pos) {
 	float dr=length(dz);
 	dr=DIST_MULTIPLIER*(r-2.)*log(r+1.)/dr;
 	//if(r2<4.) dr=0.;
-	dr=max(dr,0.);
+	dr=abs(dr); //max(dr,0.);
 	return (pos.z-SLOPE*dr)/sqrt(1.+SLOPE*SLOPE);//transforms the 2D estimated dist to 3D
 	//cone tracing would be faster but I'm too lazy
+#else
+	float dr=1.,ddr=0.,r;
+	int i=0;
+	for(i=0;i<iters && r2<BAILOUT;++i) {
+		r=sqrt(r2);
+		ddr = 2.*(dr*dr+r*ddr);
+		dr = 2.*dr*r+1.;
+		z=vec2(z.x*z.x-z.y*z.y,z.x*z.y*2.)+z0;
+                r2 = dot(z,z);
+	}
+        r = sqrt(r2);
+	float de = .5*log(dr)*(dr)/ddr;
+	//float de = dr/ddr;
+	return (pos.z-SLOPE*de)/sqrt(1.+SLOPE*SLOPE);
+#endif
 }
 // Compute the color at `pos`. I'm too lazy (once again lol) to do a good one!
 vec3 color_0(vec3 pos) {

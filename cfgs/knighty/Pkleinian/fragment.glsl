@@ -15,7 +15,7 @@
 */
 
 #define DIST_MULTIPLIER par[9].x // {min=.0001 max=1 step=.0001}
-#define DE_EPS 0.0001 //par[9].y
+
 #define MAX_DIST 10.0
 
 // Camera position and direction.
@@ -47,16 +47,16 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   aoColor = vec3(0, 0, 0);
 
 //Fuctions to call.
-#define d d_PKlein//d_PZshape //
-#define color color_PKlein//color_0//
+#define d d_PKlein
+#define color color_PKlein
 
 // Compute the distance from `pos` to the PKlein basic shape.
 float d_PZshape(vec3 p) {
    float rxy=length(p.xy)-par[9].y;
-#define TThickness par[5].x
-#define Zmult par[8].y
-#define Ziter int(par[8].x)
-   for(int i=0; i<Ziter; i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
+#define TThickness par[5].x //{min=-2 max=2 step=.001}
+#define Zmult par[8].y //{min=-2 max=2 step=.001}
+#define Ziter par[8].x  //{min=0 max=10 step=1}
+   for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
    return max(rxy,(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
 }
 
@@ -65,20 +65,20 @@ float d_PKlein(vec3 p) {
    //Just scale=1 Julia box
 	float r2=dot(p,p);
 	float DEfactor=1.;
-#define CSize vec3(par[1].y,par[1].x,par[2].y)
+#define CSizeVector par[1]
 #define Size par[0].y  // {min=0 max=10 step=.001}
-#define C vec3(par[2].x,par[3].y,par[3].x)
-#define Offset vec3(par[4].y,par[4].x,par[5].y)
+#define CVector par[2]
+#define Offset vec3(par[4])
 #define DEoffset par[0].x  // {min=-1 max=1 step=.001}
 	for(int i=0;i<iters /*&& r2<1000000.0*/;i++){
 		//Box folding
-		p=2.*clamp(p, -CSize, CSize)-p;
+		p=2.*clamp(p, -CSizeVector, CSizeVector)-p;
 		//Inversion
 		r2=dot(p,p);
 		float k=max(Size/r2,1.);
 		p*=k;DEfactor*=k;
 		//julia seed
-		p+=C;
+		p+=CVector;
 		//r2=dot(p,p);
 	}
 	//Call basic shape and scale its DE
@@ -95,14 +95,10 @@ vec3 color_PKlein(vec3 p) {
 	float DEfactor=1.;
 	vec4  col=vec4(0.0);
 	float rmin=r2;
-//#define CSize vec3(par[1].y,par[1].x,par[2].y)
-//#define Size par[0].y
-//#define C vec3(par[2].x,par[3].y,par[3].x)
-//#define Offset vec3(par[4].y,par[4].x,par[5].y)
-//#define DEoffset par[0].x
-	for(int i=0;i<iters /*&& r2<1000000.0*/;i++){
+
+	for(int i=0;i<color_iters /*&& r2<1000000.0*/;i++){
 		//Box folding
-		vec3 p1=2.*clamp(p, -CSize, CSize)-p;
+		vec3 p1=2.*clamp(p, -CSizeVector, CSizeVector)-p;
 		col.xyz+=abs(p-p1);//vec3(notEqual(p,p1));
 		p=p1;
 		//Inversion
@@ -110,16 +106,15 @@ vec3 color_PKlein(vec3 p) {
 		float k=max(Size/r2,1.);col.w+=abs(k-1.);
 		p*=k;DEfactor*=k;
 		//julia seed
-		p+=C;
+		p+=CVector;
 		r2=dot(p,p);
 		rmin=min(rmin,r2);
 	}
 	//rmin=min(1.,r2);
-	return mix(vec3(sqrt(rmin)),(0.5+0.5*sin(col.z*vec3(par[6].y,par[6].x,par[7].y))),par[7].x);//vec3(sqrt(rmin));//*col.xyz/(iters+1.);
-}
-// Compute the color at `pos`. I'm too lazy to do a good one!
-vec3 color_0(vec3 pos) {
-	return vec3(0.7,0.6,0.4);
+#define PKColor par[6]
+#define ColRatio par[7].x //{min=0 max=1 step=.01}
+//	return mix(vec3(sqrt(rmin)),(0.5+0.5*sin(col.z*PKColor)),ColRatio);//vec3(sqrt(rmin));//*col.xyz/(iters+1.);
+	return mix(sqrt(rmin)*col.xyz/(color_iters+1.),(0.5+0.5*sin(col.z*PKColor)),ColRatio);//vec3(sqrt(rmin));//*;
 }
 
 float normal_eps = 0.00001;
@@ -199,10 +194,13 @@ void main() {
   // Intersect the view ray with the Mandelbox using raymarching.
   // The distance field actually marched is the "calculated DE" minus (totalD * min_dist)
   // A perfect distance field have a gradient magnitude = 1. Assuming d() gives a perfect DE, 
-  //we have to multiply D with MINDIST_MULT in order to restore a gradient magnitude of 1
+  // we have to multiply D with MINDIST_MULT in order to restore a gradient magnitude of 1
   int steps;
 
-  for (steps=0; steps<max_steps && abs(D) > min_dist*totalD*1.0/8.0 && abs(D)>256.0*ULP && totalD < MAX_DIST; steps++) {
+  for (steps=0; steps<max_steps &&
+                abs(D) > min_dist*totalD*1.0/8.0 &&
+		abs(D)>256.0*ULP &&
+		totalD < MAX_DIST; steps++) {
     D = (side * d(p + totalD * dp) - totalD * min_dist) * MINDIST_MULT;
     totalD+=D;
   }
@@ -213,9 +211,8 @@ void main() {
 
   // We've got a hit or we're not sure.
   if (D < MAX_DIST) {
-    //D = max(D, max(DE_EPS*totalD,0.0000152587890625));
-	float D1 = min_dist*1.0/32.0*totalD;
-	vec3 n = side * normal(p, D1);
+    float D1 = min_dist*1.0/32.0*totalD;
+    vec3 n = side * normal(p, D1);
     col = color(p);
     col = blinn_phong(n, -dp, normalize(/*eye_in+*/vec3(1.0,0.5,0.7)/*+dp*/), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, D1, side));
@@ -230,12 +227,12 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = speed;
+  float zFar = 65535.0*zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
   gl_FragDepth = depth;
 
-  gl_FragColor = vec4(col, 1);
+  gl_FragColor = vec4(col, depth);
 }
