@@ -7,11 +7,11 @@
 
 #define P0 p0
 #define Z0 z0
-#define CX par[7].y// {min=-3.0 max=3 step=.001}
-#define CY par[7].x// {min=-3.0 max=3 step=.001}
-#define CZ par[8].x// {min=-3.0 max=3 step=.001}
-#define Angle par[3].x// {min=-6.0 max=6 step=.001}
-#define scale par[4].x// {min=-3 max=6 step=.001}
+#define CX par[7].y // {min=-3.0 max=3 step=.001}
+#define CY par[7].x // {min=-3.0 max=3 step=.001}
+#define CZ par[8].x // {min=-3.0 max=3 step=.001}
+#define Angle time //par[3].x// {min=-6.0 max=6 step=.001}
+#define scale par[4].x // {min=-3 max=6 step=.001}
 #define surfaceColor1 par[1]
 #define surfaceColor2 par[2]
 #define surfaceColor3 par[6]
@@ -40,6 +40,8 @@ uniform float
   ao_strength,        // Strength of ambient occlusion.
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
+
+uniform float time, speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
@@ -75,32 +77,34 @@ float ssat = sin(Angle);
 float usat = 1.0-cos(Angle);
 vec3 z0 = normalize(vec3(par[8].y, par[3].y, par[3].x));
 //WAS vec3 z0 = normalize(vec3(par[2].x, par[2].y, par[3].y));
-mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat + z0.z*ssat, z0.x*z0.z*usat - z0.y*ssat,
-                            z0.y*z0.x*usat - z0.z*ssat, z0.y*z0.y*usat + csat,      z0.y*z0.z*usat + z0.x*ssat,
-			    z0.z*z0.x*usat + z0.y*ssat, z0.z*z0.y*usat - z0.x*ssat, z0.z*z0.z*usat + csat
+mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat - z0.z*ssat, z0.x*z0.z*usat + z0.y*ssat,
+                            z0.y*z0.x*usat + z0.z*ssat, z0.y*z0.y*usat + csat,      z0.y*z0.z*usat - z0.x*ssat,
+			    z0.z*z0.x*usat - z0.y*ssat, z0.z*z0.y*usat + z0.x*ssat, z0.z*z0.z*usat + csat
 		      );
 
-// Compute the distance from `pos` to the Mandelbox.
+// Compute the distance from `pos` to the fractal.
 float de_octa(vec3 z0) {
-    float r=z0.x*z0.x+z0.y*z0.y+z0.z*z0.z;
-    
+    vec3 t = vec3(CX, CY, CZ);
+
+    float r = dot(z0, z0);
     int i = 0;
-    for (i=0;i< iters && r<20.0;i++){
+
+    for (i=0; i< iters && r < 20.0; i++){
       z0 *= RotationMatrix;
-      vec3 zz0;
-      if( z0.x+ z0.y<0.0){zz0.x=-z0.y;z0.y=-z0.x;z0.x=zz0.x;}
-      if( z0.x+ z0.z<0.0){zz0.x=-z0.z;z0.z=-z0.x;z0.x=zz0.x;}
-      if( z0.x- z0.y<0.0){zz0.x=z0.y;z0.y=z0.x;z0.x=zz0.x;}
-      if( z0.x- z0.z<0.0){zz0.x=z0.z;z0.z=z0.x;z0.x=zz0.x;}
-      //WAS CX=CY=CZ=1.
-      z0.x=z0.x*scale-CX*(scale-CX);
-      z0.y=z0.y*scale-CY*(scale-CY);
-      z0.z=z0.z*scale-CZ*(scale-CZ);
-      r=z0.x*z0.x+z0.y*z0.y+z0.z*z0.z;
-      //z0 *= RotationMatrix;
-}
+
+      if (z0.x + z0.y < 0.0) { z0.xy = -z0.yx; } 
+      if (z0.x + z0.z < 0.0) { z0.xz = -z0.zx; }
+ 
+      if (z0.x - z0.y < 0.0) { z0.xy = z0.yx; }
+      if (z0.x - z0.z < 0.0) { z0.xz = z0.zx; }
+
+      z0 *= scale;
+      z0 -= t*(scale-t);
+
+      r = dot(z0, z0);
+  }
   float k= (sqrt(r)-2.0)*pow(scale,float(-i));
-  return max(k,-k);
+  return abs(k);
 }
 // Compute the color at `pos`.
 vec3 color_octa(vec3 pos) {
@@ -108,17 +112,19 @@ vec3 color_octa(vec3 pos) {
   float trap = 1.0;
   for (int i=0; i<color_iters; i++) {
     p *= RotationMatrix;
-    float r2 = dot(p, p);
+
     vec3 pp0;
     if( p.x+ p.y<0.0){pp0.x=-p.y;p.y=-p.x;p.x=pp0.x;}
     if( p.x+ p.z<0.0){pp0.x=-p.z;p.z=-p.x;p.x=pp0.x;}
     if( p.x- p.y<0.0){pp0.x=p.y;p.y=p.x;p.x=pp0.x;}
     if( p.x- p.z<0.0){pp0.x=p.z;p.z=p.x;p.x=pp0.x;}
+
     //WAS CX=CY=CZ=1.
     p.x=p.x*scale-CX*(scale-CX);
     p.y=p.y*scale-CY*(scale-CY);
     p.z=p.z*scale-CZ*(scale-CZ);
-    r2=p.x*p.x+p.y*p.y+p.z*p.z;
+
+    float r2=dot(p, p);
     trap = min(trap, r2);
   }
   // c.x: log final distance (fractional iteration count)
@@ -233,8 +239,8 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0*zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
