@@ -1,4 +1,4 @@
-#summary Random fun things to try.
+#summary Random fun things to try
 
 = Fun things to try =
 
