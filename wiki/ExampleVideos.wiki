@@ -12,7 +12,7 @@
  to regenerate the stereoscopic footage as uploaded to youtube.
 
  * [http://www.youtube.com/watch?v=MZRZ7KNsx9U]
- `./boxplorer cfgs/knighty/SpendFuelRods/ --render -fixedfov -overunder --time` to regenerate.
+ `./boxplorer cfgs/knighty/SpentFuelRods/ --render -fixedfov -overunder --time` to regenerate.
 
  * [http://www.youtube.com/watch?v=I0ilmEcsj8c]
  `./boxplorer cfgs/knighty/Reflectoids/ --render --fixedfov --overunder` to regenerate.
