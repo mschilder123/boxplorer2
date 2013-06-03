@@ -2,7 +2,7 @@
 // Original formula by Tglad
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
 //bermarte:k-icosa,octa,dodeca formulas by knighty
-#define d de_menger
+#define d de_icosa
 
 #define P0 p0                    // standard Mandelbox
 //#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
@@ -33,7 +33,7 @@
 // Camera position and direction.
 varying vec3 eye, dir;
 varying float zoom;
-uniform float xres;
+uniform float xres, yres, time, speed;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -44,8 +44,6 @@ uniform float
   ao_strength,        // Strength of ambient occlusion.
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
-
-uniform float speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
@@ -73,74 +71,51 @@ float csat = cos(Angle);
 float ssat = sin(Angle);
 float usat = 1.-cos(Angle);
 vec3 z0 = normalize(vec3(par[2].x, par[2].y, par[3].y));
-mat3 RotationMatrix = mat3( z0.x*z0.x*usat + csat,      z0.x*z0.y*usat + z0.z*ssat, z0.x*z0.z*usat - z0.y*ssat,
-                            z0.y*z0.x*usat - z0.z*ssat, z0.y*z0.y*usat + csat,      z0.y*z0.z*usat + z0.x*ssat,
-			    z0.z*z0.x*usat + z0.y*ssat, z0.z*z0.y*usat - z0.x*ssat,                                                                      z0.z*z0.z*usat + csat
-		      );
+mat3 RotationMatrix = mat3(
+z0.x*z0.x*usat + csat, z0.x*z0.y*usat + z0.z*ssat, z0.x*z0.z*usat - z0.y*ssat,
+z0.y*z0.x*usat - z0.z*ssat, z0.y*z0.y*usat + csat, z0.y*z0.z*usat + z0.x*ssat,
+z0.z*z0.x*usat + z0.y*ssat, z0.z*z0.y*usat - z0.x*ssat, z0.z*z0.z*usat + csat);
 
-// Compute the distance from `pos` to the Mandelbox.
-float de_box(vec3 pos) {
-  vec4 p = vec4(pos,1), p0 = p;  // p.w is the distance estimate
-
-  for (int i=0; i<iters; i++) {
-    // box folding: if (p>1) p = 2-p; else if (p<-1) p = -2-p;
-    // p.xyz = abs(1.0+p.xyz) - p.xyz - abs(1.0-p.xyz);  // add;add;abs.add;abs.add (130.4%)
-    //    p.xyz = clamp(p.xyz*0.5+0.5, 0.0, 1.0) * 4.0 - 2.0 - p.xyz;  // mad.sat;mad;add (102.3%)
-    p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;  // min;max;mad
-
-    // sphere folding: if (r2 < minRad2) p /= minRad2; else if (r2 < 1.0) p /= r2;
-    float r2 = dot(p.xyz, p.xyz);
-    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);  // dp3,div,max.sat,mul
-
-    // scale, translate
-    p = p*scale + P0;
-  }
-  return ((length(p.xyz) - absScalem1) / p.w - AbsScaleRaisedTo1mIters) * DIST_MULTIPLIER;
-}
-
-float de_menger(vec3 z0) {
-    int i;float t=0.0; float r=0.0;
+float de_icosa(vec3 z0) {
+  int i; float t=0.0; float r=0.0;
     
-    for(int j=0;j<int(prefolds);j++){//Pre-fold maxFoldIterations//EXTRA
-      z0.y=abs(z0.y);
-      z0.z=abs(z0.z);
-      //z0.x=abs(z0.x);
-      t=z0.x*n3[0]+z0.y*n3[1]+z0.z*n3[2];
-      if(t<0.0){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
-   }
-    for (i=0;i<iters;i++){
-      //vec3 zz0;
-      z0=z0*RotationMatrix;
-      r=(z0.x*z0.x)+(z0.y*z0.y)+(z0.z*z0.z);
-      z0.x=abs(z0.x);z0.y=abs(z0.y);z0.z=abs(z0.z);
-      
-      t=z0.x*n3[0]+z0.y*n3[1]+z0.z*n3[2];
-      if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
-      z0.y=abs(z0.y);
-      z0.z=abs(z0.z);
-      t=z0.x*n3[0]+z0.y*n3[1]+z0.z*n3[2];
-      if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
-      z0.y=abs(z0.y);
-      z0.z=abs(z0.z);
-      t=z0.x*n3[0]+z0.y*n3[1]+z0.z*n3[2];
-      if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
+  for(i=0;i<int(prefolds);i++) { //Pre-fold maxFoldIterations
+    z0.yz = abs(z0.yz);
 
-      // Stretching:
-      // for an icosahedron: stc[]=ftris[];
-      // for a dodecahedron: stc[]=ftric[];
-      // In general you can choose: stc[]=a*ftris[]+b*ftria[]+c*ftric[]; where: a+b+c=1;
-      z0.x=scale*z0.x-ftris[0]*(scale-CX);
-      z0.y=scale*z0.y-ftris[1]*(scale-CY);
-      //CZ//ftris[2]//nothing
-      z0.z=scale*z0.z-ftris[2]*(scale);
-      r=(z0.x*z0.x)+(z0.y*z0.y)+(z0.z*z0.z);
+    t = dot(z0, n3);
+    if(t<0.0){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
+  }
+  for (i=0;i<iters && r<20.0;i++) {
+    z0 = z0*RotationMatrix;
 
-    }
-    //float menger= r*pow(scale,1.0-float(i));
-    //return max(menger,-menger);
+    z0 = abs(z0);
+    
+    t = dot(z0, n3);
+    if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
 
-    float k= (sqrt(r)-2.0)*pow(scale,float(-i));
-    return k;
+    z0.yz = abs(z0.yz);
+
+    t = dot(z0, n3);
+    if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
+
+    z0.yz = abs(z0.yz);
+
+    t = dot(z0, n3);
+    if(t<0.){z0.x-=2.*t*n3[0];z0.y-=2.*t*n3[1];z0.z-=2.*t*n3[2];}
+
+    // Stretching:
+    // for an icosahedron: stc[]=ftris[];
+    // for a dodecahedron: stc[]=ftric[];
+    // In general you can choose: stc[]=a*ftris[]+b*ftria[]+c*ftric[]; where: a+b+c=1;
+    z0.x=scale*z0.x-ftris[0]*(scale-CX);
+    z0.y=scale*z0.y-ftris[1]*(scale-CY);
+    z0.z=scale*z0.z-ftris[2]*(scale);
+
+    r = dot(z0, z0);
+  }
+
+  float k= (sqrt(r)-2.0)*pow(scale,float(-i));
+  return k;
 }
 
 // Compute the color at `pos`.
@@ -163,7 +138,7 @@ vec3 color(vec3 pos) {
 }
 
 
-float normal_eps = 0.00001;
+float normal_eps = 0.0001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
@@ -209,7 +184,7 @@ uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x 
 void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
 #if !defined(ST_NONE)
 #if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
 #else
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
 #endif
@@ -250,8 +225,7 @@ void main() {
   vec3 col = backgroundColor;
 
   // We've got a hit or we're not sure.
-  if (D < MAX_DIST)
-  {
+  if (D < MAX_DIST) {
     vec3 n = normal(p, m_dist);
     col = color(p);
     col = blinn_phong(n, -dp, normalize(eye_in+vec3(0,1,0)+dp), col);
@@ -260,15 +234,16 @@ void main() {
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
     if (D > m_dist) {
-      col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
+      col = mix(col, backgroundColor,
+                clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
   }
 
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
