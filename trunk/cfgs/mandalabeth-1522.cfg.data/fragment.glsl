@@ -16,6 +16,8 @@ uniform float glow_strength;  // How much glow is applied after max_steps. {min=
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.05}
 
 uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
+uniform float xres;
+varying float zoom;
 
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
@@ -64,7 +66,7 @@ float d_MandalaBeth1522(vec3 pos) {
    }
 
    float r = sqrt(r2);
-   return .5*log(r)*r/(2.*dr);
+   return .4*log(r)*r/(2.*dr);
 }
 
 float d_MandalaBeth1032(vec3 pos) {
@@ -132,7 +134,8 @@ vec3 color_MandalaBeth(vec3 pos) {
       trap = min(trap, r2);
    }
 
-   vec2 c = clamp(vec2( 5.*log(r2)-1.0, sqrt(trap) ), 0.0, 1.0);
+   //vec2 c = clamp(vec2( 5.*log(r2)-1.0, sqrt(trap)), 0., 6.);
+   vec2 c = normalize(vec2(log(r2), sqrt(trap)));
    return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
 }
 
@@ -200,10 +203,19 @@ void main() {
   vec3 p = eye_in, dp = normalize(dir);
 
   float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
+  float cutD;
+
+  vec3 col = backgroundColor;
+  int steps = 0;
+  float m_dist = min_dist;
+  float m_zoom = .5 * zoom / xres;
+
+  cutD = (p.z - par[0].x) / -dp.z;
+  if (p.z < par[0].x) cutD = -1.;
+  if (cutD > 0.) totalD = cutD;
 
   // Intersect the view ray with the fratal using raymarching.
-  int steps;
-  for (steps=0; steps<max_steps; steps++) {
+  for (; steps<max_steps; steps++) {
     lastD = D;
     D = d(p + totalD * dp);
     if (extraD > 0.0 && D < extraD) {
@@ -213,17 +225,20 @@ void main() {
         steps--;
         continue;
     }
-    if (D < min_dist) break;
+    if (D < m_dist) break;
     if (D > MAX_DIST) break;
 
     totalD += D;
     totalD += extraD = 0.096 * D * (D+extraD)/lastD;
+	m_dist = m_zoom * totalD;
   }
 
+float z = (p+totalD*dp).z;
+if (z - par[0].x < -m_dist) {
   p += totalD * dp;
 
   // Color the surface with Blinn-Phong shading, ambient occlusion and glow.
-  vec3 col = backgroundColor;
+
 
   // We've got a hit or we're not sure.
   if (D < MAX_DIST) {
@@ -234,17 +249,25 @@ void main() {
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
-    if (D > min_dist) {
-      col = mix(col, backgroundColor, clamp(log(D/min_dist) * dist_to_color, 0.0, 1.0));
+    if (D > m_dist) {
+      col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
   }
 
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
+ } else {
+  if (cutD>0. && D<MAX_DIST) {
+    p+=cutD*dp;
+    col = color(p.xyz);
+    vec3 n = vec3(0,0,1.);  // fixed normal of cutting plane, no ambient occlusion..
+    col = blinn_phong(n, -dp, normalize(eye_in+vec3(lightVector.x,lightVector.y,-lightVector.z)+dp), col);
+  } else totalD = MAX_DIST;
+ }
 
   // Write Z-buffer
-  float zFar = 5.0;
-  float zNear = 0.0001;
+  float zNear = abs(speed);
+  float zFar = 65535.0*zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
