@@ -6,22 +6,23 @@
 #define DE de_bulb
 #define COLOR color_bulb
 
+#define INOUT(a,b) inout a b
+
 #define Power par[0].x  // {min=0 max=15 step=.5}
 #define Bailout par[0].y  // {min=0 max=100 step=1}
 
 #define MAX_DIST 4.0
 
-#define LoDbase par[8].x  // {min=1 max=20 step=.25}
-#define LoDpow par[8].y  // {min=0 max=50 step=.001}
+#define DIST_MULTIPLIER par[8].z // {min=0.001 max=1 step=.001}
 
-#define JuliaFactor par[0].z
+#define JuliaFactor par[0].z // {min=0.001 max=1 step=.001}
 #define JuliaVector par[2]
 
 // Camera position and direction.
 varying vec3 eye, dir;
 
 // Interactive parameters.
-uniform vec3 par[10];
+uniform vec3 par[20];
 
 uniform float min_dist;  // Distance at which raymarching stops. {min=1e-08 max=1e-03 step=1e-08}
 uniform float ao_eps;  // Base distance at which ambient occlusion is estimated. {min=0 max=.001 step=.000001}
@@ -30,6 +31,9 @@ uniform float glow_strength;  // How much glow is applied after max_steps. {min=
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.05}
 
 uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
+varying float zoom;
+uniform float xres;
+uniform float time;
 
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
@@ -42,6 +46,7 @@ uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
 #define surfaceColor3 par[6]
 #define specularColor par[7]
 #define glowColor par[1]
+
 
 #define lightVector par[9]
 
@@ -89,7 +94,7 @@ float de_bulb(vec3 z0) {
 	}
 
 	float bulb=(0.5 * r * log(r)/r_dz);
-	return bulb;
+	return bulb * DIST_MULTIPLIER;
 }
 
 vec3 color_bulb(vec3 z0) {
@@ -191,17 +196,32 @@ float ambient_occlusion(vec3 p, vec3 n) {
   return clamp(ao, 0.0, 1.0);
 }
 
+uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
+void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
+#if !defined(ST_NONE)
+#if defined(ST_INTERLACED)
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+#else
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
+#endif
+  eye_in = eye + eye_d;
+  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
+#else  // ST_NONE
+  eye_in = eye;
+  dp = normalize(dir);
+#endif
+}
+
+// ytalinflusa's noise [0..1>
+float pnoise(vec2 pt){ return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
 void main() {
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  
+  float m_zoom = zoom * .5 / xres;  // screen error at dist 1.
+  float noise = pnoise(gl_FragCoord.xy);
 
-  vec3 p = eye_in, dp = normalize(dir);
-
-  float odd = fract(gl_FragCoord.y * .5);
-  float displace = (4. * odd - 1.) * speed;
-  p += displace * vec3(gl_ModelViewMatrix[0]);
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 0.0;
 
@@ -215,7 +235,7 @@ void main() {
     if (D < m_dist) break;
     totalD += D;
     if (D > MAX_DIST) break;
-    m_dist = min_dist * pow(totalD * LoDbase + 1.0, LoDpow);  // Vary LoD
+    m_dist = max(min_dist, m_zoom * totalD);
   }
 
   p += totalD * dp;
