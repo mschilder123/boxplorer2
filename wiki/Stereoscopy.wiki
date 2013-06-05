@@ -30,9 +30,9 @@ Use the tab key to flip forward through the various scenes and the backspace key
 
 The enter key toggles between windowed and fullscreen view. For fullscreen _--interlaced_ the resolution will be set to 1920x1080. For _--overunder_ or _--sidebyside_ the resolution will be set to 1280x720 (native resolution of Sony's HMZ-T1).
 
-Other configuration files that should work: colonoscopy, mbox-fp64, menger, menger-sphere, knighty/!HypTess, knighty/Reflectoids, knighty/!SpentFuelRods, syntopia/spherical
+Other configuration files that should work: colonoscopy, mbox-fp64, menger, menger-sphere, knighty/!HypTess, knighty/Reflectoids, knighty/!SpentFuelRods, syntopia/spherical and most of shadertoys.
 
 = Save it! =
 
-Found an awesome 3d scene you want to record for posterity? Hit the printscreen key and a screen shot and configuration file will be saved in the _cfgs/rrrola.cfg.data/_ directory.
+Found an awesome 3d scene you want to record for posterity? Hit the printscreen key and a screen shot and configuration file will be saved in the _cfgs/rrrola/_ directory.
 Hit the space key and an additional keyframe will be saved there, and show up as one of the scenes to tab through.
