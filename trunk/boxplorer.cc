@@ -609,7 +609,7 @@ class Camera : public KeyFrame {
       }
    }
 
-#if defined(HYDRA)
+#if defined(_WIN32)
   void mixHydraOrientation(float* quat) {
     double q[4];
     q[0] = quat[0];
@@ -620,6 +620,7 @@ class Camera : public KeyFrame {
     qmul(q, this->q);
     quat2mat(q, this->v);
   }
+
   void mixSensorOrientation(socket_t sock) {
     sockaddr_in SenderAddr;
     int SenderAddrSize = sizeof (SenderAddr);
@@ -647,7 +648,6 @@ class Camera : public KeyFrame {
     }
   }
 #endif
-
 } camera,  // Active camera view.
   config;  // Global configuration set.
 
@@ -1315,7 +1315,7 @@ void initTwBar() {
 
   if (stereoMode == ST_OCULUS) {
   // Position HUD center for left eye.
-    char pos[100];
+  char pos[100];
   int x = config.width;
   int y = config.height;
   sprintf(pos, "boxplorer position='%d %d'", x/6, y/4);
@@ -1339,8 +1339,8 @@ void LoadKeyFrames(bool fixedFov) {
   char filename[256];
   for (int i = 0; ; ++i) {
     sprintf(filename, "%s-%u.cfg", kKEYFRAME, i);
-  // We load into global camera since that's where
-  // the uniforms are bound to.
+    // We load into global camera since that's where
+    // the uniforms are bound to.
     if (!camera.loadConfig(filename)) break;
     if (fixedFov) {
       camera.width = config.width;
@@ -1436,7 +1436,7 @@ int main(int argc, char **argv) {
     die("Usage: boxplorer <configuration-file.cfg>\n");
   }
 
-#if defined(HYDRA)
+#if defined(_WIN32)
   // Listen on UDP:1337 for quat sent from Oculus SensorBox
   WSADATA wsaData;
   WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -1453,7 +1453,9 @@ int main(int argc, char **argv) {
     RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     bind(RecvSocket, (SOCKADDR *) & RecvAddr, sizeof (RecvAddr));
   }
+#endif
 
+#if defined(HYDRA)
   if (sixenseInit() != SIXENSE_SUCCESS) {
     die("sixenseInit() fail!");
   }
@@ -1666,13 +1668,13 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
-#if defined(HYDRA)
+#if defined(_WIN32)
   if (!rendering) {
       // When not rendering a sequence, now mix in orientation (and translation)
       // external sensors might have to add (e.g. Oculus orientation) into the view
       // we are about to render.
       if (stereoMode == ST_OCULUS) {
-      camera.mixSensorOrientation(RecvSocket);
+        camera.mixSensorOrientation(RecvSocket);
     }
     //camera.mixHydraOrientation(ssdata.controllers[0].rot_quat);
   }
@@ -2331,10 +2333,12 @@ int main(int argc, char **argv) {
   camera.width = savedWidth; camera.height = savedHeight;
   camera.saveConfig("last.cfg", &defines);  // Save a config file on exit, just in case.
 
-#if defined(HYDRA)
+#if defined(_WIN32)
   closesocket(RecvSocket);
   WSACleanup();
+#endif
 
+#if defined(HYDRA)
   sixenseExit();
 #endif
 
