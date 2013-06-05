@@ -51,10 +51,8 @@ DECLARE_GL_PROC(PFNGLUNIFORM2FVPROC, glUniform2fv);
 DECLARE_GL_PROC(PFNGLUNIFORM3FVPROC, glUniform3fv);
 DECLARE_GL_PROC(PFNGLGETACTIVEUNIFORMARBPROC, glGetActiveUniform);
 
-#if defined(GL_ARB_gpu_shader_fp64)
 DECLARE_GL_PROC(PFNGLUNIFORM1DPROC, glUniform1d);
 DECLARE_GL_PROC(PFNGLUNIFORM3DVPROC, glUniform3dv);
-#endif
 
 DECLARE_GL_PROC(PFNGLGENERATEMIPMAPPROC, glGenerateMipmap);
 DECLARE_GL_PROC(PFNGLGENFRAMEBUFFERSPROC, glGenFramebuffers);
@@ -78,13 +76,12 @@ DECLARE_GL_PROC(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 
 #ifndef GL_DECLARE_ONLY
 bool enableShaderProcs(void) {
-
 #ifndef __APPLE__
 
 #define IMPORT_GL_PROC(type, name) \
   do { if (!(name = (type) SDL_GL_GetProcAddress(#name))) { \
-  fprintf(stderr, "failed to import function " #name "\n"); \
-  return 0; } } while (0)
+    fprintf(stderr, "failed to import function " #name "\n"); \
+  } } while (0)
 
   IMPORT_GL_PROC(PFNGLCREATEPROGRAMPROC, glCreateProgram);
   IMPORT_GL_PROC(PFNGLCREATESHADERPROC, glCreateShader);
@@ -109,10 +106,8 @@ bool enableShaderProcs(void) {
   IMPORT_GL_PROC(PFNGLISPROGRAMPROC, glIsProgram);
   IMPORT_GL_PROC(PFNGLGETACTIVEUNIFORMARBPROC, glGetActiveUniform);
 
-#if defined(GL_ARB_gpu_shader_fp64)
   IMPORT_GL_PROC(PFNGLUNIFORM1DPROC, glUniform1d);
   IMPORT_GL_PROC(PFNGLUNIFORM3DVPROC, glUniform3dv);
-#endif
 
   IMPORT_GL_PROC(PFNGLGENERATEMIPMAPPROC, glGenerateMipmap);
   IMPORT_GL_PROC(PFNGLGENFRAMEBUFFERSPROC, glGenFramebuffers);

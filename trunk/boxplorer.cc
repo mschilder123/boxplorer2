@@ -543,11 +543,11 @@ class Camera : public KeyFrame {
      glUniform1f(glGetUniformLocation(program, "xres"), config_width);
      glUniform1f(glGetUniformLocation(program, "yres"), config_height);
 
-     #if defined(GL_ARB_gpu_shader_fp64)
-     // Also pass in some double precision values, if supported.
-     glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
-     glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
-     #endif
+   // Also pass in some double precision values, if supported.
+     if (glUniform1d)
+       glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
+     if (glUniform3dv)
+       glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
 
    // Old-style par[] list.
      glSetUniformfv(par);
@@ -1753,10 +1753,10 @@ int main(int argc, char **argv) {
                   camera.dof_offset);
       glUniform1f(glGetUniformLocation(dof_program, "speed"),
                   camera.speed);
-      #if defined(GL_ARB_gpu_shader_fp64)
+
       // Also pass in double precision speed, if supported.
-      glUniform1d(glGetUniformLocation(dof_program, "dspeed"), camera.speed);
-      #endif
+      if (glUniform1d)
+        glUniform1d(glGetUniformLocation(dof_program, "dspeed"), camera.speed);
 
       glUniform1f(glGetUniformLocation(dof_program, "xres"), config.width);
       glUniform1f(glGetUniformLocation(dof_program, "yres"), config.height);
