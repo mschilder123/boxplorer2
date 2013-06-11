@@ -25,7 +25,7 @@ edit-cfg: edit-cfg.cc Makefile.osx
 glsl: glsl.cc glsl.h TGA.h Makefile.osx
 	g++ $(CFLAGS) glsl.cc -o glsl
 
-shader.o: shader.cc shader.h
+shader.o: shader.cc shader.h shader_procs.h
 	g++ -c $(CFLAGS) shader.cc
 
 camera.o: camera.cc camera.h params.h
@@ -34,7 +34,7 @@ camera.o: camera.cc camera.h params.h
 interpolate.o: interpolate.cc interpolate.h
 	g++ -c $(CFLAGS) interpolate.cc
 
-uniforms.o: uniforms.cc uniforms.h
+uniforms.o: uniforms.cc uniforms.h shader_procs.h
 	g++ -c $(CFLAGS) uniforms.cc
 
 TwBar.o: AntTweakBar/src/TwBar.cpp

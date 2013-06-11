@@ -11,10 +11,12 @@ bool enableShaderProcs(void);
 #if (defined __APPLE__)
   #include <OpenGL/glu.h>
   #include <OpenGL/glext.h>
+#if !defined(GL_DECLARE_ONLY)
 #ifndef PFNGLUNIFORM1DPROC
 void (*glUniform1d)(int, double) = 0;
 void (*glUniform3dv)(int, int, double*) = 0;
 #endif
+#endif  // GL_DECLARE_ONLY
  #elif (defined __WIN32__)
 #elif (defined __GNUC__)
   #include <GL/glx.h>
