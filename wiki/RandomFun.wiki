@@ -6,7 +6,7 @@ Conway's Game of Life.
 
 = Details =
 
-Boxplorer2 keeps a backbuffer containing the previous frame. When making that available as texture, it is straightforward to implement http://en.wikipedia.org/wiki/Conway's_Game_of_Life in a pixel shader, as shown by syntopia in a Fragmentarium example shader.
+Boxplorer2 keeps a backbuffer containing the previous frame. When making that available as texture, it is straightforward to implement Conway's Game of Life ([http://en.wikipedia.org/wiki/Conway's_Game_of_Life]) in a pixel shader, as shown by syntopia in a Fragmentarium example shader.
 
 Add loading interesting starting positions and it gets entertaining.
 
