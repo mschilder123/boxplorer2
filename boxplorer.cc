@@ -238,6 +238,8 @@ string BaseFile;     // Initial argument filename.
 Shader fractal;
 Shader effects;
 
+string lifeform;  // Conway's Game of Life creature, if any.
+
 Uniforms uniforms;
 
 // texture holding background image
@@ -1038,7 +1040,7 @@ bool setupDirectories(const char* configFile) {
 
 // Initializes the video mode, OpenGL state, shaders, camera and shader parameters.
 // Exits the program if an error occurs.
-void initGraphics() {
+void initGraphics(int frameno = 0) {
   GLenum status = GL_NO_ERROR;
   // If not fullscreen, use the color depth of the current video mode.
   int bpp = 24;  // FSAA works reliably only in 24bit modes
@@ -1231,6 +1233,39 @@ void initGraphics() {
 
     if ((status = glGetError()) != GL_NO_ERROR)
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+  }
+
+  // Fill backbuffer w/ starting lifeform, if we have one.
+  if (config.backbuffer && !lifeform.empty()) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo[(frameno-1)&1]);
+    // Ortho projection, entire screen in regular pixel coordinates.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, config.width, config.height, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glPointSize(1);
+    glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
+    glColor4f(1,1,1,1);
+    glBegin(GL_POINTS);
+
+    {
+      istringstream in(lifeform);
+      string line;
+      while (getline(in, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        istringstream is(line);
+        int x,y;
+        is >> x;
+        is >> y;
+        glVertex2f(.5 + config.width / 2 + x, .5 + config.height / 2 + y);
+      }
+    }
+
+    glEnd();
+    glFinish();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
   }
 }
 
@@ -1436,6 +1471,11 @@ int main(int argc, char **argv) {
     die("Usage: boxplorer <configuration-file.cfg>\n");
   }
 
+  if (lifeform_file) {
+	  // Load definition into our global string.
+      readFile(lifeform_file, &lifeform);
+  }
+
 #if defined(_WIN32)
   // Listen on UDP:1337 for quat sent from Oculus SensorBox
   WSADATA wsaData;
@@ -1581,40 +1621,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  // draw backbuffer w/ starting lifeform.
-  if (config.backbuffer && lifeform_file) {
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo[(frameno-1)&1]);
-    // Ortho projection, entire screen in regular pixel coordinates.
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, config.width, config.height, 0, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glPointSize(1);
-    glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
-    glColor4f(1,1,1,1);
-    glBegin(GL_POINTS);
-
-    {
-      string lifeform;
-      readFile(lifeform_file, &lifeform);
-      istringstream in(lifeform);
-      string line;
-      while (getline(in, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        istringstream is(line);
-        int x,y;
-        is >> x;
-        is >> y;
-        glVertex2f(.5 + config.width / 2 + x, .5 + config.height / 2 + y);
-      }
-    }
-
-    glEnd();
-    glFinish();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  }
 
   while (!done) {
     int ctlXChanged = 0, ctlYChanged = 0;
@@ -1904,7 +1910,7 @@ int main(int argc, char **argv) {
             config.height = event.resize.h;
             config.fov_x = 0;  // go for square pixels..
             config.sanitizeParameters();
-            grabbedInput = 1; initGraphics(); initTwBar();
+            grabbedInput = 1; initGraphics(frameno); initTwBar();
             printf("resize(%d, %d)\n", config.width, config.height);
       } break;
 
@@ -2019,7 +2025,7 @@ int main(int argc, char **argv) {
         } else {
           config.width = savedWidth; config.height = savedHeight;
         }
-        initGraphics(); initTwBar();
+        initGraphics(frameno); initTwBar();
       } break;
 
       // Switch DLP-Link L/R polarity
