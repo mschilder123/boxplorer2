@@ -221,7 +221,8 @@ enum StereoMode { ST_NONE=0,
                   ST_INTERLACED,
                   ST_SIDEBYSIDE,
                   ST_QUADBUFFER,
-                  ST_OCULUS
+                  ST_OCULUS,
+          ST_ANAGLYPH
 } stereoMode = ST_NONE;
 
 // ogl framebuffer object, one for each eye.
@@ -490,7 +491,7 @@ class Camera : public KeyFrame {
    // Save configuration.
    void saveConfig(const string& configFile, string* defines = NULL) {
      FILE* f;
-   string filename(WorkingDir + configFile);
+     string filename(WorkingDir + configFile);
      if ((f = fopen(filename.c_str(), "w")) != 0) {
        if (defines != NULL)
          fprintf(f, "%s", defines->c_str());
@@ -523,17 +524,17 @@ class Camera : public KeyFrame {
      #define glSetUniformi(name) \
        glUniform1i(glGetUniformLocation(program, #name), name);
 
-   GLuint program = fractal.program();
+     GLuint program = fractal.program();
 
-   // These might be dupes w/ uniforms.send() below.
-   // Leave for now until all .cfg got updated.
+     // These might be dupes w/ uniforms.send() below.
+     // Leave for now until all .cfg got updated.
      glSetUniformi(max_steps); glSetUniformf(min_dist);
      glSetUniformi(iters); glSetUniformi(color_iters);
      glSetUniformf(ao_eps); glSetUniformf(ao_strength);
      glSetUniformf(glow_strength); glSetUniformf(dist_to_color);
      glSetUniformi(nrays); glSetUniformf(focus);
 
-   // Non-user uniforms.
+     // Non-user uniforms.
      glSetUniformf(fov_x); glSetUniformf(fov_y);
 
      glSetUniformf(x_scale); glSetUniformf(x_offset);
@@ -545,13 +546,13 @@ class Camera : public KeyFrame {
      glUniform1f(glGetUniformLocation(program, "xres"), config_width);
      glUniform1f(glGetUniformLocation(program, "yres"), config_height);
 
-   // Also pass in some double precision values, if supported.
+     // Also pass in some double precision values, if supported.
      if (glUniform1d)
        glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
      if (glUniform3dv)
        glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
 
-   // Old-style par[] list.
+     // Old-style par[] list.
      glSetUniformfv(par);
 
      #undef glSetUniformf
@@ -598,6 +599,7 @@ class Camera : public KeyFrame {
          glRects(0,-1,1,1);  // draw right half
          break;
        case ST_INTERLACED:
+     case ST_ANAGLYPH:
          setUniforms(1.0, 0.0, 1.0, 0.0, speed*polarity);
          glRects(-1,-1,0,1);  // draw left half
          glRects(0,-1,1,1);  // draw right half
@@ -1414,7 +1416,10 @@ int main(int argc, char **argv) {
       stereoMode = ST_SIDEBYSIDE;
     } else if (!strcmp(argv[argc-1], "--quadbuffer")) {
       stereoMode = ST_QUADBUFFER;
-    } else if (!strcmp(argv[argc-1], "--oculus")) {
+    } else if (!strcmp(argv[argc-1], "--anaglyph")) {
+    stereoMode = ST_ANAGLYPH;  
+    defines.append("#define ST_ANAGLYPH\n");
+  } else if (!strcmp(argv[argc-1], "--oculus")) {
       stereoMode = ST_OCULUS;
       defines.append("#define ST_OCULUS\n");
     } else if (!strcmp(argv[argc-1], "--render")) {
@@ -1472,7 +1477,7 @@ int main(int argc, char **argv) {
   }
 
   if (lifeform_file) {
-	  // Load definition into our global string.
+    // Load definition into our global string.
       readFile(lifeform_file, &lifeform);
   }
 
@@ -1519,8 +1524,8 @@ int main(int argc, char **argv) {
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
-  if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER)
-    config.enable_dof = 0;  // mipmapping does not work for interlaced.
+  if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER || stereoMode == ST_ANAGLYPH)
+    config.enable_dof = 0;  // fxaa post does not work for these.
   if (stereoMode == ST_OCULUS) {
     // Fix rez. Otherwise mirrored screen drops Rift?
     config.width = 1280; config.height = 800;
@@ -2018,7 +2023,7 @@ int main(int argc, char **argv) {
             config.height = 800; config.width = 1280; // WTF? xfire fail on that rez
             //config.height = 720; config.width = 1280;
             config.fov_y = 110.0; config.fov_x = 90.0;
-          } else if (stereoMode == ST_NONE) {
+          } else if (stereoMode == ST_NONE || stereoMode == ST_ANAGLYPH) {
             config.height = 1600; config.width = 2560;  // 30"
 //            config.height = 1080; config.width = 1920;  // 27"
           }

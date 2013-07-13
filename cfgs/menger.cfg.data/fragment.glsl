@@ -618,7 +618,10 @@ bool setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
   dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
 #else
 #if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
+#elif defined(ST_ANAGLYPH)
+  float id = -1.0 + 2.0 * mod(gl_FragCoord.x + mod(gl_FragCoord.y, 2.0), 2.0);
+  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(id * speed, 0, 0, 0));
 #else
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
 #endif
@@ -767,6 +770,14 @@ void main() {
 
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
+
+  // gamma
+  //finalCol = pow(clamp(finalCol, 0.0, 1.0), vec3(0.45));
+
+#if defined(ST_ANAGLYPH)
+  float id = mod(gl_FragCoord.x + mod(gl_FragCoord.y, 2.0), 2.0);
+  finalCol *= vec3(1.0 - id, id, id); 
+#endif
 
   float zNear = abs(speed);
   float zFar = 65535.0 * zNear;
