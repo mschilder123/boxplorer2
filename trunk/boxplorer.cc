@@ -287,6 +287,15 @@ bool readFile(const string& name, string* content) {
   return true;
 }
 
+bool readIncludeFile(const string& name, string* content) {
+  string filename(BaseDir + "include/" + name);
+  char* s = _readFile(filename.c_str());
+  if (!s) return false;
+  content->assign(s);
+  free(s);
+  printf(__FUNCTION__ " : read '%s'\n", filename.c_str());
+  return true;
+}
 
 ////////////////////////////////////////////////////////////////
 // FPS tracking.
@@ -979,6 +988,18 @@ int setupShaders(void) {
 
   readFile(VERTEX_SHADER_FILE, &vertex);
   readFile(FRAGMENT_SHADER_FILE, &fragment);
+
+  // Process synthetic #include statements.
+  size_t inc_pos;
+  while ((inc_pos = fragment.find("#include ")) != string::npos) {
+    size_t name_start = fragment.find("\"", inc_pos) + 1;
+    size_t name_end = fragment.find("\"", name_start);
+    string name(fragment, name_start, name_end - name_start);
+    size_t line_end = fragment.find("\n", inc_pos);
+    string inc;
+    readIncludeFile(name, &inc);
+    fragment.replace(inc_pos, line_end - inc_pos, inc);
+  }
 
   glsl_source.assign(defines + fragment);
 
