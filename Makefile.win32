@@ -1,6 +1,6 @@
 all: boxplorer.exe shadershrink.exe edit-cfg.exe glsl.exe
 
-CFLAGS=/nologo /I. /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
+CFLAGS=/nologo /I. /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /Gd /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC
 LDFLAGS=/link /LIBPATH:SDL /LIBPATH:sixense /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \

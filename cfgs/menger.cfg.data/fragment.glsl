@@ -10,7 +10,10 @@
 
 #define DECLARE_DE(x)
 #define DECLARE_COLORING(x)
+
 #define INOUT(a,b) inout a b
+#define IN(a,b) in a b
+#define OUT(a,b) out a b
 
 // distance estimator func
 #ifndef d
@@ -584,57 +587,7 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
   return col;
 }
 
-uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
-bool setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
-#if !defined(ST_NONE)
-#if defined ST_OCULUS
-  float halfx = xres / 2.0;
-
-  vec2 q;
-  if (sign(speed) < 0.0) {
-    // left. 45 pixel shift towards center. Eyeballed.
-    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
-  } else {
-    // right. 45 pixel shift towards center.
-    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
-  }
-  vec2 p = -1.0 + 2.0 * q;
-
-  // Oculus barrel distort parameters.
-  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
-  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
-  float r2 = dot(p, p);  // Radius squared, from center.
-  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.10) { 
-    //discard;  // Don't waste time on pixels we can't see.
-    return false;
-  }
-
-  // Shift eye position, abs(speed) is half inter-occular distance.
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
-  eye_in = eye + eye_d;
-
-  // Note: no asymmetric frustum for Rift.
-  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
-#else
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
-#elif defined(ST_ANAGLYPH)
-  float id = -1.0 + 2.0 * mod(gl_FragCoord.x + mod(gl_FragCoord.y, 2.0), 2.0);
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(id * speed, 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  // Construct asymmetric frustum.
-  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
-#endif // ST_OCULUS
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-  return true;
-}
+#include "setup.inc"
 
 #if 0
 // 3d noise
@@ -704,7 +657,7 @@ float pnoise(vec2 pt){ return fract(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.1376
 void main() {
   vec3 eye_in, dp; 
 
-  if (!setup_stereo(eye_in, dp)) {
+  if (!setup_ray(eye, dir, eye_in, dp)) {
     gl_FragColor = vec4(0.0);
     gl_FragDepth = 0.0;
 	return;
@@ -774,19 +727,5 @@ void main() {
   // gamma
   //finalCol = pow(clamp(finalCol, 0.0, 1.0), vec3(0.45));
 
-#if defined(ST_ANAGLYPH)
-  float id = mod(gl_FragCoord.x + mod(gl_FragCoord.y, 2.0), 2.0);
-  finalCol *= vec3(1.0 - id, id, id); 
-#endif
-
-  float zNear = abs(speed);
-  float zFar = 65535.0 * zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(finalCol, depth);
-  // This one blurs reflection, but only based on last (furthest) hit..
-  //gl_FragColor = vec4(finalCol, (a+b/clamp(totalD/length(dir), zNear, zFar)));
+  write_pixel(firstD, finalCol);
 }
-
