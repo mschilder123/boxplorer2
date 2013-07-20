@@ -400,5 +400,4 @@ void main(void)
   col = PostEffects(col, xy);
   
   write_pixel(dir, distance, col);
-  gl_FragColor=vec4(col,1.0);
 }

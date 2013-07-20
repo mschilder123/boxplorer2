@@ -218,5 +218,5 @@ void main(void)
     // vigneting
     col *= pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
     
-    write_pixel(dir, tmat.z, col);
+    write_pixel(dir, tmat.x, col);
 }
