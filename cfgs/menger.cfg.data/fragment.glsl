@@ -655,9 +655,9 @@ float snoise(vec3 v) {
 float pnoise(vec2 pt){ return fract(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547); }
 
 void main() {
-  vec3 eye_in, dp; 
+  vec3 eye_out, dp; 
 
-  if (!setup_ray(eye, dir, eye_in, dp)) {
+  if (!setup_ray(eye, dir, eye_out, dp)) {
     gl_FragColor = vec4(0.0);
     gl_FragDepth = 0.0;
 	return;
@@ -666,7 +666,7 @@ void main() {
   float m_zoom = zoom * .5 / xres;  // screen error at dist 1.
   float noise = pnoise(gl_FragCoord.xy);
 
-  vec3 p = eye_in;
+  vec3 p = eye_out;
   float totalD = d(p);
   float side = sign(totalD);
   totalD *= side * noise;  // Randomize first step.
@@ -727,5 +727,5 @@ void main() {
   // gamma
   //finalCol = pow(clamp(finalCol, 0.0, 1.0), vec3(0.45));
 
-  write_pixel(firstD, finalCol);
+  write_pixel(dir, firstD, finalCol);
 }

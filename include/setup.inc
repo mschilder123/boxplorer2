@@ -1,7 +1,7 @@
 uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
 
-bool setup_ray(IN(vec3,eye), IN(vec3,dir),
-	       OUT(vec3,eye_in), OUT(vec3,dp)) {
+bool setup_ray(IN(vec3,eye), IN(vec3,ray),
+	       OUT(vec3,eye_out), OUT(vec3,ray_out)) {
 #if !defined(ST_NONE)
 #if defined ST_OCULUS
   float halfx = xres / 2.0;
@@ -28,10 +28,10 @@ bool setup_ray(IN(vec3,eye), IN(vec3,dir),
 
   // Shift eye position, abs(speed) is half inter-occular distance.
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
-  eye_in = eye + eye_d;
+  eye_out = eye + eye_d;
 
   // Note: no asymmetric frustum for Rift.
-  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
+  ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
 #else
 #if defined(ST_INTERLACED)
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
@@ -41,19 +41,19 @@ bool setup_ray(IN(vec3,eye), IN(vec3,dir),
 #else
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
 #endif
-  eye_in = eye + eye_d;
+  eye_out = eye + eye_d;
   // Construct asymmetric frustum.
-  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
+  ray_out = normalize(ray * (focus + 30.0) * abs(speed) - eye_d);
 #endif // ST_OCULUS
 #else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
+  eye_out = eye;
+  ray_out = normalize(ray);
 #endif
 
   return true;
 }
 
-void write_pixel(float z, vec3 finalCol) {
+void write_pixel(vec3 ray, float z, vec3 finalCol) {
 #if defined(ST_ANAGLYPH)
   float id = mod(gl_FragCoord.x + mod(gl_FragCoord.y, 2.0), 2.0);
   finalCol *= vec3(1.0 - id, id, id); 
@@ -63,7 +63,7 @@ void write_pixel(float z, vec3 finalCol) {
   float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(z/length(dir), zNear, zFar));
+  float depth = (a + b / clamp(z/length(ray), zNear, zFar));
   gl_FragDepth = depth;
   gl_FragColor = vec4(finalCol, depth);
 }
