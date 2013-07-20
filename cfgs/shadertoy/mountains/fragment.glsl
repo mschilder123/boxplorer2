@@ -7,9 +7,6 @@
 // Video of my OpenGL version that uses streaming texture normals for speed...
 // http://www.youtube.com/watch?v=qzkBnCBpQAM
 
-// Stereo version code thanks to Croqueteer (borrowed twice now!:))
-//#define STEREO 
-
 // boxplorer i/o
 varying vec3 eye, dir;
 uniform float xres, yres, speed, time;
@@ -18,57 +15,7 @@ uniform float xres, yres, speed, time;
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 
-// boxplorer 3d hackery
-uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
-bool setup_stereo(out vec3 eye_in, out vec3 dp) {
-#if !defined(ST_NONE)
-#if defined ST_OCULUS
-  float halfx = xres / 2.0;
-
-  vec2 q;
-  if (sign(speed) < 0.0) {
-    // left. 45 pixel shift towards center. Eyeballed.
-    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
-  } else {
-    // right. 45 pixel shift towards center.
-    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
-  }
-  vec2 p = -1.0 + 2.0 * q;
-
-  // Oculus barrel distort parameters.
-  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
-  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
-  float r2 = dot(p, p);  // Radius squared, from center.
-  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.10) { 
-    //discard;  // Don't waste time on pixels we can't see.
-    return false;
-  }
-
-  // Shift eye position, abs(speed) is half inter-occular distance.
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
-  eye_in = eye + eye_d;
-
-  // Note: no asymmetric frustum for Rift.
-  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
-#else
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  // Construct asymmetric frustum.
-  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
-#endif // ST_OCULUS
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-  return true;
-}
-
-
+#include "setup.inc"
 
 vec3 sunLight  = normalize( vec3(  0.4, 0.4,  0.48 ) );
 vec3 sunColour = vec3(1.0, .9, .83);
@@ -437,10 +384,6 @@ void main(void)
     vec2 s = xy * vec2(iResolution.x/iResolution.y,1.0);
     vec3 camTar;
 
-    #ifdef STEREO
-    float isCyan = mod(gl_FragCoord.x + mod(gl_FragCoord.y,2.0),2.0);
-    #endif
-
     // Use several forward heights, of decreasing influence with distance from the camera.
     float h = 0.0;
     for (float f = 1.0; f > 0.3; f-=.1)
@@ -459,13 +402,10 @@ void main(void)
     vec3 cv = normalize(cross(cu,cw));
     vec3 rd = normalize( s.x*cu + s.y*cv + 1.5*cw );
 
-    #ifdef STEREO
-    cameraPos += .45*cu*isCyan; // move camera to the right - the rd vector is still good
-    #endif
-
     // Use boxplorer camera
-    if (!setup_stereo( cameraPos, rd )) {
+    if (!setup_ray( eye, dir, cameraPos, rd )) {
       gl_FragColor = vec4(0);
+      gl_FragDepth = 0.0;
       return;
     }
 
@@ -495,11 +435,7 @@ void main(void)
 
     col = PostEffects(col);
     
-    #ifdef STEREO   
-    col *= vec3( isCyan, 1.0-isCyan, 1.0-isCyan );  
-    #endif
-    
-    gl_FragColor=vec4(col,1.0);
+    write_pixel(dir, distance, col);
 }
 
 //--------------------------------------------------------------------------

@@ -5,33 +5,15 @@
 // Camera position and direction.
 varying vec3 eye;
 varying vec3 dir;
-varying float zoom;
 
-uniform float xres;
-uniform float yres;
-uniform float time;
-
-// Interactive parameters.
-uniform vec3 par[20];
-
-uniform float min_dist;           // Distance at which raymarching stops.
-uniform float ao_eps;             // Base distance at which ambient occlusion is estimated.
-uniform float ao_strength;        // Strength of ambient occlusion.
-uniform float glow_strength;      // How much glow is applied after max_steps.
-uniform float dist_to_color;      // How is background mixed with the surface color after max_steps.
-
-uniform float speed;  // eye separation really.
-
-uniform int iters;        // {min=1 max=1000} Number of fractal iterations.
-uniform int color_iters;  // {min=0 max=1000} Coloration iterations.
-uniform int max_steps;    // {min=1 max=1000} Maximum raymarching steps.
-uniform int nrays;        // {min=1 max=10} # of ray bounces.
-
+uniform float xres, yres, time, speed;
 uniform sampler2D bg_texture;
 
 vec2 iResolution = vec2(xres, yres);
 float iGlobalTime = time;
 #define iChannel0 bg_texture
+
+#include "setup.inc"
 
 //uniform vec2      iResolution;     // viewport resolution (in pixels)
 //uniform float     iGlobalTime;     // shader playback time (in seconds)
@@ -39,35 +21,32 @@ float iGlobalTime = time;
 //uniform vec4      iMouse;          // mouse pixel coords. xy: current (if MLB down), zw: click
 //uniform samplerXX iChannel0..3;    // input channel. XX = 2D/Cube
 
-// Uncomment the following define in order to see Mike in 3D!
-#undef STEREO 
-
 float hash( float n )
 {
-    return fract(sin(n)*43758.5453123);
+  return fract(sin(n)*43758.5453123);
 }
 
 float noise( in float x )
 {
-    float p = floor(x);
-    float f = fract(x);
+  float p = floor(x);
+  float f = fract(x);
 
-    f = f*f*(3.0-2.0*f);
+  f = f*f*(3.0-2.0*f);
 
-    return mix( hash(p+0.0), hash(p+1.0),f);
+  return mix( hash(p+0.0), hash(p+1.0),f);
 }
 
 float noise( in vec2 x )
 {
-    vec2 p = floor(x);
-    vec2 f = fract(x);
+  vec2 p = floor(x);
+  vec2 f = fract(x);
 
-    f = f*f*(3.0-2.0*f);
+  f = f*f*(3.0-2.0*f);
 
-    float n = p.x + p.y*157.0;
+  float n = p.x + p.y*157.0;
 
-    float res = mix(mix( hash(n+  0.0), hash(n+  1.0),f.x),
-                    mix( hash(n+157.0), hash(n+158.0),f.x),f.y);
+  float res = mix(mix( hash(n+  0.0), hash(n+  1.0),f.x),
+                  mix( hash(n+157.0), hash(n+158.0),f.x),f.y);
 
   return res;
 }
@@ -78,14 +57,14 @@ mat2 m2 = mat2( 0.80, -0.60,
 
 float fbm( vec2 p )
 {
-    float f = 0.0;
+  float f = 0.0;
 
-    f += 0.5000*noise( p ); p = m2*p*2.02;
-    f += 0.2500*noise( p ); p = m2*p*2.03;
-    f += 0.1250*noise( p ); p = m2*p*2.01;
-    f += 0.0625*noise( p );
+  f += 0.5000*noise( p ); p = m2*p*2.02;
+  f += 0.2500*noise( p ); p = m2*p*2.03;
+  f += 0.1250*noise( p ); p = m2*p*2.01;
+  f += 0.0625*noise( p );
 
-    return f/0.9375;
+  return f/0.9375;
 }
 
 vec3 texturize( sampler2D sa, vec3 p, vec3 n )
@@ -110,14 +89,14 @@ vec2 sdSegment( vec3 a, vec3 b, vec3 p )
 
 float smin( float a, float b )
 {
-    float k = 0.06;
+  float k = 0.06;
   float h = clamp( 0.5 + 0.5*(b-a)/k, 0.0, 1.0 );
   return mix( b, a, h ) - k*h*(1.0-h);
 }
 
 float opS( float d1, float d2 )
 {
-    return max(-d1,d2);
+  return max(-d1,d2);
 }
 
 
@@ -130,16 +109,16 @@ vec2 sdMonster( vec3 p )
   q.y -= 0.3*pow(1.0-length(p.xz),1.0)*smoothstep(0.0, 0.2, p.y);
   q.y *= 1.05;
   q.z *= 1.0 + 0.1*smoothstep( 0.0, 0.5, q.z )*smoothstep( -0.5, 0.5, p.y );
-    float dd = length( (p - vec3(0.0,0.65,0.8))*vec3(1.0,0.75,1.0) );
+  float dd = length( (p - vec3(0.0,0.65,0.8))*vec3(1.0,0.75,1.0) );
   float am = clamp( 4.0*abs(p.y-0.45), 0.0, 1.0 );
   float fo = -0.03*(1.0-smoothstep( 0.0, 0.04*am, abs(dd-0.42) ))*am;
-    float dd2 = length( (p - vec3(0.0,0.65,0.8))*vec3(1.0,0.25,1.0) );
+  float dd2 = length( (p - vec3(0.0,0.65,0.8))*vec3(1.0,0.25,1.0) );
   float am2 = clamp( 1.5*(p.y-0.45), 0.0, 1.0 );
   float fo2 = -0.085*(1.0-smoothstep( 0.0, 0.08*am2, abs(dd2-0.42) ))*am2;
-    q.y += -0.05+0.05*length(q.x);
+  q.y += -0.05+0.05*length(q.x);
   
   float d1 = length( q ) - 0.9 + fo + fo2;
-    vec2 res = vec2( 0.8*d1, 1.0 );
+  vec2 res = vec2( 0.8*d1, 1.0 );
 
   // arms
   vec2 h = sdSegment( vec3(.83,0.15,0.0), vec3(1.02,-0.6,-.1), p );
@@ -150,58 +129,55 @@ vec2 sdMonster( vec3 p )
   res.x = smin( res.x, d2 );
   
   // hands
-  if( p.y<-1.0 )
-  {
+  if( p.y<-1.0 ) {
     float fa = sin(3.0*iGlobalTime);
-  h = sdSegment( vec3(0.95,-1.2,0.1), vec3(0.97,-1.5,0.0), p );
-  d2 = h.x - 0.03;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.97,-1.5,0.0), vec3(0.95,-1.7,0.0)-0.01*fa, p );
-  d2 = h.x - 0.03 + 0.01*h.y;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.95,-1.2,0.1), vec3(1.05,-1.5,0.1), p );
-  d2 = h.x - 0.03;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(1.05,-1.5,0.1), vec3(1.0,-1.75,0.1)-0.01*fa, p );
-  d2 = h.x - 0.03 + 0.01*h.y;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.95,-1.2,0.1), vec3(0.98,-1.5,0.2), p );
-  d2 = h.x - 0.03;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.98,-1.5,0.2), vec3(0.95,-1.7,0.15)-0.01*fa, p );
-  d2 = h.x - 0.03 + 0.01*h.y;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.95,-1.2,0.1), vec3(0.85,-1.4,0.2), p );
-  d2 = h.x - 0.04 + 0.01*h.y;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.85,-1.4,0.2), vec3(0.85,-1.63,0.15)+0.01*fa, p );
-  d2 = h.x - 0.03 + 0.01*h.y;
-  res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.95,-1.2,0.1), vec3(0.97,-1.5,0.0), p );
+    d2 = h.x - 0.03;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.97,-1.5,0.0), vec3(0.95,-1.7,0.0)-0.01*fa, p );
+    d2 = h.x - 0.03 + 0.01*h.y;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.95,-1.2,0.1), vec3(1.05,-1.5,0.1), p );
+    d2 = h.x - 0.03;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(1.05,-1.5,0.1), vec3(1.0,-1.75,0.1)-0.01*fa, p );
+    d2 = h.x - 0.03 + 0.01*h.y;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.95,-1.2,0.1), vec3(0.98,-1.5,0.2), p );
+    d2 = h.x - 0.03;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.98,-1.5,0.2), vec3(0.95,-1.7,0.15)-0.01*fa, p );
+    d2 = h.x - 0.03 + 0.01*h.y;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.95,-1.2,0.1), vec3(0.85,-1.4,0.2), p );
+    d2 = h.x - 0.04 + 0.01*h.y;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.85,-1.4,0.2), vec3(0.85,-1.63,0.15)+0.01*fa, p );
+    d2 = h.x - 0.03 + 0.01*h.y;
+    res.x = smin( res.x, d2 );
   }
   
   // legs
-  if( p.y<0.0 )
-  {
-  h = sdSegment( vec3(0.5,-0.5,0.0), vec3(0.6,-1.2,0.1), p );
-  d2 = h.x - 0.14 + h.y*0.08;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.6,-1.2,0.1), vec3(0.5,-1.8,0.0), p );
-  d2 = h.x - 0.06;
-  res.x = smin( res.x, d2 );
+  if( p.y<0.0 ) {
+    h = sdSegment( vec3(0.5,-0.5,0.0), vec3(0.6,-1.2,0.1), p );
+    d2 = h.x - 0.14 + h.y*0.08;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.6,-1.2,0.1), vec3(0.5,-1.8,0.0), p );
+    d2 = h.x - 0.06;
+    res.x = smin( res.x, d2 );
   }
 
     // feet
-  if( p.y<-1.5 )
-  {
-  h = sdSegment( vec3(0.5,-1.8,0.0), vec3(0.6,-1.8,0.4), p );
-  d2 = h.x - 0.09 + 0.02*h.y;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.5,-1.8,0.0), vec3(0.77,-1.8,0.35), p );
-  d2 = h.x - 0.08 + 0.02*h.y;
-  res.x = smin( res.x, d2 );
-  h = sdSegment( vec3(0.5,-1.8,0.0), vec3(0.9,-1.8,0.2), p );
-  d2 = h.x - 0.07 + 0.02*h.y;
-  res.x = smin( res.x, d2 );
+  if( p.y<-1.5 ) {
+    h = sdSegment( vec3(0.5,-1.8,0.0), vec3(0.6,-1.8,0.4), p );
+    d2 = h.x - 0.09 + 0.02*h.y;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.5,-1.8,0.0), vec3(0.77,-1.8,0.35), p );
+    d2 = h.x - 0.08 + 0.02*h.y;
+    res.x = smin( res.x, d2 );
+    h = sdSegment( vec3(0.5,-1.8,0.0), vec3(0.9,-1.8,0.2), p );
+    d2 = h.x - 0.07 + 0.02*h.y;
+    res.x = smin( res.x, d2 );
   }
   
   // horns
@@ -229,15 +205,14 @@ vec2 sdMonster( vec3 p )
   if( -mo > res.x )
     res = vec2( -mo, 4.0 );
 
-    res.x += 0.01*(smoothstep( 0.0, 0.05, mo+0.062 ) - smoothstep( 0.05, 0.10, mo+0.062 ));
+  res.x += 0.01*(smoothstep( 0.0, 0.05, mo+0.062 ) - smoothstep( 0.05, 0.10, mo+0.062 ));
 
     // teeth  
-  if( p.x<0.3 )
-  {
+  if( p.x<0.3 ) {
     p.x = mod( p.x, 0.16 )-0.08;  
     float d5 = length( (p-vec3(0.0,-0.37,0.65))*vec3(1.0,2.0,1.0))-0.08;
-  if( d5<res.x )
-    res = vec2( d5, 2.0 );
+    if( d5<res.x )
+      res = vec2( d5, 2.0 );
   }
   
   return res;
@@ -246,8 +221,7 @@ vec2 sdMonster( vec3 p )
 
 vec2 map( in vec3 p )
 {
-    vec2 res = vec2( p.y, 0.0 );
-    
+  vec2 res = vec2( p.y, 0.0 );
   vec2 tmp = sdMonster( p );
 
   if( tmp.x<res.x ) res=tmp;
@@ -259,27 +233,26 @@ vec3 intersect( in vec3 ro, in vec3 rd )
 {
   float maxd = 70.0;
   float precis = 0.001;
-    float h=precis*2.0;
-    float t = 0.0;
+  float h=precis*2.0;
+  float t = 0.0;
   float d = 0.0;
-    float m = 1.0;
-    for( int i=0; i<90; i++ )
-    {
-        if( abs(h)<precis||t>maxd ) continue;//break;
-        t += h;
-      vec2 res = map( ro+rd*t );
-        h = res.x;
+  float m = 1.0;
+  for( int i=0; i<90; i++ ) {
+    if( abs(h)<precis||t>maxd ) continue;//break;
+    t += h;
+    vec2 res = map( ro+rd*t );
+    h = res.x;
     d = res.y;
     m = res.y;
-    }
+  }
 
-    if( t>maxd ) m=-1.0;
-    return vec3( t, d, m );
+  if( t>maxd ) m=-1.0;
+  return vec3( t, d, m );
 }
 
 vec3 calcNormal( in vec3 pos )
 {
-    vec3 eps = vec3(0.002,0.0,0.0);
+  vec3 eps = vec3(0.002,0.0,0.0);
 
   return normalize( vec3(
            map(pos+eps.xyy).x - map(pos-eps.xyy).x,
@@ -289,32 +262,26 @@ vec3 calcNormal( in vec3 pos )
 
 float softshadow( in vec3 ro, in vec3 rd, float mint, float k )
 {
-    float res = 1.0;
-    float t = mint;
+  float res = 1.0;
+  float t = mint;
   float h = 1.0;
-    for( int i=0; i<35; i++ )
-    {
-        h = map(ro + rd*t).x;
-        res = min( res, k*h/t );
+  for( int i=0; i<35; i++ ) {
+    h = map(ro + rd*t).x;
+    res = min( res, k*h/t );
     t += clamp( h, 0.02, 2.0 );
-    }
-    return clamp(res,0.0,1.0);
+  }
+  return clamp(res,0.0,1.0);
 }
 
 
 vec3 lig = normalize(vec3(1.0,0.7,0.9));
 
-void main(void)
-{
+void main(void) {
   vec2 q = gl_FragCoord.xy / iResolution.xy;
   vec2 p = -1.0 + 2.0 * q;
   p.x *= iResolution.x/iResolution.y;
 //  vec2 m = vec2(0.5);
 //  if( iMouse.z>0.0 ) m = iMouse.xy/iResolution.xy;
-
-  #ifdef STEREO
-  float eyeID = mod(gl_FragCoord.x + mod(gl_FragCoord.y,2.0),2.0);
-    #endif
 
     //-----------------------------------------------------
     // animate
@@ -327,31 +294,18 @@ void main(void)
     //-----------------------------------------------------
 
   float an = sin(-0.25 + 0.31416*ctime); // - 6.2831*(dir.x-0.5);
- #if 0 
-  vec3 ro = vec3(3.5*sin(an),1.8,3.5*cos(an));
-  vec3 ta = vec3(0.0,1.5,0.0);
 
-  // camera matrix
-  vec3 ww = normalize( ta - ro );
-  vec3 uu = normalize( cross(ww,vec3(0.0,1.0,0.0) ) );
-  vec3 vv = normalize( cross(uu,ww));
+  vec3 ro;
+  vec3 rd;
+  if (!setup_ray(eye, dir, ro, rd)) {
+    gl_FragColor = vec4(0.0);
+    gl_FragDepth = 0.0;
+    return;
+  }
 
-  // create view ray
-  vec3 rd = normalize( p.x*uu + p.y*vv + 2.0*ww );
-
-#ifdef STEREO
-  vec3 fo = ro + rd*7.0; // put focus plane behind Mike
-  ro -= 0.1*uu*eyeID;    // eye separation
-  rd = normalize(fo-ro);
-#endif
-#else
-  vec3 ro = eye;
-  vec3 rd = normalize(dir);
-#endif
-
-    //-----------------------------------------------------
+  //-----------------------------------------------------
   // render
-    //-----------------------------------------------------
+  //-----------------------------------------------------
 
   vec3 col = vec3(1.0);
 
@@ -467,12 +421,5 @@ void main(void)
   // vigneting
   col *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.25 );
 
-#ifdef STEREO 
-  col *= vec3( eyeID, 1.0-eyeID, 1.0-eyeID ); 
-#endif
-
-  float z = tmat.x;
-
-  gl_FragColor = vec4( col, 1.0 );
-  gl_FragDepth = 0.1;
+  write_pixel(dir, tmat.x, col);
 }
