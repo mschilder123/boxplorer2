@@ -8,56 +8,7 @@ uniform float xres, yres, speed, time;
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 
-// boxplorer 3d hackery
-uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
-bool setup_stereo(out vec3 eye_in, out vec3 dp) {
-#if !defined(ST_NONE)
-#if defined ST_OCULUS
-  float halfx = xres / 2.0;
-
-  vec2 q;
-  if (sign(speed) < 0.0) {
-    // left. 45 pixel shift towards center. Eyeballed.
-    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
-  } else {
-    // right. 45 pixel shift towards center.
-    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
-  }
-  vec2 p = -1.0 + 2.0 * q;
-
-  // Oculus barrel distort parameters.
-  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
-  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
-  float r2 = dot(p, p);  // Radius squared, from center.
-  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.10) { 
-    //discard;  // Don't waste time on pixels we can't see.
-    return false;
-  }
-
-  // Shift eye position, abs(speed) is half inter-occular distance.
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
-  eye_in = eye + eye_d;
-
-  // Note: no asymmetric frustum for Rift.
-  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
-#else
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  // Construct asymmetric frustum.
-  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
-#endif // ST_OCULUS
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-  return true;
-}
-
+#include "setup.inc"
 
 float rand(vec3 r) { return fract(sin(dot(r.xy,vec2(1.38984*sin(r.z),1.13233*cos(r.z))))*653758.5453); }
 
@@ -132,16 +83,19 @@ void main()
     2.0*((-2.0*(t-sin(4.0*t)/4.0)/pi)+0.5+0.5));
 
     // Use boxplorer camera
-    if (!setup_stereo( ray_pos, ray_dir )) {
+    if (!setup_ray( eye, dir, ray_pos, ray_dir )) {
       gl_FragColor = vec4(0);
+      gl_FragDepth = 0.0;
       return;
     }
 
 	float i=float(Iterations);
+  float totalDist = 0.0;
 	for(int j=0;j<Iterations;j++)
 	{
 		float dist=distfunc(ray_pos);
 		ray_pos+=dist*ray_dir;
+    totalDist+=dist;
 
 		if(abs(dist)<0.001) { i=float(j); break; }
 	}
@@ -160,5 +114,6 @@ void main()
 	vec3 reflected=reflect(ray_dir,normal);
 	vec3 env= vec3(.5); //textureCube(iChannel0,reflected*reflected*reflected).xyz;
 
-	gl_FragColor=vec4(col*light+0.1*env,1.0);
+	col=col*light+0.1*env;
+  write_pixel(dir, totalDist, col);
 }
