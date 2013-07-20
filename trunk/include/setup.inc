@@ -1,10 +1,10 @@
 uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
 
-#ifndef OUT
-#define OUT(a,b) out a b
+#ifndef OUT_
+#define OUT_(a,b) out a b
 #endif
 
-bool setup_ray(vec3 eye, vec3 ray, OUT(vec3,eye_out), OUT(vec3,ray_out)) {
+bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
 #if !defined(ST_NONE)
 #if defined ST_OCULUS
   float halfx = xres / 2.0;

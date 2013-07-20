@@ -315,8 +315,8 @@ public:
 
 // inout (reference params) need a rewrite.
 #define INOUT(a,b) a & b
-#define IN(a,b) a b
-#define OUT(a,b) a & b
+#define IN_(a,b) a b
+#define OUT_(a,b) a & b
 
 // These attributes are meaningless for now in C++.
 #define varying
