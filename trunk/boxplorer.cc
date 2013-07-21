@@ -83,7 +83,7 @@ using namespace std;
 #define EFFECTS_VERTEX_SHADER_FILE   "effects_vertex.glsl"
 #define EFFECTS_FRAGMENT_SHADER_FILE "effects_fragment.glsl"
 
-#define die(...)    ( fprintf(stderr, __VA_ARGS__), exit(-1), 1 )
+#define die(...)    ( fprintf(stderr, __VA_ARGS__), _exit(1), 1 )
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(x) ( sizeof(x)/sizeof((x)[0]) )
 #endif
@@ -398,7 +398,7 @@ class Camera : public KeyFrame {
    // Load configuration.
    bool loadConfig(const string& configFile, string* defines = NULL) {
      bool result = false;
-   string filename(WorkingDir + configFile);
+     string filename(WorkingDir + configFile);
      FILE* f;
      if ((f = fopen(filename.c_str(), "r")) != 0) {
        size_t i;
@@ -491,7 +491,7 @@ class Camera : public KeyFrame {
      if (dist_to_color <= 0) dist_to_color = 0.2;
 
      orthogonalize();
-   mat2quat(this->v, this->q);
+     mat2quat(this->v, this->q);
 
      // Don't do anything with user parameters - they must be
      // sanitized (clamped, ...) in the shader.
@@ -608,7 +608,7 @@ class Camera : public KeyFrame {
          glRects(0,-1,1,1);  // draw right half
          break;
        case ST_INTERLACED:
-     case ST_ANAGLYPH:
+       case ST_ANAGLYPH:
          setUniforms(1.0, 0.0, 1.0, 0.0, speed*polarity);
          glRects(-1,-1,0,1);  // draw left half
          glRects(0,-1,1,1);  // draw right half
@@ -794,10 +794,10 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
                p0->par[j][2], p1->par[j][2], p2->par[j][2], p3->par[j][2]);
       }
 
-    // Spline generic float uniform array.
-    for (int j = 0; j < tmp.n_funis; ++j) {
-      SPLINE(tmp.funis[j], p0->funis[j], p1->funis[j], p2->funis[j], p3->funis[j]);
-    }
+      // Spline generic float uniform array.
+      for (int j = 0; j < tmp.n_funis; ++j) {
+        SPLINE(tmp.funis[j], p0->funis[j], p1->funis[j], p2->funis[j], p3->funis[j]);
+      }
 
       // Spline common params, if marked as such.
 #define PROCESS(a,b,c,doSpline) \
@@ -1168,8 +1168,9 @@ void initGraphics(int frameno = 0) {
     glBindTexture(GL_TEXTURE_2D, 0);
   }
 
-  if ((status = glGetError()) != GL_NO_ERROR)
+  if ((status = glGetError()) != GL_NO_ERROR) {
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+  }
 
   if (config.enable_dof || config.backbuffer) {
     // Compile DoF shader, setup FBO as render target.
@@ -1196,8 +1197,9 @@ void initGraphics(int frameno = 0) {
                             config.width, config.height);
       glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-      if ((status = glGetError()) != GL_NO_ERROR)
+      if ((status = glGetError()) != GL_NO_ERROR) {
         die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
 
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture[i]);
@@ -1233,20 +1235,23 @@ void initGraphics(int frameno = 0) {
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                              GL_TEXTURE_2D, texture[i], 0);
 
-      if ((status = glGetError()) != GL_NO_ERROR)
+      if ((status = glGetError()) != GL_NO_ERROR) {
         die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
 
       // Attach depthbuffer to framebuffer
       glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                 GL_RENDERBUFFER, depthBuffer[i]);
 
-      if ((status = glGetError()) != GL_NO_ERROR)
+      if ((status = glGetError()) != GL_NO_ERROR) {
         die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
 
       status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
-      if (status != GL_FRAMEBUFFER_COMPLETE)
+      if (status != GL_FRAMEBUFFER_COMPLETE) {
         die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
+      }
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -1254,8 +1259,9 @@ void initGraphics(int frameno = 0) {
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    if ((status = glGetError()) != GL_NO_ERROR)
+    if ((status = glGetError()) != GL_NO_ERROR) {
       die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    }
   }
 
   // Fill backbuffer w/ starting lifeform, if we have one.
@@ -1438,9 +1444,9 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[argc-1], "--quadbuffer")) {
       stereoMode = ST_QUADBUFFER;
     } else if (!strcmp(argv[argc-1], "--anaglyph")) {
-    stereoMode = ST_ANAGLYPH;  
-    defines.append("#define ST_ANAGLYPH\n");
-  } else if (!strcmp(argv[argc-1], "--oculus")) {
+      stereoMode = ST_ANAGLYPH;  
+      defines.append("#define ST_ANAGLYPH\n");
+    } else if (!strcmp(argv[argc-1], "--oculus")) {
       stereoMode = ST_OCULUS;
       defines.append("#define ST_OCULUS\n");
     } else if (!strcmp(argv[argc-1], "--render")) {
@@ -1473,12 +1479,15 @@ int main(int argc, char **argv) {
 
   // Load configuration.
   if (setupDirectories(configFile) &&
-    config.loadConfig(BaseFile, &defines)) {
+      config.loadConfig(BaseFile, &defines)) {
+    // succuss
   } else {
 #if defined(_WIN32)
     // For windows users that don't specify an argument, offer a dialog.
     char filename[256] = {0};
-    OPENFILENAME opf = {0};
+    OPENFILENAME opf;
+    ZeroMemory(&opf, sizeof(opf));
+    opf.lStructSize = sizeof(OPENFILENAME);
     opf.lpstrFilter = "Fractal configuration files\0*.cfg\0\0";
     opf.nFilterIndex = 1L;
     opf.lpstrFile = filename;
@@ -1487,14 +1496,14 @@ int main(int argc, char **argv) {
     opf.lpstrTitle = "Open fractal configuration file";
     opf.nFileOffset = 0;
     opf.lpstrDefExt = "cfg";
-    opf.Flags = OFN_PATHMUSTEXIST | OFN_READONLY;
-    opf.lStructSize = sizeof(OPENFILENAME);
+    opf.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_READONLY;
     if (GetOpenFileName(&opf) &&
-    setupDirectories(opf.lpstrFile) &&
-    config.loadConfig(BaseFile, &defines)) {
+      setupDirectories(opf.lpstrFile) &&
+      config.loadConfig(BaseFile, &defines)) {
+      // succuss
     } else
 #endif
-    die("Usage: boxplorer <configuration-file.cfg>\n");
+    { die("Usage: boxplorer <configuration-file.cfg>\n"); }
   }
 
   if (lifeform_file) {
@@ -1527,7 +1536,7 @@ int main(int argc, char **argv) {
   }
 
   sixenseSetFilterEnabled(1);
-  if (sixenseSetFilterParams(0.0, 0.0, 1000.0, 1.0) != SIXENSE_SUCCESS) {
+  if (sixenseSetFilterParams(0.0, 0.0, 2000.0, 1.0) != SIXENSE_SUCCESS) {
     die("SetFilterParams() fail!");
   }
 
@@ -1540,13 +1549,25 @@ int main(int argc, char **argv) {
   if (sixenseIsControllerEnabled(0) != SIXENSE_SUCCESS) {
     die("controller(0) not enabled!");
   }
+
+  double speed_base = 200.0;
+  int lbuttons = SIXENSE_BUTTON_START;  // so we calibrate on first loop.
+  int rbuttons = 0;
+  float neutral_x = 0;
+  float neutral_y = 0;
+  float neutral_z = 0;
 #endif
+
+  double speed_factor = 1.0;
 
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
   if (enableDof) config.enable_dof = (enableDof == 1);  // override
-  if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER || stereoMode == ST_ANAGLYPH)
+  if (stereoMode == ST_INTERLACED ||
+      stereoMode == ST_QUADBUFFER ||
+      stereoMode == ST_ANAGLYPH) {
     config.enable_dof = 0;  // fxaa post does not work for these.
+  }
   if (stereoMode == ST_OCULUS) {
     // Fix rez. Otherwise mirrored screen drops Rift?
     config.width = 1280; config.height = 800;
@@ -1722,7 +1743,7 @@ int main(int argc, char **argv) {
       }
 
       GLSL::dvec3 pos(camera.pos());
-    double de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
+      double de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
 
       if (de != last_de) {
         printf("de=%12.12e\n", de);
@@ -1760,7 +1781,9 @@ int main(int argc, char **argv) {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	  camera.speed *= speed_factor;
     camera.render(stereoMode);  // draw fractal
+	  camera.speed /= speed_factor;
 
     glUseProgram(0);
 
@@ -1786,11 +1809,11 @@ int main(int argc, char **argv) {
       glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
                   camera.dof_offset);
       glUniform1f(glGetUniformLocation(dof_program, "speed"),
-                  camera.speed);
+                  camera.speed * speed_factor);
 
       // Also pass in double precision speed, if supported.
       if (glUniform1d)
-        glUniform1d(glGetUniformLocation(dof_program, "dspeed"), camera.speed);
+        glUniform1d(glGetUniformLocation(dof_program, "dspeed"), camera.speed * speed_factor);
 
       glUniform1f(glGetUniformLocation(dof_program, "xres"), config.width);
       glUniform1f(glGetUniformLocation(dof_program, "yres"), config.height);
@@ -2343,18 +2366,89 @@ int main(int argc, char **argv) {
 
 #if defined(HYDRA)
   // Sixense Hydra
-    if (sixenseGetAllNewestData(&ssdata) != SIXENSE_SUCCESS) {
-    die("sixenseGetAllNewestData() fail!");
-    }
+  if (sixenseGetAllNewestData(&ssdata) == SIXENSE_SUCCESS) {
 //  printf("%f %f %f %f\n", ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
 
+  int clbuttons = ssdata.controllers[1].buttons;
+  int crbuttons = ssdata.controllers[0].buttons;
+
+#if 0
   camera.move(0, 0, camera.speed *   ssdata.controllers[0].joystick_y);
   m_rotateX2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_x);
   m_rotateY2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_y);
   m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
+#endif
 
 //  printf("%08x, %f\n", ssdata.controllers[0].buttons, ssdata.controllers[0].trigger);
-//  printf("%f %f %f\n", ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
+//  printf("%+7.7f %+7.7f %+7.7f, ", ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
+//  printf("%+7.7f %+7.7f %+7.7f\n", ssdata.controllers[1].pos[0],ssdata.controllers[1].pos[1],ssdata.controllers[1].pos[2]);
+
+  float dx = ssdata.controllers[0].pos[0] - ssdata.controllers[1].pos[0];
+  float dy = ssdata.controllers[0].pos[1] - ssdata.controllers[1].pos[1];
+  float dz = ssdata.controllers[0].pos[2] - ssdata.controllers[1].pos[2];
+  float d = sqrt(dx*dx + dy*dy + dz*dz);
+
+  // printf("%+7.7f\n", d);
+
+  // spot in between two hands.
+  dx = (ssdata.controllers[0].pos[0] + ssdata.controllers[1].pos[0]) / 2.0;
+  dy = (ssdata.controllers[0].pos[1] + ssdata.controllers[1].pos[1]) / 2.0;
+  dz = (ssdata.controllers[0].pos[2] + ssdata.controllers[1].pos[2]) / 2.0;
+
+  // set neutral when any start button is pressed.
+  bool calibrate = (lbuttons | rbuttons | clbuttons | crbuttons)
+                     & SIXENSE_BUTTON_START;
+
+  if (calibrate) {
+	  speed_base = d;
+	  neutral_x = dx;
+	  neutral_y = dy;
+	  neutral_z = dz;
+  }
+
+  // distance between controllers is eye separation / speed multiplier.
+  speed_factor = d / speed_base;
+
+//  printf("triggers %+7.7f, %+7.7f\n", ssdata.controllers[0].trigger, ssdata.controllers[1].trigger);
+//  printf("buttons  %+7.7x, %+7.7x\n", clbuttons, crbuttons);
+
+  // flip back&forth through keyframes w/ edge trigger of bumper button presses.
+  if ((clbuttons & SIXENSE_BUTTON_BUMPER) &&
+     ((clbuttons ^ lbuttons) & SIXENSE_BUTTON_BUMPER)) {
+	  --keyframe;
+	  if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
+	  if (keyframe < keyframes.size()) {
+      camera = keyframes[keyframe];
+    } else {
+      camera = config;
+    }
+  }
+  lbuttons = clbuttons;
+
+  if ((crbuttons & SIXENSE_BUTTON_BUMPER) &&
+     ((crbuttons ^ rbuttons) & SIXENSE_BUTTON_BUMPER)) {
+	  ++keyframe;
+	  if (keyframe >= keyframes.size()) keyframe = 0;
+	  if (keyframe < keyframes.size()) {
+      camera = keyframes[keyframe];
+    } else {
+      camera = config;
+    }
+  }
+  rbuttons = crbuttons;
+
+  dx = (neutral_x - dx) / 100.0;
+  dy = (neutral_y - dy) / 100.0;
+  dz = (neutral_z - dz) / 100.0;
+
+  printf("%+8.8lf %+8.8lf %+8.8lf\n", dx, dy, dz);
+
+  dx *= (camera.speed * speed_factor);
+  dy *= (camera.speed * speed_factor);
+  dz *= (camera.speed * speed_factor);
+  camera.move(-dx, -dy, dz);
+  }
+
 #endif
 
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
