@@ -1,0 +1,77 @@
+# Needs a recent Windows SDL2 drop in ./SDL2/
+#
+all: boxplorer-sdl2.exe shadershrink.exe edit-cfg.exe glsl.exe
+
+CFLAGS=/nologo /I. /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DHYDRAX
+LDFLAGS=/link /LIBPATH:SDL2/lib/x86 /LIBPATH:sixense /SUBSYSTEM:console /nologo
+
+TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
+        TwPrecomp.obj LoadOGL.obj \
+	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj \
+	LoadOGLCore.obj TwOpenGLCore.obj
+
+BX_OBJS=boxplorer-sdl2.obj interpolate.obj uniforms.obj camera.obj shader.obj
+
+boxplorer-sdl2.exe: $(BX_OBJS) $(TW_OBJS)
+	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
+
+shadershrink.exe: shadershrink.cc Makefile-sdl2.win32
+	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
+
+glsl.exe: glsl.cc TGA.h glsl.h Makefile-sdl2.win32
+        cl $(CFLAGS) glsl.cc $(LDFLAGS)
+
+edit-cfg.exe: edit-cfg.cc Makefile-sdl2.win32
+	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
+
+boxplorer-sdl2.obj: boxplorer-sdl2.cc default_shaders.h shader_procs.h TGA.h Makefile-sdl2.win32 \
+        glsl.h interpolate.h uniforms.h camera.h shader.h params.h cfgs\menger.cfg.data\fragment.glsl 
+	cl -c $(CFLAGS) boxplorer-sdl2.cc
+
+interpolate.obj: interpolate.cc interpolate.h
+	cl -c $(CFLAGS) interpolate.cc
+
+shader.obj: shader.cc shader.h
+	cl -c $(CFLAGS) shader.cc
+
+uniforms.obj: uniforms.cc uniforms.h
+	cl -c $(CFLAGS) uniforms.cc
+
+camera.obj: camera.cc camera.h params.h
+	cl -c $(CFLAGS) camera.cc
+
+TwBar.obj: AntTweakBar\src\TwBar.cpp
+	cl -c $(CFLAGS) $**
+
+TwMgr.obj: AntTweakBar\src\TwMgr.cpp
+	cl -c $(CFLAGS) $**
+
+TwColors.obj: AntTweakBar\src\TwColors.cpp
+	cl -c $(CFLAGS) $**
+
+TwFonts.obj: AntTweakBar\src\TwFonts.cpp
+	cl -c $(CFLAGS) $**
+
+TwEventSDL.obj: AntTweakBar\src\TwEventSDL.c
+	cl -c $(CFLAGS) $**
+
+TwEventSDL12.obj: AntTweakBar\src\TwEventSDL12.c
+	cl -c $(CFLAGS) $**
+
+TwEventSDL13.obj: AntTweakBar\src\TwEventSDL13.c
+	cl -c $(CFLAGS) $**
+
+TwOpenGL.obj: AntTweakBar\src\TwOpenGL.cpp
+	cl -c $(CFLAGS) $**
+
+TwOpenGLCore.obj: AntTweakBar\src\TwOpenGLCore.cpp
+	cl -c $(CFLAGS) $**
+
+TwPrecomp.obj: AntTweakBar\src\TwPrecomp.cpp
+	cl -c $(CFLAGS) $**
+
+LoadOGL.obj: AntTweakBar\src\LoadOGL.cpp
+	cl -c $(CFLAGS) $**
+
+LoadOGLCore.obj: AntTweakBar\src\LoadOGLCore.cpp
+	cl -c $(CFLAGS) $**
