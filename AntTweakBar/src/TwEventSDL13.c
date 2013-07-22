@@ -12,7 +12,8 @@
 //  ---------------------------------------------------------------------------
 
 
-#include "MiniSDL13.h" // a subset of SDL.h needed to compile TwEventSDL.c
+//#include "MiniSDL13.h" // a subset of SDL.h needed to compile TwEventSDL.c
+#include "SDL.h"
 // note: AntTweakBar.dll does not need to link with SDL, 
 // it just needs some definitions for its helper functions.
 
@@ -118,9 +119,10 @@ int TW_CALL TwEventSDL13(const void *sdlEvent)
         else
             handled = TwMouseButton((event->type==SDL_MOUSEBUTTONUP)?TW_MOUSE_RELEASED:TW_MOUSE_PRESSED, (TwMouseButtonID)event->button.button);
         break;
-    case SDL_VIDEORESIZE:
+    case SDL_WINDOWEVENT:
+        if (event->window.event == SDL_WINDOWEVENT_RESIZED)
         // tell the new size to TweakBar
-        TwWindowSize(event->resize.w, event->resize.h);
+        TwWindowSize(event->window.data1, event->window.data2);
         // do not set 'handled', SDL_VIDEORESIZE may be also processed by the calling application
         break;
     }
