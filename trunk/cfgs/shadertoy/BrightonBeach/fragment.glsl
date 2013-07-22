@@ -21,7 +21,6 @@ vec2 iResolution = vec2(xres, yres);
 
 #include "setup.inc"
 
-//#define STEREO 
 #define VARY_SIZE
 
 vec3 sunLight  = normalize( vec3(  0.35, 0.3,  0.6 ) );
@@ -378,6 +377,7 @@ void main(void)
     // Missed scene, now just get the sky value...
     col = GetSky(direction);
     col = GetClouds(col, direction);
+    distance = 0.0;
   }
   else
   {
