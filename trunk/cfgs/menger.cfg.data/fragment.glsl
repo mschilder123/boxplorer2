@@ -686,11 +686,13 @@ void main() {
     rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
   } else {
     rayCol = background_color(dp);
+    totalD = 0.0;
   }
 
   vec3 finalCol = rayCol;
   float firstD = totalD;
 
+if (firstD != 0.0)
 // uncomment to have only sphere be reflective.
 //  if (de_sphere(p) < de_mandelbox(p))
 {
