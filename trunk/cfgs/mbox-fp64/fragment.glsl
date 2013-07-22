@@ -226,7 +226,7 @@ bool setup_stereo(inout dvec3 eye_in, inout dvec3 dp) {
   dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
 #else
 #if defined(ST_INTERLACED)
-  dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(dspeed), 0, 0, 0));
+  dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * dspeed, 0, 0, 0));
 #else
   dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4(dspeed, 0, 0, 0));
 #endif
