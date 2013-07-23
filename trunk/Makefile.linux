@@ -5,7 +5,7 @@ CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA 
 
 LDFLAGS=-lm -lGL -lSDL -lX11
 
-TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o
 
 BX_OBJS=boxplorer.o interpolate.o uniforms.o camera.o shader.o
 
@@ -51,6 +51,12 @@ TwPrecomp.o: AntTweakBar/src/TwPrecomp.cpp
 	g++ -c $(CFLAGS) $<
 
 TwColors.o: AntTweakBar/src/TwColors.cpp
+	g++ -c $(CFLAGS) $<
+
+TwOpenGLCore.o: AntTweakBar/src/TwOpenGLCore.cpp
+	g++ -c $(CFLAGS) $<
+
+LoadOGLCore.o: AntTweakBar/src/LoadOGLCore.cpp
 	g++ -c $(CFLAGS) $<
 
 TwOpenGL.o: AntTweakBar/src/TwOpenGL.cpp
