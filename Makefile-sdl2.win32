@@ -7,7 +7,7 @@ LDFLAGS=/link /LIBPATH:SDL2/lib/x86 /LIBPATH:sixense /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj \
-	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj \
+	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj TwEventSDL20.obj \
 	LoadOGLCore.obj TwOpenGLCore.obj
 
 BX_OBJS=boxplorer-sdl2.obj interpolate.obj uniforms.obj camera.obj shader.obj
@@ -59,6 +59,9 @@ TwEventSDL12.obj: AntTweakBar\src\TwEventSDL12.c
 	cl -c $(CFLAGS) $**
 
 TwEventSDL13.obj: AntTweakBar\src\TwEventSDL13.c
+	cl -c $(CFLAGS) $**
+
+TwEventSDL20.obj: AntTweakBar\src\TwEventSDL20.c
 	cl -c $(CFLAGS) $**
 
 TwOpenGL.obj: AntTweakBar\src\TwOpenGL.cpp
