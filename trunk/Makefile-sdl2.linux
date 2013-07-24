@@ -1,11 +1,11 @@
 # Needs SDL2 build in ./SDL2
 all: boxplorer-sdl2 shadershrink edit-cfg glsl
 
-CFLAGS=-O2 -ISDL2/include -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX
+CFLAGS=-O2 -ISDL2/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX
 
 LDFLAGS=-lm -lGL -lX11 -LSDL2/lib -lSDL2 -lSDL2main
 
-TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o TwEventSDL20.o
 
 BX_OBJS=boxplorer-sdl2.o interpolate.o uniforms.o camera.o shader.o
 
@@ -72,4 +72,7 @@ TwEventSDL12.o: AntTweakBar/src/TwEventSDL12.c
 	g++ -c $(CFLAGS) $<
 
 TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL20.o: AntTweakBar/src/TwEventSDL20.c
 	g++ -c $(CFLAGS) $<
