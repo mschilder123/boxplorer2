@@ -1,6 +1,6 @@
 all: boxplorer shadershrink edit-cfg glsl
 
-CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/
+CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -DNO_SDL2 -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/
 
 LDFLAGS=-framework SDL -framework OpenGL -framework Cocoa
 
