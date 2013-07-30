@@ -358,28 +358,20 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
   return col;
 }
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 30x speed.
-void setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
-#if !defined(ST_NONE)
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-}
+#include "setup.inc"
 
 // ytalinflusa's noise [0..1>
 float pnoise(vec2 pt){ return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
 void main() {
+  vec3 eye_in, dp;
+  if (!setup_ray(eye, dir ,eye_in, dp)) {
+    gl_FragColor = vec4(0.0);
+    gl_FragDepth = 0.0;
+    return;
+  }
+
   init();
-  vec3 eye_in, dp; setup_stereo(eye_in, dp);
 
   float m_zoom = zoom * .5 / xres;  // screen error at dist 1.
   float noise = pnoise(gl_FragCoord.xy);
@@ -451,13 +443,5 @@ void main() {
   // draw lights, if any on primary ray.
   finalCol = mix(finalCol, light.xyz, light.w);
 
-  float zNear = abs(speed);
-  float zFar = 65535.0*zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(finalCol, depth);
-  //gl_FragColor = vec4(vec3(pow(finalCol.x,1.0/2.2), pow(finalCol.y, 1.0/2.2), pow(finalCol.z, 1.0/2.2)), depth);
+  write_pixel(dir, firstD, finalCol);
 }
-

@@ -206,54 +206,7 @@ float marche(inout vec3 p, in vec3 dp, inout float D, inout float totalD, in flo
 	return float(steps);
 }
 
-uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
-bool setup_stereo(INOUT(vec3,eye_in), INOUT(vec3,dp)) {
-#if !defined(ST_NONE)
-#if defined ST_OCULUS
-  float halfx = xres / 2.0;
-
-  vec2 q;
-  if (sign(speed) < 0.0) {
-    // left. 45 pixel shift towards center. Eyeballed.
-    q = (gl_FragCoord.xy - vec2(focus + 45.0, 0.0)) / vec2(halfx, yres);
-  } else {
-    // right. 45 pixel shift towards center.
-    q = (gl_FragCoord.xy - vec2(halfx - focus - 45.0, 0.0)) / vec2(halfx, yres);
-  }
-  vec2 p = -1.0 + 2.0 * q;
-
-  // Oculus barrel distort parameters.
-  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
-  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
-  float r2 = dot(p, p);  // Radius squared, from center.
-  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
-  if (dot(p, p) > 0.10) { 
-    //discard;  // Don't waste time on pixels we can't see.
-    return false;
-  }
-
-  // Shift eye position, abs(speed) is half inter-occular distance.
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
-  eye_in = eye + eye_d;
-
-  // Note: no asymmetric frustum for Rift.
-  dp = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
-#else
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  // Construct asymmetric frustum.
-  dp = normalize(dir * (focus + 30.0) * abs(speed) - eye_d);
-#endif // ST_OCULUS
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-  return true;
-}
+#include "setup.inc"
 
 float hash( float n ) {
     return fract(sin(n)*5345.8621276);
@@ -276,10 +229,10 @@ float noise( in vec2 x ) {
 void main() {
   vec3 eye_in, dp; 
 
-  if (!setup_stereo(eye_in, dp)) {
+  if (!setup_ray(eye, dir, eye_in, dp)) {
     gl_FragColor = vec4(0.0);
     gl_FragDepth = 0.0;
-	return;
+    return;
   }
 
   float noise = noise(gl_FragCoord.xy / vec2(xres, yres));
@@ -336,11 +289,5 @@ while(i<int(REFITER) && cont){
   i++;
 }
 
-  float zNear = abs(speed);
-  float zFar = 65535.0 * zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(firstD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(finalcol, depth);
+  write_pixel(dir, firstD, finalcol);
 }
