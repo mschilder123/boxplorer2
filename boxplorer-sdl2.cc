@@ -19,31 +19,30 @@
 #else  // _WIN32
 
 #include <winsock2.h>
-#include <Ws2tcpip.h>
 #include <CommDlg.h>
-#include <direct.h>
 
 #pragma warning(disable: 4996) // unsafe function
 #pragma warning(disable: 4244) // double / float conversion
 #pragma warning(disable: 4305) // double / float truncation
 #pragma warning(disable: 4800) // forcing value to bool
 
-#pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
+
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "glu32.lib")
+
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
+
+#include "oculus_sdk.h"
 
 #if defined(HYDRA)
 #include <sixense.h>
 #pragma comment(lib, "sixense.lib")
 #pragma comment(lib, "sixense_utils.lib")
 #endif
-
-typedef SOCKET socket_t;
 
 #endif  // _WIN32
 
@@ -360,7 +359,7 @@ GLuint depthBuffer[2];
 
 string BaseDir;     // Where our executable and include dirs live.
 string WorkingDir;  // Where current fractal code & data lives.
-string BaseFile;     // Initial argument filename.
+string BaseFile;    // Initial argument filename.
 
 Shader fractal;
 Shader effects;
@@ -464,13 +463,17 @@ float getFPS(void) {
   int i; Uint32 sum;
   for (i=sum=0; i<framesToAverage; i++) sum += frameDurations[i];
   float fps = framesToAverage * 1000.f / sum;
-#if 1
+
   static Uint32 lastfps = 0;
-  if (lastFrameTime - lastfps > 1000) {
+  if (lastFrameTime - lastfps > 5000) {
+    // Once per 5 seconds.
+#if defined(_WIN32)
+    SetOculusPrediction(0.9 / fps);  // A bit lower than latency.
+#endif
     printf("fps %f\n", fps);
     lastfps = lastFrameTime;
   }
-#endif
+
   return fps;
 }
 
@@ -757,31 +760,19 @@ class Camera : public KeyFrame {
     quat2mat(q, this->v);
   }
 
-  void mixSensorOrientation(socket_t sock) {
-    sockaddr_in SenderAddr;
-    int SenderAddrSize = sizeof (SenderAddr);
-
+  void mixSensorOrientation(float q[4]) {
     double q1[4];
-    bool gotData = false;
+    q1[0] = q[0];
+    q1[1] = q[1];
+    q1[2] = q[2];
+    q1[3] = q[3];
 
-    for(;;) {
-      float qf[4];  // receive Quatf
-      int r = recvfrom(sock, (char*)&qf, sizeof(qf), 0,
-                       (SOCKADDR*)&SenderAddr, &SenderAddrSize);
-      if (r == sizeof(qf)) {
-        for (int i = 0; i < 4; ++i) q1[i] = qf[i];
-        gotData = true;
-      } else break;
-    }
+    q1[2] = -q1[2];  // We roll other way
+    qnormalize(q1);
 
-    if (gotData) {
-      q1[2] = -q1[2];  // We roll other way
-      qnormalize(q1);
-
-      // combine current view quat with sensor quat.
-      qmul(q1, this->q);
-      quat2mat(q1, this->v);
-    }
+    // combine current view quat with sensor quat.
+    qmul(q1, this->q);
+    quat2mat(q1, this->v);
   }
 #endif
 } camera,  // Active camera view.
@@ -1608,21 +1599,27 @@ int main(int argc, char **argv) {
   }
 
 #if defined(_WIN32)
-  // Listen on UDP:1337 for quat sent from Oculus SensorBox
-  WSADATA wsaData;
-  WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-  socket_t RecvSocket = INVALID_SOCKET;
-
   if (stereoMode == ST_OCULUS) {
-    RecvSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    u_long nonblock = 1;
-    ioctlsocket(RecvSocket, FIONBIO, &nonblock);
-    sockaddr_in RecvAddr;
-    RecvAddr.sin_family = AF_INET;
-    RecvAddr.sin_port = htons(1337);
-    RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    bind(RecvSocket, (SOCKADDR *) & RecvAddr, sizeof (RecvAddr));
+    if (!InitOculusSDK()) {
+      die("InitOculusSDK() fail!");
+    }
+
+    hmd_settings_t hmd;
+    if (!GetOculusDeviceInfo(&hmd)) {
+      die("GetOculusDeviceInfo() fail!");
+    }
+    printf("Oculus %dx%d\n", hmd.h_resolution, hmd.v_resolution);
+    printf("Oculus ipd %f\n", hmd.interpupillary_distance);
+    printf("Oculus distortion (%f,%f,%f,%f)\n",
+                    hmd.distortion_k[0],
+                    hmd.distortion_k[1],
+                    hmd.distortion_k[2],
+                    hmd.distortion_k[3]);
+    // TODO: actually do something w/ these values.
+
+    SetOculusPrediction(.025);  // Also gets adjusted later based on fps.
+    SetOculusDriftCorrect(1);
+    ResetOculusOrientation();
   }
 #endif
 
@@ -1829,7 +1826,9 @@ int main(int argc, char **argv) {
       // external sensors might have to add (e.g. Oculus orientation) into the view
       // we are about to render.
       if (stereoMode == ST_OCULUS) {
-        camera.mixSensorOrientation(RecvSocket);
+        float q[4];
+        GetOculusQuat(q);
+        camera.mixSensorOrientation(q);
     }
     //camera.mixHydraOrientation(ssdata.controllers[0].rot_quat);
   }
@@ -2548,8 +2547,9 @@ int main(int argc, char **argv) {
   camera.saveConfig("last.cfg", &defines);  // Save a config file on exit, just in case.
 
 #if defined(_WIN32)
-  closesocket(RecvSocket);
-  WSACleanup();
+  if (stereoMode == ST_OCULUS) {
+    ReleaseOculusSDK();
+  }
 #endif
 
 #if defined(HYDRA)
