@@ -60,7 +60,6 @@ void KeyFrame::orthogonalize() {
 // Rotate the camera by `deg` degrees around a normalized axis.
 // Behaves like `glRotate` without normalizing the axis.
 void KeyFrame::rotate(double deg, double x, double y, double z) {
-  quat2mat(this->q, this->v);
   double s = sin(deg*PI/180), c = cos(deg*PI/180), t = 1-c;
   double r[3][3] = {
     { x*x*t +   c, x*y*t + z*s, x*z*t - y*s },
@@ -73,6 +72,7 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
     for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
   }
   orthogonalize();
+  // Keep this->q in sync with this->v
   mat2quat(this->v, this->q);
 }
 

@@ -483,9 +483,6 @@ float getFPS(void) {
 #include "params.h"
 
 class Camera : public KeyFrame {
-  private:
-
-
   public:
    Camera& operator=(const KeyFrame& other) {
     *((KeyFrame*)this) = other;
@@ -748,7 +745,6 @@ class Camera : public KeyFrame {
       }
    }
 
-#if defined(_WIN32)
   void mixHydraOrientation(float* quat) {
     double q[4];
     q[0] = quat[0];
@@ -772,9 +768,29 @@ class Camera : public KeyFrame {
 
     // combine current view quat with sensor quat.
     qmul(q1, this->q);
+
     quat2mat(q1, this->v);
+    mat2quat(this->v, this->q);
   }
-#endif
+
+  void unmixSensorOrientation(float q[4]) {
+    double q1[4];
+    q1[0] = q[0];
+    q1[1] = q[1];
+    q1[2] = q[2];
+    q1[3] = q[3];
+
+    q1[2] = -q1[2];  // We roll other way
+    qnormalize(q1);
+
+    // apply inverse current view.
+    double qinv[4];
+    qinvert(qinv, q1);
+    qmul(qinv, this->q);
+
+    quat2mat(qinv, this->v);
+    mat2quat(this->v, this->q);
+  }
 } camera,  // Active camera view.
   config;  // Global configuration set.
 
@@ -1752,6 +1768,7 @@ int main(int argc, char **argv) {
   }
 
   double last_de = 10.0;
+  KeyFrame* next_camera = &camera;
 
   // Check availability of DE; setup func ptr.
   if (!de_func_name.empty()) {
@@ -1767,8 +1784,11 @@ int main(int argc, char **argv) {
     }
   }
 
+  float view_q[4] = {0.5,0.3,0.2,1};
 
   while (!done) {
+    if (next_camera != &camera) camera = *next_camera;
+
     int ctlXChanged = 0, ctlYChanged = 0;
 
     // Splined keyframes playback logic. Messy. Sets up next camera.
@@ -1820,19 +1840,20 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
-#if defined(_WIN32)
+    next_camera = &camera;
+
   if (!rendering) {
+#if defined(_WIN32)
       // When not rendering a sequence, now mix in orientation (and translation)
       // external sensors might have to add (e.g. Oculus orientation) into the view
       // we are about to render.
       if (stereoMode == ST_OCULUS) {
-        float q[4];
-        GetOculusQuat(q);
-        camera.mixSensorOrientation(q);
-    }
-    //camera.mixHydraOrientation(ssdata.controllers[0].rot_quat);
-  }
+        GetOculusQuat(view_q);
+      }
 #endif
+
+      camera.mixSensorOrientation(view_q);
+  }
 
     if (!rendering && (de_func || de_func_64)) {
       // Get a distance estimate, for navigation and eye separation.
@@ -2189,15 +2210,15 @@ int main(int argc, char **argv) {
             render_time = 0;
             render_start = now();
             keyframe = 0;
-        } else camera = config;
+        } else next_camera = &config;
       } break;
 
       case SDLK_END: {  // Stop spline playback.
         splines.clear();
         if (!keyframes.empty()) {
           keyframe = keyframes.size() - 1;
-          camera = keyframes[keyframe];
-        } else camera = config;
+          next_camera = &keyframes[keyframe];
+        } else next_camera = &config;
       } break;
 
       case SDLK_DELETE: {
@@ -2217,7 +2238,7 @@ int main(int argc, char **argv) {
             keyframe = keyframes.size() - 1;
 
             if (keyframe < keyframes.size())
-              camera = keyframes[keyframe];
+              next_camera = &keyframes[keyframe];
           }
         }
       } break;
@@ -2273,7 +2294,7 @@ int main(int argc, char **argv) {
 
         if (keyframe < keyframes.size() && splines.empty()) {
            // Don't jump camera ahead if we were playing, just stop in place.
-           camera = keyframes[keyframe];
+           next_camera = &keyframes[keyframe];
         }
 
         if (keyframe < keyframes.size()) {
@@ -2282,7 +2303,7 @@ int main(int argc, char **argv) {
               keyframes[keyframe].delta_time);
         }
 
-        if (keyframes.empty()) camera = config;  // back to start
+        if (keyframes.empty()) next_camera = &config;  // back to start
 
         if (hasCtrl) {
           // Start playing: spline and start at keyframe.
@@ -2307,11 +2328,11 @@ int main(int argc, char **argv) {
         --keyframe;
         if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
         if (keyframe < keyframes.size()) {
-          camera = keyframes[keyframe];
+          next_camera = &keyframes[keyframe];
           printf("at keyframe %lu, speed %.8e, delta_time %f\n",
               (unsigned long)keyframe, keyframes[keyframe].speed,
               keyframes[keyframe].delta_time);
-        } else camera = config;
+        } else next_camera = &config;
         splines.clear();
       } break;
 
@@ -2506,9 +2527,9 @@ int main(int argc, char **argv) {
 	  --keyframe;
 	  if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
 	  if (keyframe < keyframes.size()) {
-      camera = keyframes[keyframe];
+      next_camera = &keyframes[keyframe];
     } else {
-      camera = config;
+      next_camera = &config;
     }
   }
   lbuttons = clbuttons;
@@ -2518,9 +2539,9 @@ int main(int argc, char **argv) {
 	  ++keyframe;
 	  if (keyframe >= keyframes.size()) keyframe = 0;
 	  if (keyframe < keyframes.size()) {
-      camera = keyframes[keyframe];
+      next_camera = &keyframes[keyframe];
     } else {
-      camera = config;
+      next_camera = &config;
     }
   }
   rbuttons = crbuttons;
@@ -2539,6 +2560,8 @@ int main(int argc, char **argv) {
 #endif  // HYDRA
 
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
+
+    camera.unmixSensorOrientation(view_q);
   }
 
   TwTerminate();
