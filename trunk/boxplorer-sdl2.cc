@@ -375,7 +375,7 @@ GLuint background_texture;
 int polarity=1;
 
 int kJOYSTICK;
-SDL_Joystick* joystick;
+SDL_Joystick* joystick = NULL;
 
 ////////////////////////////////////////////////////////////////
 // Helper functions
@@ -756,6 +756,7 @@ class Camera : public KeyFrame {
     quat2mat(q, this->v);
   }
 
+  // take this->q and q and produce this->v,q := this->q + q
   void mixSensorOrientation(float q[4]) {
     double q1[4];
     q1[0] = q[0];
@@ -770,9 +771,15 @@ class Camera : public KeyFrame {
     qmul(q1, this->q);
 
     quat2mat(q1, this->v);
-    mat2quat(this->v, this->q);
+
+    // this->q = q1;
+    this->q[0] = q1[0];
+    this->q[1] = q1[1];
+    this->q[2] = q1[2];
+    this->q[3] = q1[3];
   }
 
+  // take this->v and q and produce this->v,q := this->v - q
   void unmixSensorOrientation(float q[4]) {
     double q1[4];
     q1[0] = q[0];
@@ -784,12 +791,18 @@ class Camera : public KeyFrame {
     qnormalize(q1);
 
     // apply inverse current view.
-    double qinv[4];
-    qinvert(qinv, q1);
-    qmul(qinv, this->q);
+    qinvert(q1, q1);
 
-    quat2mat(qinv, this->v);
     mat2quat(this->v, this->q);
+    qmul(q1, this->q);
+
+    quat2mat(q1, this->v);
+
+    // this->q = q1;
+    this->q[0] = q1[0];
+    this->q[1] = q1[1];
+    this->q[2] = q1[2];
+    this->q[3] = q1[3];
   }
 } camera,  // Active camera view.
   config;  // Global configuration set.
@@ -937,7 +950,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 
       #undef SPLINE
 
-      //tmp.orthogonalize();  // this should be no-op given matrix came from quat?
+      tmp.orthogonalize();  // this should be no-op given matrix came from quat?
       output->push_back(tmp);
     }
   }
@@ -968,6 +981,10 @@ void m_singlePress(int* x, int d) { if (d==1 || d==-1) *x += d; }
 
 void m_rotateX(int d) { camera.rotate(sign(d)*camera.keyb_rot_speed, 0, 1, 0); }
 void m_rotateY(int d) { camera.rotate(-sign(d)*camera.keyb_rot_speed, 1, 0, 0); }
+
+#define t_rotateX2(d) yaw_angle += (d)
+#define t_rotateY2(d) pitch_angle += (d)
+#define t_rotateZ2(d) roll_angle += (d)
 
 void m_rotateX2(float d) { camera.rotate(d, 0, 1, 0); }
 void m_rotateY2(float d) { camera.rotate(d, 1, 0, 0);}
@@ -1784,7 +1801,11 @@ int main(int argc, char **argv) {
     }
   }
 
-  float view_q[4] = {0.5,0.3,0.2,1};
+  float view_q[4] = {0,0,0,1};
+
+  float pitch_angle = 0.0;  // around x
+  float yaw_angle = 0.0;  // around y
+  float roll_angle = 0.0;  // around z
 
   while (!done) {
     if (next_camera != &camera) camera = *next_camera;
@@ -2425,11 +2446,15 @@ int main(int argc, char **argv) {
 
     if(joystick) {
       SDL_JoystickUpdate();
-      joystick_x   = SDL_JoystickGetAxis(joystick, 0);
-      joystick_y   = SDL_JoystickGetAxis(joystick, 1);
-      joystick_z   = SDL_JoystickGetAxis(joystick, 2);
-      joystick_r   = SDL_JoystickGetAxis(joystick, 3);
+      joystick_x   = SDL_JoystickGetAxis(joystick, 2);
+      joystick_y   = SDL_JoystickGetAxis(joystick, 3);
+      joystick_z   = SDL_JoystickGetAxis(joystick, 1);
+      joystick_r   = SDL_JoystickGetAxis(joystick, 0);
       joystick_hat = SDL_JoystickGetHat (joystick, 0);
+      if (abs(joystick_x) < 5000) joystick_x = 0;
+      if (abs(joystick_y) < 5000) joystick_y = 0;
+      if (abs(joystick_z) < 5000) joystick_z = 0;
+      if (abs(joystick_r) < 10000) joystick_r = 0;
     }
 
     (void)mouse_buttons;
@@ -2438,7 +2463,7 @@ int main(int argc, char **argv) {
 
     if (keystate[SDL_SCANCODE_W]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDL_SCANCODE_S]) camera.move(0, 0, -camera.speed);  //back
-    if (joystick_z != 0)  camera.move(0, 0,  camera.speed * -joystick_z / 10000.0);
+    if (joystick_z != 0)  camera.move(0, 0,  camera.speed * -joystick_z / 20000.0);
 
     if (keystate[SDL_SCANCODE_A] || (joystick_hat & SDL_HAT_LEFT )) camera.move(-camera.speed, 0, 0);  //left
     if (keystate[SDL_SCANCODE_D] || (joystick_hat & SDL_HAT_RIGHT)) camera.move( camera.speed, 0, 0);  //right
@@ -2455,10 +2480,10 @@ int main(int argc, char **argv) {
 
     // Joystick look.
     if (joystick_x != 0 || joystick_y != 0) {
-      m_rotateX2(camera.mouse_rot_speed *  joystick_x * camera.fov_x / 90.0 / 5000.0);
-      m_rotateY2(camera.mouse_rot_speed * -joystick_y * camera.fov_y / 75.0 / 5000.0);
+      m_rotateX2(camera.mouse_rot_speed *  joystick_x * camera.fov_x / 90.0 / 20000.0);
+      m_rotateY2(camera.mouse_rot_speed * -joystick_y * camera.fov_y / 75.0 / 10000.0);
     }
-    if (joystick_r != 0) m_rotateZ2(camera.keyb_rot_speed * joystick_r / 10000.0);
+    if (joystick_r != 0) m_rotateZ2(camera.keyb_rot_speed * -joystick_r / 100000.0);
 
    if (keystate[SDL_SCANCODE_Z]){ if (camera.speed > 0.000001) camera.speed -= camera.speed/10; printf("speed %.8e\n", camera.speed);}
    if (keystate[SDL_SCANCODE_C]){ if (camera.speed < 1.0) camera.speed += camera.speed/10; printf("speed %.8e\n", camera.speed);}
@@ -2561,6 +2586,7 @@ int main(int argc, char **argv) {
 
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
 
+    // We might have changed view. Preserve changes, minus HMD orientation.
     camera.unmixSensorOrientation(view_q);
   }
 

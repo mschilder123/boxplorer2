@@ -1,5 +1,6 @@
 // from http://shankel.best.vwh.net/interpolate.c
 
+#include <assert.h>
 #include <math.h>
 #include "interpolate.h"
 
@@ -59,7 +60,7 @@ void quat2mat(const double *q,double *m) {
 void mat2quat(const double *m1, double *q) {
 	int i,j,k;
 	double Tr;
-	double fd;
+	double S;
 	double m[16];
 
 	// From column major to row major. Only relevant entries are copied.
@@ -78,16 +79,16 @@ void mat2quat(const double *m1, double *q) {
 //	m[12] = m1[12];
 //	m[13] = m1[13];
 //	m[14] = m1[14];
-	m[15] = m1[15];
+//	m[15] = m1[15];
 
-	Tr = m[0] + m[5] + m[10] + m[15];
+	Tr = m[0] + m[5] + m[10] + 1;
 	
 	if (Tr >= 1) {
-		fd = 2.0 * sqrt(Tr);
-		q[3] = fd / 4.0f;
-		q[0] = (m[6]-m[9]) / fd;
-		q[1] = (m[8]-m[2]) / fd;
-		q[2] = (m[1]-m[4]) / fd;
+		S = 2.0 * sqrt(Tr);
+		q[3] = S / 4.0f;
+		q[0] = (m[6]-m[9]) / S;
+		q[1] = (m[8]-m[2]) / S;
+		q[2] = (m[1]-m[4]) / S;
 	} else {
 		i=0;
 		if (m[5] > m[0]) {
@@ -99,11 +100,11 @@ void mat2quat(const double *m1, double *q) {
 		j = (i+1)%3;
 		k = (j+1)%3;
 		
-		fd = 2.0 * sqrt(1 + m[5*i] - m[5*j] - m[5*k]);
-		q[i] = fd / 4;
-		q[j] = (m[i*4+j] + m[i+4*j]) / fd;
-		q[k] = (m[i*4+k] + m[i+4*k]) / fd;
-		q[3] = (m[k+4*j] - m[j+4*k]) / fd;
+		S = 2.0 * sqrt(1 + m[5*i] - m[5*j] - m[5*k]);
+		q[i] = S / 4;
+		q[j] = (m[i*4+j] + m[i+4*j]) / S;
+		q[k] = (m[i*4+k] + m[i+4*k]) / S;
+		q[3] = (m[k+4*j] - m[j+4*k]) / S;
 	}
 }
 
@@ -165,7 +166,8 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 
 void qnormalize(double* q) {
   double mag = sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
-  if (fabs(mag) > .000001 && fabs(mag - 1.0) > .000001) {
+//  if (fabs(mag) > .000001 && fabs(mag - 1.0) > .000001)
+  {
     double invMag = 1.0 / mag;
     q[0] *= invMag;
     q[1] *= invMag;
