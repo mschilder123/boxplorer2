@@ -164,14 +164,22 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 }
 
 void qnormalize(double* q) {
-	double mag = q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3];
-	if (fabs(mag) > .000001 && fabs(mag - 1.0) > .000001) {
-		double invMag = 1.0 / mag;
-		q[0] *= invMag;
-		q[1] *= invMag;
-		q[2] *= invMag;
-		q[3] *= invMag;
-	}
+  double mag = sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
+  if (fabs(mag) > .000001 && fabs(mag - 1.0) > .000001) {
+    double invMag = 1.0 / mag;
+    q[0] *= invMag;
+    q[1] *= invMag;
+    q[2] *= invMag;
+    q[3] *= invMag;
+  }
+}
+
+void qinvert(double* qout, const double* q) {
+  qout[0] = -q[0];
+  qout[1] = -q[1];
+  qout[2] = -q[2];
+  qout[3] = q[3];
+  qnormalize(qout);
 }
 
 // from game programming gems 2, page 224
