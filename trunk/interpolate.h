@@ -29,6 +29,7 @@ void quat2x(const double* q, double* x);
 void x2quat(const double* x, double *q);
 
 void qnormalize(double* q);
+void qinvert(double* qout, const double* q);
 
 // q1 *= q2
 void qmul(double* q1, const double* q2);
