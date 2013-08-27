@@ -490,7 +490,8 @@ class Camera : public KeyFrame {
    }
 
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
-   void activate() const {
+   void activate() {
+      orthogonalize();
       glMatrixMode(GL_MODELVIEW);
       glLoadMatrixd(v);
    }
@@ -2090,9 +2091,10 @@ int main(int argc, char **argv) {
     while (SDL_PollEvent(&event)) {
       if(event.type==SDL_JOYBUTTONDOWN) {
         // Hack to reach "case SDLK_*" code:
-        event.type=SDL_KEYDOWN;
-        if(event.jbutton.button) event.key.keysym.sym=SDLK_TAB;
+        if(event.jbutton.button&1) event.key.keysym.sym=SDLK_TAB;
         else event.key.keysym.sym=SDLK_BACKSPACE;
+        event.key.keysym.mod = 0;
+        event.type = SDL_KEYDOWN;
       }
       if (grabbedInput ||
           !TwEventSDL(&event, SDL_MAJOR_VERSION, SDL_MINOR_VERSION))
