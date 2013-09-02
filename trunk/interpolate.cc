@@ -1,7 +1,9 @@
-// from http://shankel.best.vwh.net/interpolate.c
+// Some from http://shankel.best.vwh.net/interpolate.c
 
 #include <assert.h>
 #include <math.h>
+#include <float.h>
+
 #include "interpolate.h"
 
 // Compute the dot product of two vectors.
@@ -9,10 +11,13 @@ double dot(const double x[3], const double y[3]) {
   return x[0]*y[0] + x[1]*y[1] + x[2]*y[2];
 }
 
-// Normalize a vector. If it was zero, return false.
+// Normalize a vector. If it was ~zero, return false.
 bool normalize(double x[3]) {
-  double len = dot(x, x); if (len == 0) return false;
-  len = 1/sqrt(len); x[0] *= len; x[1] *= len; x[2] *= len;
+  double len = dot(x, x);
+  if (abs(len) < FLT_EPSILON) return false;
+  if (abs(len - 1.0) < FLT_EPSILON) return true;
+  len = 1.0 / sqrt(len);
+  x[0] *= len; x[1] *= len; x[2] *= len;
   return true;
 }
 
@@ -24,6 +29,7 @@ void mslerp(const double *m1,const double *m2,double *mr,double t) {
 	quat2mat(qr,mr);
 }
 
+// Leaves m[12..14] untouched.
 void quat2mat(const double *q,double *m) {
 	double x2,y2,z2,xy,xz,xw,yz,yw,zw;
 	x2 = 2*q[0]*q[0];
@@ -54,9 +60,10 @@ void quat2mat(const double *q,double *m) {
 	m[3] = 0;
 	m[7] = 0;
 	m[11] = 0;
-//	m[15] = 1;
+	m[15] = 1;
 }
 
+// m1 best be ortho.
 void mat2quat(const double *m1, double *q) {
 	int i,j,k;
 	double Tr;
@@ -81,9 +88,9 @@ void mat2quat(const double *m1, double *q) {
 //	m[14] = m1[14];
 //	m[15] = m1[15];
 
-	Tr = m[0] + m[5] + m[10] + 1;
+	Tr = m[0] + m[5] + m[10] + 1.0;
 	
-	if (Tr >= 1) {
+	if (Tr >= 1.0) {
 		S = 2.0 * sqrt(Tr);
 		q[3] = S / 4.0f;
 		q[0] = (m[6]-m[9]) / S;
@@ -108,6 +115,7 @@ void mat2quat(const double *m1, double *q) {
 	}
 }
 
+// q1 *= q2
 void qmul(double* q1, const double* q2) {
 	double t[4];
 
@@ -148,7 +156,7 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 			q3[i] = q2[i];
 		}
 	}
-	if (dot > 0.999f) {
+	if (abs(dot - 1.0) < FLT_EPSILON) {
         // Very close, just linear interpolate.
 		for (i=0;i<4;i++) {
 			qr[i] = q1[i] + (q3[i]-q1[i])*t;
@@ -166,8 +174,7 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 
 void qnormalize(double* q) {
   double mag = sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
-//  if (fabs(mag) > .000001 && fabs(mag - 1.0) > .000001)
-  {
+  if (fabs(mag) > FLT_EPSILON && fabs(mag - 1.0) > FLT_EPSILON) {
     double invMag = 1.0 / mag;
     q[0] *= invMag;
     q[1] *= invMag;
@@ -201,4 +208,5 @@ void x2quat(const double* x, double *q) {
   q[0] = (2*x[0]*x[3]) / d;
   q[1] = (2*x[1]*x[3]) / d;
   q[2] = (2*x[2]*x[3]) / d;
+  qnormalize(q);
 }

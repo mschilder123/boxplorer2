@@ -901,7 +901,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 
       // The CatmullRom spline function; 0 <= t <= 1
       // Suffers from overshoot for non-evenly spaced control points.
-      // Need to look into Bessel-Overhauser mitigation.
+      // TODO: look into Bessel-Overhauser mitigation.
       #define SPLINE(X,p0,p1,p2,p3) \
         ((X) = (double)(.5 * (2 * (p1) + \
                             t*( (-(p0) + (p2)) + \
@@ -916,7 +916,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
       qnormalize(tmp.q);
       quat2mat(tmp.q, tmp.v);  // convert quat to the splined rotation matrix
 
-      // Spline position into tmp.v[12..15]
+      // Spline position into tmp.v[12..14]
       for (size_t j = 12; j < 15; ++j) {
         // To control numerical precision, re-base to (p2-p1)/2.
         double a = p0->v[j], b = p1->v[j], c = p2->v[j], d = p3->v[j];
@@ -926,9 +926,9 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
         tmp.v[j] += base;
       }
 
-      // Spline par[] array. Some of those could also be rotations, which will not
-      // spline nicely at all times..
-      // TODO: have couple of uniform quats for shader use and spline those nicely.
+      // Spline par[] array. Some of those could also be rotations,
+      // which will not spline nicely at all times..
+      // TODO: have couple of uniform quats for shader use and spline those.
       for (size_t j = 0; j < ARRAYSIZE(tmp.par); ++j) {
         SPLINE(tmp.par[j][0],
                p0->par[j][0], p1->par[j][0], p2->par[j][0], p3->par[j][0]);
@@ -951,7 +951,7 @@ void CatmullRom(const vector<KeyFrame>& keyframes,
 
       #undef SPLINE
 
-      tmp.orthogonalize();  // this should be no-op given matrix came from quat?
+      tmp.orthogonalize();
       output->push_back(tmp);
     }
   }
