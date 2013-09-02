@@ -27,7 +27,7 @@
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
 
 #define DIST_MULTIPLIER par[8].z  // {min=.01 max=1.0 step=.01}
-#define MAX_DIST 5.0
+#define MAX_DIST 10.0
 
 // Camera position and direction.
 varying vec3 eye, dir;
@@ -236,6 +236,9 @@ void main() {
     if (D > m_dist) {
       col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
+  } else {
+    // Record a miss as depth 0; might be interpreted by effect shaders.
+    totalD = 0.0;
   }
 
   // Glow is based on the number of steps.
