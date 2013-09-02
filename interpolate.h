@@ -20,7 +20,7 @@ void qslerp(const double *q1,const double *q2,double *qr,double t);
 
 // Matrix-Quaternion conversions
 void mat2quat(const double *m,double *q);
-// Does not touch row 4!
+// Does not touch m[12..14]
 void quat2mat(const double *q,double *m);
 
 // Quat to splinable r4 mapping conversions.
