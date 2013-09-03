@@ -14,8 +14,8 @@ double dot(const double x[3], const double y[3]) {
 // Normalize a vector. If it was ~zero, return false.
 bool normalize(double x[3]) {
   double len = dot(x, x);
-  if (abs(len) < FLT_EPSILON) return false;
-  if (abs(len - 1.0) < FLT_EPSILON) return true;
+  if (fabs(len) < FLT_EPSILON) return false;
+  if (fabs(len - 1.0) < FLT_EPSILON) return true;
   len = 1.0 / sqrt(len);
   x[0] *= len; x[1] *= len; x[2] *= len;
   return true;
@@ -156,7 +156,7 @@ void qslerp(const double *q1,const double *q2,double *qr,double t) {
 			q3[i] = q2[i];
 		}
 	}
-	if (abs(dot - 1.0) < FLT_EPSILON) {
+	if (fabs(dot - 1.0) < FLT_EPSILON) {
         // Very close, just linear interpolate.
 		for (i=0;i<4;i++) {
 			qr[i] = q1[i] + (q3[i]-q1[i])*t;
