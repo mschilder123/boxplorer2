@@ -39,7 +39,7 @@ void main() {
   float FXAA_REDUCE_MIN = (1.0/128.0);
 
   float z = texture2D(my_texture, texture_coordinate.xy).w;  // save z
-  if (z == 0.0f) {
+  if (z == float(0)) {
     // 0 is used for background hit, i.e. missed fractal. Do not touch.
     gl_FragColor = texture2D(my_texture, texture_coordinate.xy);
     gl_FragDepth = z;
