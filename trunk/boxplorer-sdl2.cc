@@ -2084,7 +2084,7 @@ int main(int argc, char **argv) {
         camera.pos()[0], camera.pos()[1], camera.pos()[2],
         getLastFrameDuration()
     );
-    //SDL_WM_SetCaption(caption, 0);
+    SDL_SetWindowTitle(window.window(), caption);
 
     // Process UI events.
     SDL_Event event;
