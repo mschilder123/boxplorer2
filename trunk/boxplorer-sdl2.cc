@@ -1701,7 +1701,8 @@ int main(int argc, char **argv) {
     config.fov_y = 110; config.fov_x = 90.0;
     fixedFov = true;
   }
-  if (stereoMode == ST_INTERLACED) {
+  if (stereoMode == ST_INTERLACED ||
+      stereoMode == ST_OVERUNDER) {
     // Fix at 1080P
     config.width = 1920; config.height = 1080;
     config.fov_y = 30; config.fov_x = 0.0;
