@@ -56,7 +56,8 @@ class IntUniform : public iUniform {
     return o.str();
    }
    void bindToUI(void* vbar) {
-     TwAddVarRW((TwBar*)vbar, name_.c_str(), TW_TYPE_INT32, adr_, attr_.c_str());
+     TwAddVarRW((TwBar*)vbar, name_.c_str(), TW_TYPE_INT32, adr_,
+                attr_.c_str());
    }
    void send(int program) {
      glUniform1i(glGetUniformLocation(program, name_.c_str()), *adr_);
@@ -67,8 +68,51 @@ class IntUniform : public iUniform {
    }
    bool ok() { return adr_ != NULL; }
  private:
-  IntUniform(const IntUniform& other) : adr_(other.adr_), name_(other.name_), type_(other.type_), attr_(other.attr_) {}
+  IntUniform(const IntUniform& other) :
+          adr_(other.adr_), name_(other.name_),
+          type_(other.type_), attr_(other.attr_) {}
   IntUniform& operator=(const IntUniform& other);
+
+  int* adr_;
+  string name_;
+  string type_;
+  string attr_;
+};
+
+class BoolUniform : public iUniform {
+ public:
+   BoolUniform() : adr_(NULL) {}
+   virtual ~BoolUniform() {}
+   iUniform* Clone() { return new BoolUniform(*this); }
+
+   bool parse(const string& line) {
+     return parseLine(line, &type_, &name_, &attr_);
+   }
+   const string& name() { return name_; }
+   string toString() {
+    ostringstream o;
+    o << "bool " << name_ << " ";
+    if (adr_ != NULL) o << *adr_  << " @" << adr_;
+    else o << "(nil)";
+    return o.str();
+   }
+   void bindToUI(void* vbar) {
+     TwAddVarRW((TwBar*)vbar, name_.c_str(), TW_TYPE_BOOL32, adr_,
+                attr_.c_str());
+   }
+   void send(int program) {
+     glUniform1i(glGetUniformLocation(program, name_.c_str()), *adr_);
+   }
+   bool link(KeyFrame* kf) {
+     adr_ = (int*)kf->map_address("int", name_, 1);
+     return adr_ != NULL;
+   }
+   bool ok() { return adr_ != NULL; }
+ private:
+  BoolUniform(const BoolUniform& other) :
+          adr_(other.adr_), name_(other.name_),
+          type_(other.type_), attr_(other.attr_) {}
+  BoolUniform& operator=(const BoolUniform& other);
 
   int* adr_;
   string name_;
@@ -105,7 +149,9 @@ class FloatUniform : public iUniform {
    }
    bool ok() { return adr_ != NULL; }
 private:
-    FloatUniform(const FloatUniform& other) : adr_(other.adr_), name_(other.name_), type_(other.type_), attr_(other.attr_) {}
+    FloatUniform(const FloatUniform& other) :
+            adr_(other.adr_), name_(other.name_),
+            type_(other.type_), attr_(other.attr_) {}
   FloatUniform& operator=(const FloatUniform& other);
 
   float* adr_;
@@ -133,7 +179,8 @@ class DoubleUniform : public iUniform {
     return o.str();
    }
    void bindToUI(void* bar) {
-     TwAddVarRW((TwBar*)bar, name_.c_str(), TW_TYPE_DOUBLE, adr_, attr_.c_str());
+     TwAddVarRW((TwBar*)bar, name_.c_str(), TW_TYPE_DOUBLE, adr_,
+                attr_.c_str());
    }
    void send(int program) {
      glUniform1d(glGetUniformLocation(program, name_.c_str()), *adr_);
@@ -144,7 +191,9 @@ class DoubleUniform : public iUniform {
    }
    bool ok() { return adr_ != NULL; }
 private:
-    DoubleUniform(const DoubleUniform& other) : adr_(other.adr_), name_(other.name_), type_(other.type_), attr_(other.attr_) {}
+    DoubleUniform(const DoubleUniform& other) :
+            adr_(other.adr_), name_(other.name_),
+            type_(other.type_), attr_(other.attr_) {}
   DoubleUniform& operator=(const DoubleUniform& other);
 
   double* adr_;
@@ -167,15 +216,18 @@ class Vec3Uniform : public iUniform {
    string toString() {
     ostringstream o;
     o << "vec3 " << name_ << " ";
-    if (adr_ != NULL) o << adr_[0] << " " << adr_[1] << " " << adr_[2] << " @" << adr_;
+    if (adr_ != NULL) o << adr_[0] << " "
+                        << adr_[1] << " " << adr_[2] << " @" << adr_;
     else o << "(nil)";
     return o.str();
    }
    void bindToUI(void* bar) {
      if (name_.find("Color") != string::npos) {
-       TwAddVarRW((TwBar*)bar, name_.c_str(), TW_TYPE_COLOR3F, adr_, attr_.c_str());
+       TwAddVarRW((TwBar*)bar, name_.c_str(), TW_TYPE_COLOR3F, adr_,
+                       attr_.c_str());
      } else if (name_.find("Vector") != string::npos) {
-       TwAddVarRW((TwBar*)bar, name_.c_str(), TW_TYPE_DIR3F, adr_, attr_.c_str());
+       TwAddVarRW((TwBar*)bar, name_.c_str(), TW_TYPE_DIR3F, adr_,
+                       attr_.c_str());
      }
    }
    void send(int program) {
@@ -187,7 +239,9 @@ class Vec3Uniform : public iUniform {
    }
    bool ok() { return adr_ != NULL; }
  private:
-     Vec3Uniform(const Vec3Uniform& other) : adr_(other.adr_), name_(other.name_), type_(other.type_), attr_(other.attr_) {}
+     Vec3Uniform(const Vec3Uniform& other) :
+             adr_(other.adr_), name_(other.name_),
+             type_(other.type_), attr_(other.attr_) {}
    Vec3Uniform& operator=(const Vec3Uniform& other);
 
    float* adr_;
@@ -225,6 +279,10 @@ bool Uniforms::parseLine(const string& line, iUniformPtr* uni) {
 #endif
   } else if (type.compare("vec3") == 0) {
     iUniformPtr tmp(new Vec3Uniform);
+    if (!tmp->parse(line)) return false;
+    *uni = tmp;
+  } else if (type.compare("bool") == 0) {
+    iUniformPtr tmp(new BoolUniform);
     if (!tmp->parse(line)) return false;
     *uni = tmp;
   } else {

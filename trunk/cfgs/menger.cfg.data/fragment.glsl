@@ -55,6 +55,9 @@ uniform int color_iters;  // {min=0 max=1000} Coloration iterations.
 uniform int max_steps;    // {min=1 max=1000} Maximum raymarching steps.
 uniform int nrays;        // {min=1 max=10} # of ray bounces.
 
+uniform bool julia;
+#define JuliaVector par[1]
+
 // Colors. Can be negative or >1 for interesting effects.
 #define backgroundColor par[10]
 #define surfaceColor1 par[11]
@@ -267,9 +270,9 @@ float de_mandelbox(vec3 pos) {
     u.z*u.x*usat - u.y*ssat, u.z*u.y*usat + u.x*ssat, u.z*u.z*usat + csat
     );
 
-
-
-  vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
+  vec4 p = vec4(pos, 1.0);  // p.w is the distance estimate
+  vec4 p0;
+  if (julia) p0 = vec4(JuliaVector, 1.0); else p0 = p;
   for (int i=0; i<iters; i++) {
     p = vec4(rotationMatrix * p.xyz, p.w);
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
@@ -304,9 +307,12 @@ double de_mandelbox_64(dvec3 pos) {
     u.z*u.x*usat - u.y*ssat, u.z*u.y*usat + u.x*ssat, u.z*u.z*usat + csat
     );
 
-
-
-  dvec4 p = dvec4(pos, 1.0), p0 = p;  // p.w is the distance estimate
+  dvec4 p = dvec4(pos, 1.0);  // p.w is the distance estimate
+  dvec4 p0;
+  if (julia)
+    p0 = dvec4(JuliaVector.x, JuliaVector.y, JuliaVector.z, 1.0);
+  else
+    p0 = p;
   for (int i=0; i<iters; i++) {
     p = dvec4(rotationMatrix * dvec3(p.xyz), p.w);
     p = dvec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
@@ -368,9 +374,11 @@ DECLARE_DE(de_combi)
 vec3 c_mandelbox(vec3 pos) {
   float minRad2 = clamp(MB_MINRAD2, float(1.0e-9), float(1.0));
   vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
-  vec3 p = pos, p0 = p;
+  vec3 p = pos;
+  vec3 p0;
   float trap = 1.0;
 
+  if (julia) p0 = JuliaVector; else p0 = p;
   for (int i=0; i<color_iters; i++) {
     p = clamp(p, -1.0, 1.0) * 2.0 - p;
     float r2 = dot(p, p);
@@ -390,32 +398,32 @@ DECLARE_COLORING(c_mandelbox)
 // --- note in refectoids.cfg, add d d_PKlein to let .exe know which DE to use.
 // Compute the distance from `pos` to the PKlein basic shape.
 float d_PZshape(vec3 p) {
-   float rxy = sign(par[9].y)*(length(p.xy)-abs(par[9].y));
+  float rxy = sign(par[9].y)*(length(p.xy)-abs(par[9].y));
 
- float TThickness = par[5].x;
- float Zmult = par[8].y;
- float Ziter = par[8].x;
-
-   for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
+  float TThickness = par[5].x;
+  float Zmult = par[8].y;
+  float Ziter = par[8].x;
+ 
+  for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
 
 // This abs() creates the nice holes but also causes banding.
 // For movement-only DE, holes are just what we want ;-)
-     return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+  return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
  //  return max(rxy,   -(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
 }
 
 // Compute the distance from `pos` to the PKlein.
 float d_PKlein(vec3 p) {
    //Just scale=1 Julia box
-	float r2=dot(p,p);
-	float DEfactor=1.;
+  float r2=dot(p,p);
+  float DEfactor=1.;
 
- float rDIST_MULTIPLIER = par[9].x;
- vec3 CSize = vec3(par[1].y,par[1].x,par[2].y);
- float Size = par[0].y;
- vec3 C = vec3(par[2].x,par[3].y,par[3].x);
- vec3 Offset = vec3(par[4].y,par[4].x,par[5].y);
- float DEoffset = par[0].x;
+  float rDIST_MULTIPLIER = par[9].x;
+  vec3 CSize = vec3(par[1].y,par[1].x,par[2].y);
+  float Size = par[0].y;
+  vec3 C = vec3(par[2].x,par[3].y,par[3].x);
+  vec3 Offset = vec3(par[4].y,par[4].x,par[5].y);
+  float DEoffset = par[0].x;
 
 	for(int i=0;i<iters;i++){
 		//Box folding
