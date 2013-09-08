@@ -1882,6 +1882,7 @@ int main(int argc, char **argv) {
       // Setup just the vars needed for DE. For now, iters and par[0..20]
       // TODO: make de() method of camera?
       GLSL::iters = camera.iters;
+      GLSL::julia = camera.julia;
       for (int i = 0; i < 20; ++i) {
         GLSL::par[i] = GLSL::vec3(camera.par[i]);
       }

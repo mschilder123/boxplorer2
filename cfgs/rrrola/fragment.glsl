@@ -20,8 +20,8 @@
 
 #endif  // _FAKE_GLSL_
 
-#define P0 p0                    // standard Mandelbox
-//#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
+uniform bool julia;
+#define JuliaVector par[1]
 
 #define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
@@ -29,11 +29,11 @@
 #define DIST_MULTIPLIER par[8].z  // {min=.01 max=1.0 step=.01}
 #define MAX_DIST 10.0
 
+uniform float xres, yres, speed;
+
 // Camera position and direction.
 varying vec3 eye, dir;
 varying float zoom;
-
-uniform float xres, yres, speed;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -86,13 +86,15 @@ void init() {
 }
 
 float de_mandelbox(vec3 pos) {
-  vec4 p = vec4(pos,1.0), p0 = p;  // p.w is the distance estimate
+  vec4 p = vec4(pos,1.0);  // p.w is the distance estimate
+  vec4 P0;
+  if (julia) P0 = vec4(JuliaVector, 1.0); else P0 = p;
   for (int i=0; i<iters; i++) {
     p = vec4(rotationMatrix * p.xyz, p.w);
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + p0;
+    p = p*scale + P0;
 // if (r2 > 100.0) break;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
@@ -104,14 +106,16 @@ DECLARE_DE(de_mandelbox)
 vec3 c_mandelbox(vec3 pos) {
   float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
   vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
-  vec3 p = pos, p0 = p;
+  vec3 p = pos;
+  vec3 P0;
+  if (julia) P0 = JuliaVector; else P0 = p;
   float trap = 1.0;
   for (int i=0; i<color_iters; i++) {
     p = vec3(rotationMatrix * p.xyz);
     p = clamp(p, -1.0, 1.0) * 2.0 - p;
     float r2 = dot(p, p);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + p0;
+    p = p*scale + P0;
     trap = min(trap, r2);
   }
   // c.x: log final distance (fractional iteration count)
@@ -179,6 +183,22 @@ float noise( in vec2 x ) {
 
 #include "setup.inc"
 
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main() {
   vec3 eye_in, dp; 
 
@@ -228,13 +248,58 @@ void main() {
   if (totalD < MAX_DIST) {
     vec3 n = normal(p, D/*m_dist*/);
     col = c(p);
-    col = blinn_phong(n, -dp, normalize(eye_in+vec3(0,1,0)+dp), col);
+#if 1
+    col = blinn_phong(n, -dp,
+                      normalize(eye_in+vec3(0,1,0)+dp),
+                      col);
+
     col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
+
+    //vec3 hsv = rgb2hsv(col);
+    //hsv.z /= clamp(.005 * (m_dist / (m_zoom * abs(speed))), 1.0, 10.0);
+    //col = hsv2rgb(hsv);
+#else
+    // light things up a bit
+    vec3 light_d = vec3(gl_ModelViewMatrix * vec4(abs(speed) * 4.0, abs(speed), 0, 0));
+    vec3 light = eye + light_d;
+    // trace back from p to light to determine shadow.
+    vec3 tolight = normalize(light - p);
+    float lightDist = length(light - p);
+    float shadow = 1.0f;
+    float shadowRayLength = abs(speed);
+    for (int i = 0; i < steps; ++i) {
+      float d = d(p + shadowRayLength * tolight);
+      shadowRayLength += d;
+      if (shadowRayLength > lightDist - 2*m_dist) {
+        break;
+      }
+
+      shadow = min(shadow, 1.0 * d / shadowRayLength);
+
+      if (d < m_dist) {
+        shadow = 0.0;
+        break;
+      }
+    }
+
+    col = blinn_phong(n, -dp,
+                      tolight,
+                      //normalize(eye_in+vec3(0,1,0)+dp),
+                      col);
+
+    //col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
+
+    vec3 hsv = rgb2hsv(col);
+    hsv.z *= shadow;
+    col = hsv2rgb(hsv);
+#endif
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
     if (D > m_dist) {
-      col = mix(col, backgroundColor, clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
+      col = mix(col,
+                backgroundColor,
+                clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
   } else {
     // Record a miss as depth 0; might be interpreted by effect shaders.
@@ -242,7 +307,9 @@ void main() {
   }
 
   // Glow is based on the number of steps.
-  col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
+  col = mix(col,
+            glowColor,
+            (float(steps)+noise)/float(max_steps) * glow_strength);
 
   write_pixel(dir, totalD, col);
 }

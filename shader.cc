@@ -100,6 +100,7 @@ bool Shader::compile(const string& defines,
         case 0x8b53: stype.assign("ivec2"); break;
         case 0x8b54: stype.assign("ivec3"); break;
         case 0x8b55: stype.assign("ivec4"); break;
+        case 0x8b56: stype.assign("bool"); break;
         case 0x8ffc: stype.assign("dvec2"); break;
         case 0x8ffd: stype.assign("dvec3"); break;
         case 0x8ffe: stype.assign("dvec4"); break;
