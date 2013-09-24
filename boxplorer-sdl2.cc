@@ -371,10 +371,9 @@ Uniforms uniforms;
 // texture holding background image
 GLuint background_texture;
 
-// DLP-Link L/R or interlaced polarity
-int polarity=1;
+// DLP-Link or interlaced L/R eye polarity
+int polarity = 1;
 
-int kJOYSTICK;
 SDL_Joystick* joystick = NULL;
 
 ////////////////////////////////////////////////////////////////
@@ -1553,6 +1552,8 @@ int main(int argc, char **argv) {
   bool fixedFov = false;
   char* lifeform_file = NULL;
   int enableDof = 0;
+  bool xbox360 = true;  // try find xbox360 controller
+  int kJOYSTICK = 0;  // joystick by index
 
   // Peel known options off the back..
   while (argc>1) {
@@ -1587,6 +1588,8 @@ int main(int argc, char **argv) {
       fixedFov = true;
     } else if (!strcmp(argv[argc-1], "--loop")) {
       loop = true;
+    } else if (!strcmp(argv[argc-1], "--no360")) {
+      xbox360 = false;
     } else if (!strncmp(argv[argc-1], "--kf=", 5)) {
       kKEYFRAME = argv[argc-1] + 5;
     } else if (!strncmp(argv[argc-1], "--joystick=", 11)) {
@@ -1728,6 +1731,7 @@ int main(int argc, char **argv) {
   atexit(SDL_Quit);
 
   if (kJOYSTICK) {
+    // open a joystick by explicit index.
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
     joystick = SDL_JoystickOpen(kJOYSTICK-1);
     printf(__FUNCTION__ " : JoystickName '%s'\n",
@@ -1738,6 +1742,16 @@ int main(int argc, char **argv) {
            SDL_JoystickNumButtons(joystick));
     printf(__FUNCTION__ " : JoystickNumHats   : %i\n",
            SDL_JoystickNumHats(joystick));
+  } else if (xbox360) {
+    // find and open the first xbox 360 controller we see.
+    SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+    for (int i = 0; joystick = SDL_JoystickOpen(i); ++i) {
+      string name(SDL_JoystickName(joystick));
+      printf(__FUNCTION__ " : JoystickName '%s'\n",
+             name.c_str());
+      if (name.find("XBOX 360") != string::npos) break;  // got it
+      SDL_JoystickClose(joystick);
+    }
   }
 
    // Set up the video mode, OpenGL state, shaders and shader parameters.
@@ -2212,9 +2226,9 @@ int main(int argc, char **argv) {
         initTwBar();
       } break;
 
-      // Switch DLP-Link L/R polarity
+      // Switch L/R eye polarity
       case SDLK_p: {
-        polarity*=-1;
+        polarity *= -1;
       } break;
 
       // Save config and screenshot (filename = current time).
