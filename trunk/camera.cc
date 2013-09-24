@@ -72,6 +72,7 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
     for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
   }
   orthogonalize();
+  bg_weight = 0;
 }
 
 void* KeyFrame::map_address(const string& type, const string& name, int n) {

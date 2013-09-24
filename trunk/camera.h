@@ -54,6 +54,7 @@ class KeyFrame {
     for (int i=0; i<3; i++) {
       pos()[i] += right()[i]*x + up()[i]*y + ahead()[i]*z;
     }
+    bg_weight = 0;
   }
 
   // Move camera in the normalized absolute direction `dir` by `len` units.
