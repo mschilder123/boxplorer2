@@ -363,6 +363,7 @@ class Camera : public KeyFrame {
   public:
    Camera& operator=(const KeyFrame& other) {
     *((KeyFrame*)this) = other;
+    bg_weight = 0;  // reset progressive rendering count.
     return *this;
    }
 
@@ -489,6 +490,8 @@ class Camera : public KeyFrame {
      if (ao_strength <= 0) ao_strength = 0.1;
      if (glow_strength <= 0) glow_strength = 0.25;
      if (dist_to_color <= 0) dist_to_color = 0.2;
+
+     bg_weight = 0;  // No samples in backbuffer yet.
 
      orthogonalize();
      mat2quat(this->v, this->q);
@@ -1923,6 +1926,7 @@ int main(int argc, char **argv) {
 
     SDL_GL_SwapBuffers();
     ++frameno;
+    camera.bg_weight++;
 
     if (rendering && !splines.empty()) {
       // If we're playing a sequence back, save every frame to disk.

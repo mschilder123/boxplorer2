@@ -38,7 +38,8 @@
   PROCESS(int, yres, "yres", false) \
   PROCESS(int, use_bg_texture, "use_bg_texture", false) \
   PROCESS(int, backbuffer, "backbuffer", false) \
-  PROCESS(int, julia, "julia", true)
+  PROCESS(int, julia, "julia", true) \
+  PROCESS(int, bg_weight, "bg_weight", true)
 
 #define NUMPARS 20
 
