@@ -1,13 +1,17 @@
 // from: https://www.shadertoy.com/view/Mds3Rn
 
-uniform float xres, yres, time;
+uniform float xres, yres, time, speed;
+varying vec3 eye, dir;
+
+#include "setup.inc"
+#line 8
 
 const float PI=3.14159265358979323846;
 
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
-float speed=iGlobalTime*0.2975;
-float ground_x=1.0-0.325*sin(PI*speed*0.25);
+float mspeed=iGlobalTime*0.2975;
+float ground_x=1.0-0.325*sin(PI*mspeed*0.25);
 float ground_y=1.0;
 float ground_z=0.5;
 
@@ -18,7 +22,7 @@ vec2 rotate(vec2 k,float t)
 
 float draw_scene(vec3 p)
 	{
-	float tunnel_m=0.125*cos(PI*p.z*1.0+speed*4.0-PI);
+	float tunnel_m=0.125*cos(PI*p.z*1.0+mspeed*4.0-PI);
 	float tunnel1_p=2.0;
 	float tunnel1_w=tunnel1_p*0.225;
 	float tunnel1=length(mod(p.xy,tunnel1_p)-tunnel1_p*0.5)-tunnel1_w;	// tunnel1
@@ -48,19 +52,27 @@ void main(void)
 	{
 	vec2 position=(gl_FragCoord.xy/iResolution.xy);
 	vec2 p=-1.0+2.0*position;
-	vec3 dir=normalize(vec3(p*vec2(1.77,1.0),1.0));		// screen ratio (x,y) fov (z)
-	//dir.yz=rotate(dir.yz,PI*0.5*sin(PI*speed*0.125));	// rotation x
-	dir.zx=rotate(dir.zx,-PI*speed*0.25);			// rotation y
-	dir.xy=rotate(dir.xy,-speed*0.5);			// rotation z
-	vec3 ray=vec3(ground_x,ground_y,ground_z-speed*2.5);
+	vec3 raydir=normalize(vec3(p*vec2(1.77,1.0),1.0));		// screen ratio (x,y) fov (z)
+	//raydir.yz=rotate(raydir.yz,PI*0.5*sin(PI*mspeed*0.125));	// rotation x
+	raydir.zx=rotate(raydir.zx,-PI*mspeed*0.25);			// rotation y
+	raydir.xy=rotate(raydir.xy,-mspeed*0.5);			// rotation z
+	vec3 ray=vec3(ground_x,ground_y,ground_z-mspeed*2.5);
+#if 1
+  vec3 pos;  // not used; DE is picky. Only expose dynamic orientation.
+  if (!setup_ray(eye, dir, pos, raydir)) {
+    gl_FragColor = vec4(0.);
+    gl_FragDepth = 0;
+    return;
+  }
+#endif
 	float t=0.0;
 	const int ray_n=96;
 	for(int i=0;i<ray_n;i++)
 		{
-		float k=draw_scene(ray+dir*t);
+		float k=draw_scene(ray+raydir*t);
 		t+=k*0.75;
 		}
-	vec3 hit=ray+dir*t;
+	vec3 hit=ray+raydir*t;
 	vec2 h=vec2(-0.0025,0.002); // light
 	vec3 n=normalize(vec3(draw_scene(hit+h.xyx),draw_scene(hit+h.yxy),draw_scene(hit+h.yyx)));
 	float c=(n.x+n.y+n.z)*0.35;
