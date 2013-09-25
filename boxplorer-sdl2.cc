@@ -143,8 +143,10 @@ vec3 (*c)(vec3);
 }  // namespace GLSL
 
 
+#if defined(_WIN32)
 #pragma warning(disable: 4244) // conversion loss
 #pragma warning(disable: 4305) // truncation
+#endif  // _WIN32
 
 #define sign(a) GLSL::sign(a)
 
@@ -985,10 +987,6 @@ void m_singlePress(int* x, int d) { if (d==1 || d==-1) *x += d; }
 void m_rotateX(int d) { camera.rotate(sign(d)*camera.keyb_rot_speed, 0, 1, 0); }
 void m_rotateY(int d) { camera.rotate(-sign(d)*camera.keyb_rot_speed, 1, 0, 0); }
 
-#define t_rotateX2(d) yaw_angle += (d)
-#define t_rotateY2(d) pitch_angle += (d)
-#define t_rotateZ2(d) roll_angle += (d)
-
 void m_rotateX2(float d) { camera.rotate(d, 0, 1, 0); }
 void m_rotateY2(float d) { camera.rotate(d, 1, 0, 0);}
 void m_rotateZ2(float d) { camera.rotate(d, 0, 0, 1); }
@@ -1312,7 +1310,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     glDeleteFramebuffers(ARRAYSIZE(fbo), fbo);
     glGenFramebuffers(ARRAYSIZE(fbo), fbo);
 
-    for (int i = 0; i < ARRAYSIZE(fbo); ++i) {
+    for (size_t i = 0; i < ARRAYSIZE(fbo); ++i) {
       glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer[i]);
       glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
                             config.width, config.height);
@@ -1745,7 +1743,7 @@ int main(int argc, char **argv) {
   } else if (xbox360) {
     // find and open the first xbox 360 controller we see.
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-    for (int i = 0; joystick = SDL_JoystickOpen(i); ++i) {
+    for (int i = 0; (joystick = SDL_JoystickOpen(i)) != NULL; ++i) {
       string name(SDL_JoystickName(joystick));
       printf(__FUNCTION__ " : JoystickName '%s'\n",
              name.c_str());
@@ -1821,10 +1819,6 @@ int main(int argc, char **argv) {
   }
 
   float view_q[4] = {0,0,0,1};
-
-  float pitch_angle = 0.0;  // around x
-  float yaw_angle = 0.0;  // around y
-  float roll_angle = 0.0;  // around z
 
   while (!done) {
     if (next_camera != &camera) camera = *next_camera;
@@ -2460,6 +2454,8 @@ int main(int argc, char **argv) {
     bool hasAlt = keystate[SDL_SCANCODE_RALT] || keystate[SDL_SCANCODE_LALT];
     bool hasCtrl = keystate[SDL_SCANCODE_RCTRL] || keystate[SDL_SCANCODE_LCTRL];
     bool hasShift = keystate[SDL_SCANCODE_RSHIFT] || keystate[SDL_SCANCODE_LSHIFT];
+    (void)hasAlt;
+    (void)hasShift;
     (void)hasCtrl;
 
     // Continue after calling SDL_GetRelativeMouseState() so view direction
