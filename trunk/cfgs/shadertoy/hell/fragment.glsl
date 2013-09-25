@@ -61,7 +61,7 @@ void main(void)
   vec3 pos;  // not used; DE is picky. Only expose dynamic orientation.
   if (!setup_ray(eye, dir, pos, raydir)) {
     gl_FragColor = vec4(0.);
-    gl_FragDepth = 0;
+    gl_FragDepth = 0.;
     return;
   }
 #endif
