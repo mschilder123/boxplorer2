@@ -50,7 +50,7 @@ const Sphere kGlass = Sphere(vec4(73.0, 16.5, 78.0, 16.5), vec4(0.999, 0.999, 0.
 // Note this is the only object that emits light (12.0)
 const Sphere kLight = Sphere(vec4(50.0, 81.6 - 15.0, 81.6, 7.0), vec4(0.0, 0.0, 0.0, 12.0), kDiffuse);
 
-Hit intersect(Hit hit, Ray ray, Sphere sphere) {
+Hit intersect(Hit hit, Ray ray, const Sphere sphere) {
   vec3 op = sphere.positionRadius.xyz - ray.origin;
   float b = dot(op, ray.direction);
   float d = b * b - dot(op, op) + sphere.positionRadius.w * sphere.positionRadius.w;
