@@ -24,7 +24,7 @@ vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = vec3(0., 0., 0.);
 float iGlobalTime = time;
 
-//#define ENABLE_HARD_SHADOWS // turn off to enable faster AO soft shadows 
+#define ENABLE_HARD_SHADOWS // turn off to enable faster AO soft shadows 
 #define ENABLE_VIBRATION
 //#define ENABLE_POSTPROCESS // Works better on window view rather than full screen
 
@@ -79,7 +79,7 @@ vec2 de(vec3 pos) {
   tpos.xz=abs(.5-mod(tpos.xz,1.));
   vec4 p=vec4(tpos,1.);
   float y=max(0.,.35-abs(pos.y-3.35))/.35;
-  for (int i=0; i<7; i++) {//LOWERED THE ITERS
+  for (int i=0; i<9; i++) {//LOWERED THE ITERS
     p.xyz = abs(p.xyz)-vec3(-0.02,1.98,-0.02);
     p=p*(2.0+vibration*y)/clamp(dot(p.xyz,p.xyz),.4,1.)-vec4(0.5,1.,0.4,0.);
     p.xz*=mat2(-0.416,-0.91,0.91,-0.416);
