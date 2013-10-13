@@ -15,7 +15,6 @@ static OVR::DeviceManager *manager;
 static OVR::HMDDevice *hmd;
 static OVR::SensorDevice *sensor;
 static OVR::SensorFusion *fusion;
-static OVR::Util::MagCalibration *magnet;
 static OVR::HMDInfo hmdinfo;
 
 int InitOculusSDK()
@@ -38,8 +37,6 @@ int InitOculusSDK()
   fusion->AttachToSensor(sensor);
   fusion->SetYawCorrectionEnabled(true);
 
-  magnet = new OVR::Util::MagCalibration();
-
   return 1;
 }
 
@@ -47,10 +44,6 @@ void GetOculusView(float view[3])
 {
   if (!fusion) {
     return;
-  }
-
-  if (magnet && magnet->IsAutoCalibrating()) {
-    magnet->UpdateAutoCalibration(*fusion);
   }
 
   // GetPredictedOrientation() works even if prediction is disabled
@@ -66,10 +59,6 @@ void GetOculusView(float view[3])
 void GetOculusQuat(float quat[4]) {
   if (!fusion) {
     return;
-  }
-
-  if (magnet && magnet->IsAutoCalibrating()) {
-    magnet->UpdateAutoCalibration(*fusion);
   }
 
   // GetPredictedOrientation() works even if prediction is disabled
@@ -100,11 +89,6 @@ void ReleaseOculusSDK()
     fusion = NULL;
   }
 
-  if (magnet) {
-    delete magnet;
-    magnet = NULL;
-  }
-
   OVR::System::Destroy();
 }
 
@@ -122,19 +106,6 @@ void SetOculusPrediction(float time)
 
 }
 
-void SetOculusDriftCorrect(int enable)
-{
-  if (!fusion || !magnet) {
-    return;
-  }
-
-  if (enable) {
-    magnet->BeginAutoCalibration(*fusion);
-  } else {
-    magnet->ClearCalibration(*fusion);
-  }
-}
-
 int GetOculusDeviceInfo(hmd_settings_t *hmd_settings)
 {
   if(!hmd->GetDeviceInfo(&hmdinfo)) {
@@ -150,8 +121,10 @@ int GetOculusDeviceInfo(hmd_settings_t *hmd_settings)
   hmd_settings->lens_separation_distance = hmdinfo.LensSeparationDistance;
   hmd_settings->eye_to_screen_distance = hmdinfo.EyeToScreenDistance;
 
-  memcpy(hmd_settings->distortion_k, hmdinfo.DistortionK, sizeof(float) * 4);
-  memcpy(hmd_settings->chrom_abr, hmdinfo.ChromaAbCorrection, sizeof(float) * 4);
+  memcpy(hmd_settings->distortion_k,
+                  hmdinfo.DistortionK, sizeof(float) * 4);
+  memcpy(hmd_settings->chrom_abr,
+                  hmdinfo.ChromaAbCorrection, sizeof(float) * 4);
 
   return 1;
 }
