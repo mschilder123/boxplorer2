@@ -1656,7 +1656,6 @@ int main(int argc, char **argv) {
     // TODO: actually do something w/ these values.
 
     SetOculusPrediction(.025);  // Also gets adjusted later based on fps.
-    SetOculusDriftCorrect(1);
     ResetOculusOrientation();
   }
 #endif

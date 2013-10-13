@@ -22,7 +22,6 @@ void GetOculusView(float view[3]);
 void GetOculusQuat(float quat[4]);
 void ReleaseOculusSDK();
 void SetOculusPrediction(float time);
-void SetOculusDriftCorrect(int enable);
 
 int GetOculusDeviceInfo(hmd_settings_t *hmd_settings);
 
