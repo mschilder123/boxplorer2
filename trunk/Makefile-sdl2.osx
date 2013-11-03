@@ -1,0 +1,77 @@
+all: boxplorer-sdl2 edit-cfg glsl
+
+CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/ -I/Library/Frameworks/SDL2.framework/Headers/
+
+LDFLAGS=-framework SDL2 -framework OpenGL -framework Cocoa
+
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o TwEventSDL20.o TwOpenGLCore.o LoadOGLCore.o
+
+BX_OBJS=boxplorer-sdl2.o interpolate.o camera.o uniforms.o shader.o
+
+boxplorer-sdl2: $(BX_OBJS) $(TW_OBJS)
+	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer-sdl2 $(LDFLAGS)
+
+boxplorer-sdl2.o: boxplorer-sdl2.cc default_shaders.h shader_procs.h Makefile.osx \
+             TGA.h cfgs/menger.cfg.data/fragment.glsl interpolate.h camera.h \
+	     uniforms.h shader.h params.h
+	g++ -c $(CFLAGS) boxplorer-sdl2.cc
+
+shadershrink: shadershrink.cc shadershrink.h Makefile.osx
+	g++ $(CFLAGS) shadershrink.cc -o shadershrink
+
+edit-cfg: edit-cfg.cc Makefile.osx
+	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
+
+glsl: glsl.cc glsl.h TGA.h Makefile.osx
+	g++ $(CFLAGS) glsl.cc -o glsl
+
+shader.o: shader.cc shader.h shader_procs.h
+	g++ -c $(CFLAGS) shader.cc
+
+camera.o: camera.cc camera.h params.h
+	g++ -c $(CFLAGS) camera.cc
+
+interpolate.o: interpolate.cc interpolate.h
+	g++ -c $(CFLAGS) interpolate.cc
+
+uniforms.o: uniforms.cc uniforms.h shader_procs.h
+	g++ -c $(CFLAGS) uniforms.cc
+
+TwBar.o: AntTweakBar/src/TwBar.cpp
+	g++ -c $(CFLAGS) $<
+
+TwFonts.o: AntTweakBar/src/TwFonts.cpp
+	g++ -c $(CFLAGS) $<
+
+TwMgr.o: AntTweakBar/src/TwMgr.cpp
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL12.o: AntTweakBar/src/TwEventSDL12.c
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
+	g++ -c $(CFLAGS) $<
+
+TwEventSDL20.o: AntTweakBar/src/TwEventSDL20.c
+	g++ -c $(CFLAGS) $<
+
+TwPrecomp.o: AntTweakBar/src/TwPrecomp.cpp
+	g++ -c $(CFLAGS) $<
+
+TwColors.o: AntTweakBar/src/TwColors.cpp
+	g++ -c $(CFLAGS) $<
+
+TwOpenGLCore.o: AntTweakBar/src/TwOpenGLCore.cpp
+	g++ -c $(CFLAGS) $<
+
+LoadOGLCore.o: AntTweakBar/src/LoadOGLCore.cpp
+	g++ -c $(CFLAGS) $<
+
+TwOpenGL.o: AntTweakBar/src/TwOpenGL.cpp
+	g++ -c $(CFLAGS) $<
+
+LoadOGL.o: AntTweakBar/src/LoadOGL.cpp
+	g++ -c $(CFLAGS) $<
