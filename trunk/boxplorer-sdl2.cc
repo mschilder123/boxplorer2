@@ -287,27 +287,43 @@ class GFX {
     // if current resolution matches a display, go
     // fullscreen on that display.
     // Otherwise, stick with current.
+    bool likelyOculus = (height_ == 800);
+    bool foundMatch = false;
+    int alternate1080p = -1;
     for (int i = 0; i < ndisplays_; ++i) {
-      if (width_ == rect_[i].w &&
-          height_ == rect_[i].h) {
-        d = i;
+      if ((width_ == rect_[i].w && height_ == rect_[i].h)) {
+        d = i;  // exact match, done.
+        foundMatch = true;
         break;
       }
+      if (rect_[i].h == 1080) alternate1080p = i;
+    }
+
+    int targetWidth = rect_[d].w;
+    int targetHeight = rect_[d].h;
+
+    if (!foundMatch && likelyOculus && alternate1080p != -1) {
+       // Could not find exact match.
+       // Oculus might be duplicating a 1080p desktop.
+       d = alternate1080p;
+       // Stick w/ oculus resolution, rather than native screen one.
+       targetWidth = width_;
+       targetHeight = height_;
     }
 
     if (!fullscreen_) {
       printf(__FUNCTION__ ": to fullscreen %dx%d display %d\n",
-                      rect_[d].w, rect_[d].h, d);
-      window_ = SDL_CreateWindow("test",
+                      targetWidth, targetHeight, d);
+      window_ = SDL_CreateWindow("boxplorer2",
           rect_[d].x, rect_[d].y,
-          rect_[d].w, rect_[d].h,
+          targetWidth, targetHeight,
           SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN);
-      width_ = rect_[d].w;
-      height_ = rect_[d].h;
+      width_ = targetWidth;
+      height_ = targetHeight;
     } else {
       printf(__FUNCTION__ ": from fullscreen %dx%d display %d\n",
                       last_width_, last_height_, d);
-      window_ = SDL_CreateWindow("test",
+      window_ = SDL_CreateWindow("boxplorer2",
           last_x_, last_y_,
           last_width_, last_height_,
           SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
@@ -1699,7 +1715,7 @@ int main(int argc, char **argv) {
     config.enable_dof = 0;  // fxaa post does not work for these.
   }
   if (stereoMode == ST_OCULUS) {
-    // Fix rez. Otherwise mirrored screen drops Rift?
+    // Fix resolution for optimal performance.
     config.width = 1280; config.height = 800;
     config.fov_y = 110; config.fov_x = 90.0;
     fixedFov = true;
@@ -2444,7 +2460,8 @@ int main(int argc, char **argv) {
     // Get keyboard and mouse state.
     const Uint8* keystate = SDL_GetKeyboardState(0);
     int mouse_dx, mouse_dy;
-    Sint16 joystick_x=0, joystick_y=0, joystick_z=0, joystick_r=0;
+    Sint16 joystick_x=0, joystick_y=0, joystick_z=0, joystick_r=0,
+           joystick_lt=-32768, joystick_rt=-32768;
     Uint8 joystick_hat=0;
     Uint8 mouse_buttons = SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
     int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
@@ -2467,6 +2484,8 @@ int main(int argc, char **argv) {
       joystick_y   = SDL_JoystickGetAxis(joystick, 3);
       joystick_z   = SDL_JoystickGetAxis(joystick, 1);
       joystick_r   = SDL_JoystickGetAxis(joystick, 0);
+      joystick_lt  = SDL_JoystickGetAxis(joystick, 4);
+      joystick_rt  = SDL_JoystickGetAxis(joystick, 5);
       joystick_hat = SDL_JoystickGetHat (joystick, 0);
       if (abs(joystick_x) < 5000) joystick_x = 0;
       if (abs(joystick_y) < 5000) joystick_y = 0;
@@ -2480,7 +2499,12 @@ int main(int argc, char **argv) {
 
     if (keystate[SDL_SCANCODE_W]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDL_SCANCODE_S]) camera.move(0, 0, -camera.speed);  //back
-    if (joystick_z != 0)  camera.move(0, 0,  camera.speed * -joystick_z / 20000.0);
+#if !defined(MOVE_W_TRIGGERS)
+    if (joystick_z != 0) camera.move(0, 0,  camera.speed * -joystick_z / 20000.0);
+#else
+    if (joystick_lt != -32768) camera.move(0, 0,  camera.speed * (joystick_lt + 32768) / 20000.0);
+    if (joystick_rt != -32768) camera.move(0, 0,  -camera.speed * (joystick_rt + 32768) / 20000.0);
+#endif
 
     if (keystate[SDL_SCANCODE_A] || (joystick_hat & SDL_HAT_LEFT )) camera.move(-camera.speed, 0, 0);  //left
     if (keystate[SDL_SCANCODE_D] || (joystick_hat & SDL_HAT_RIGHT)) camera.move( camera.speed, 0, 0);  //right
