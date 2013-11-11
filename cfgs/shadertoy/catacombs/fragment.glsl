@@ -12,10 +12,8 @@ float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = dir;
 
-float myDE(vec3);
-#define DE_FUNC_VEC3 myDE
 #include "setup.inc"
-#line 18
+#line 16
 
 float fbm( vec3 p, vec3 n )
 {
@@ -322,7 +320,7 @@ vec4 render( in vec3 ro, in vec3 rd )
   return vec4( col, t );
 }
 
-float myDE(vec3 p) { return map(p).x; }
+float de_for_host(vec3 p) { return map(p).x; }
 
 void main( void )
 {

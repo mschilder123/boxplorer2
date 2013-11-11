@@ -65,15 +65,15 @@ bool Shader::compile(const string& defines,
 
   GLint status;
   glGetProgramiv(p, GL_LINK_STATUS, &status);
-  ok_ = (status == GL_TRUE);
-
-  if (!ok_) return false;
 
   glGetProgramInfoLog(p, sizeof(log), &logLength, log);
   if (logLength) {
     log_.append("--link:\n");
     log_.append(log);
   }
+
+  ok_ = (status == GL_TRUE);
+  if (!ok_) return false;
 
   {
     // Capture active uniforms

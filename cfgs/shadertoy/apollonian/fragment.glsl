@@ -20,14 +20,11 @@ uniform int color_iters;    // {min=1 max=1000} Number of fractal iterations.
 vec2      iResolution = vec2(xres, yres);     // viewport resolution (in pixels)
 float     iGlobalTime = time;     // shader playback time (in seconds)
 
-float de(vec3);
-#define DE_FUNC_VEC3 de
-
 uniform vec3 par[1];
 #define ss par[0].x  // {min=.1 max=2.0 step=.001}
 
 #include "setup.inc"
-#line 30
+#line 27
 
 float de( vec3 p ) {
   float scale = 1.0;  
@@ -40,6 +37,8 @@ float de( vec3 p ) {
   }
   return 0.25*abs(p.y)/scale;
 }
+
+float de_for_host(vec3 p) { return de(p); }
 
 vec4 trap( vec3 p ) {
   vec4 orb = vec4(1000.0);  

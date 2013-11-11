@@ -1,8 +1,6 @@
 // Lenord's Spudsville.
 // Bits and pieces from knighty, rrrola, syntopia stitched together.
 
-#define DE_FUNC_VEC3 DE
-
 #define DIST_MULTIPLIER par[9].x  // {min=.01 max=1 step=.01}
 #define MAX_DIST 10.0
 
@@ -100,7 +98,7 @@ float DE(vec3 z) {
 }
 
 vec3 color(vec3 pos) {
-	return vec3(0.7,0.6,0.4);
+  return vec3(0.7,0.6,0.4);
 }
 
 float normal_eps = 0.00001;
@@ -146,23 +144,25 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side) {
 
 #define ULP 0.000000059604644775390625
 float trace(inout vec3 p, in vec3 dp, inout float D, inout float totalD, in float side, in float MINDIST_MULT){
-	// Intersect the view ray with the fractal using raymarching.
-	// The distance field actually traced is the "calculated DE" minus (totalD * min_dist)
-	// A perfect distance field have a gradient magnitude = 1. Assuming DE() gives a perfect DE, 
-	//we have to multiply D with MINDIST_MULT in order to restore a gradient magnitude of 1
-	int steps;
-	for (steps=0; steps<max_steps &&
+  // Intersect the view ray with the fractal using raymarching.
+  // The distance field actually traced is the "calculated DE" minus (totalD * min_dist)
+  // A perfect distance field have a gradient magnitude = 1. Assuming DE() gives a perfect DE, 
+  //we have to multiply D with MINDIST_MULT in order to restore a gradient magnitude of 1
+  int steps;
+  for (steps=0; steps<max_steps &&
                 abs(D)>max(totalD*8192.0*ULP,ULP) &&
                 totalD < MAX_DIST; steps++) {
-		totalD+=D;
-		D = (side * DE(p + totalD * dp) - totalD * min_dist) * MINDIST_MULT;
-	}
-	p += totalD * dp;
-	return float(steps);
+    totalD+=D;
+    D = (side * DE(p + totalD * dp) - totalD * min_dist) * MINDIST_MULT;
+  }
+  p += totalD * dp;
+  return float(steps);
 }
 
 #include "setup.inc"
-#line 166
+#line 163
+
+float de_for_host(vec3 p) { return DE(p); }
 
 void main() {
   vec3 eye_in, dp; 
@@ -177,11 +177,11 @@ void main() {
   float MINDIST_MULT=1.0/(1.0+min_dist);
   D *= MINDIST_MULT;
 
-	vec3 finalcol=vec3(0.);
-	float refpart=1.0;
+  vec3 finalcol=vec3(0.);
+  float refpart=1.0;
 #define REFACTOR par[8].z  //{min=0 max=1 step=.01}
 #define REFITER par[9].z
-	bool cont=true;
+  bool cont=true;
   float firstD = 0.;  // save first step for depth buffer
 
   for (int ray = 0; ray < int(REFITER); ++ray) {
@@ -193,24 +193,24 @@ void main() {
 
     // We've got a hit or we're not sure.
     if (totalD < MAX_DIST) {
-	    float D1 = min_dist*.5*totalD;
-	    vec3 n = side * normal(p, max(256.0*ULP,D1));
+      float D1 = min_dist*.5*totalD;
+      vec3 n = side * normal(p, max(256.0*ULP,D1));
       col = color(p);
       col = blinn_phong(n, -dp, normalize(eye_in+vec3(-1.0,-0.5,-0.7)), col);
       col = mix(aoColor, col, ambient_occlusion(p, n, D1, side));
-	
-	    dp=reflect(dp,n);
-	    p -= totalD * dp;
-	    D = 9. * D1;
+  
+      dp=reflect(dp,n);
+      p -= totalD * dp;
+      D = 9. * D1;
 
       if (D > max(totalD*8192.0*ULP,ULP)){
         col = mix(col, backgroundColor,
                   clamp(log(D/min_dist) * dist_to_color, 0.0, 1.0));
       }
-	    col = mix(col, glowColor, steps/float(max_steps) * glow_strength);
+      col = mix(col, glowColor, steps/float(max_steps) * glow_strength);
     }else {
-	    cont=false;
-	  }
+      cont=false;
+    }
 
 #if 1
     // Glow is based on the number of steps.
