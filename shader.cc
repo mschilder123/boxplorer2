@@ -61,6 +61,13 @@ bool Shader::compile(const string& defines,
   glAttachShader(p, v);
   glAttachShader(p, f);
   glLinkProgram(p);
+  program_ = p;
+
+  GLint status;
+  glGetProgramiv(p, GL_LINK_STATUS, &status);
+  ok_ = (status == GL_TRUE);
+
+  if (!ok_) return false;
 
   glGetProgramInfoLog(p, sizeof(log), &logLength, log);
   if (logLength) {
@@ -114,13 +121,8 @@ bool Shader::compile(const string& defines,
     free(name);
   }
 
-  program_ = p;
-
   source_.assign(defines);
   source_.append(fragment_shader);
 
-  GLint status;
-  glGetProgramiv(p, GL_LINK_STATUS, &status);
-
-  return status == GL_TRUE;
+  return true;
 }

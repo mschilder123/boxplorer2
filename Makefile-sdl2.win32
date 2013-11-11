@@ -17,7 +17,7 @@ BX_OBJS=boxplorer-sdl2.obj interpolate.obj uniforms.obj camera.obj shader.obj \
 				oculus_sdk.obj
 
 boxplorer-sdl2.exe: $(BX_OBJS) $(TW_OBJS)
-	link $(LDFLAGS) /LTCG $(BX_OBJS) $(TW_OBJS)
+	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
 
 shadershrink.exe: shadershrink.cc Makefile-sdl2.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)

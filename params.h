@@ -31,6 +31,7 @@
   PROCESS(float, dof_scale, "dof_scale", true) \
   PROCESS(float, dof_offset, "dof_offset", true) \
   PROCESS(int, enable_dof, "enable_dof", false) \
+  PROCESS(int, disable_de, "disable_de", false) \
   PROCESS(int, no_spline, "no_spline", false) \
   PROCESS(float, focus, "focus", true) \
   PROCESS(int, nrays, "nrays", true) \

@@ -12,7 +12,10 @@ float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = dir;
 
+float myDE(vec3);
+#define DE_FUNC_VEC3 myDE
 #include "setup.inc"
+#line 18
 
 float fbm( vec3 p, vec3 n )
 {
@@ -30,8 +33,6 @@ float distToBox( in vec3 p, in vec3 abc )
   vec3 di = max(abs(p)-abc,0.0);
   return dot(di,di);
 }
-
-
 
 vec2 column( in float x, in float y, in float z )
 {
@@ -321,6 +322,8 @@ vec4 render( in vec3 ro, in vec3 rd )
   return vec4( col, t );
 }
 
+float myDE(vec3 p) { return map(p).x; }
+
 void main( void )
 {
   vec2 q = gl_FragCoord.xy/iResolution.xy;
@@ -344,11 +347,7 @@ void main( void )
   vec3 rd = normalize( p.x*cu + p.y*cv + 1.5*cw );
 
   // Use boxplorer camera
-  if (!setup_ray( eye, dir, ro, rd )) {
-    gl_FragColor = vec4(0);
-    gl_FragDepth = 0.0;
-    return;
-  }
+  if (!setup_ray( eye, dir, ro, rd )) return;
   
   vec4 colz = render( ro, rd );
 

@@ -16,8 +16,10 @@ uniform sampler2D bg_texture;
 #define iChannel3 bg_texture
 vec2 iResolution = vec2(xres, yres);
 
+#define DE_FUNC_VEC3 myDE
+float myDE(vec3);
 #include "setup.inc"
-#line 20
+#line 22
 
 // #define SHOW_ORNAMENTS
 #define SHOW_GALLERY
@@ -329,11 +331,11 @@ bool intersectSphere ( in vec3 ro, in vec3 rd, in vec4 sph, out vec3 normal ) {
 vec3 intersect( in vec3 ro, in vec3 rd ) {
   float maxd = 1500.0;
   float precis = 0.01;
-    float h=precis*2.0;
-    float t = 0.0;
+  float h=precis*2.0;
+  float t = 0.0;
   float d = 0.0;
-    float m = 1.0;
-    for( int i=0; i<140; i++ )
+  float m = 1.0;
+  for( int i=0; i<140; i++ )
     {
     if( abs(h)>precis && t<maxd ) {
       t += h;
@@ -341,10 +343,10 @@ vec3 intersect( in vec3 ro, in vec3 rd ) {
       h = 0.96*mt.x;
       m = mt.y;
     }
-    }
+  }
 
-    if( t>maxd ) m=-1.0;
-    return vec3( t, d, m );
+  if( t>maxd ) m=-1.0;
+  return vec3( t, d, m );
 }
 
 float intersectSimple( in vec3 ro, in vec3 rd ) {
@@ -429,6 +431,10 @@ vec3 path( float time ) {
   return vec3( -getXoffset(z)+5.*cos(time*0.1), 1.25, z );  
 }
 
+float myDE(vec3 p) {
+  return mapTerrain(p).x;
+}
+
 void main( void ) {
   vec2 q = gl_FragCoord.xy / iResolution.xy;
   vec2 p = -1.0 + 2.0*q;
@@ -454,11 +460,7 @@ void main( void ) {
   vec3 rd = normalize( p.x*cu + p.y*cv + 2.1*cw );
 #else
   vec3 ro, rd;
-  if (!setup_ray(eye, dir, ro, rd)) {
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
-    return;
-  }
+  if (!setup_ray(eye, dir, ro, rd)) return;
 #endif
 
   
@@ -476,15 +478,15 @@ void main( void ) {
   if( intersectPlane( ro, rd, 0., dist ) && dist < distSimple ) {     
     ro = ro+rd*dist;
     totaldist = dist;
-    
+
     depth = mapTerrain(ro).x;
-    
+
     vec2 coord = ro.xz;
     vec2 dx = vec2( EPSILON, 0. );
     vec2 dz = vec2( 0., EPSILON );
     
     float bumpfactor = BUMPFACTOR * (1. - smoothstep( 0., BUMPDISTANCE, dist) );
-        
+
     normal = vec3( 0., 1., 0. );
     normal.x = -bumpfactor * (waterHeightMap(coord + dx) - waterHeightMap(coord-dx) ) / (2. * EPSILON);
     normal.z = -bumpfactor * (waterHeightMap(coord + dz) - waterHeightMap(coord-dz) ) / (2. * EPSILON);
@@ -497,7 +499,7 @@ void main( void ) {
   } else {
     tmat = intersect( ro, rd);
   }
-    
+
   totaldist += tmat.x;
   
   // sky   
@@ -625,9 +627,5 @@ void main( void ) {
   col *= vec3(1.03,1.02,1.0);
   col *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
   
-#if 0
-  gl_FragColor = vec4( col, 1.0 );
-#else
   write_pixel(dir, totaldist, col);
-#endif
 }
