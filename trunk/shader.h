@@ -5,7 +5,7 @@
 
 class Shader {
 public:
-  Shader() : program_(0) {}
+  Shader() : program_(0), ok_(false) {}
   virtual ~Shader() { clear(); }
 
   // Create, load and link shader.
@@ -17,6 +17,7 @@ public:
   void clear();
 
   unsigned int program() { return program_; }
+  bool ok() const { return ok_; }
 
   const std::string& source() const { return source_; }
   const std::string& log() const { return log_; }
@@ -27,6 +28,7 @@ private:
   unsigned int program_;
   std::string log_;
   std::string uniforms_;
+  bool ok_;
 };
 
 #endif  // _F_SHADER_H_

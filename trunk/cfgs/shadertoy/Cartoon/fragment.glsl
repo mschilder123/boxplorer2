@@ -13,8 +13,10 @@ varying vec3 eye, dir;
 uniform sampler2D my_texture;
 uniform int iters, max_steps;
 
+float de(vec3);
+#define DE_FUNC_VEC3 de
 #include "setup.inc"
-#line 18
+#line 20
 
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = vec3(0.);
@@ -169,8 +171,6 @@ void main(void)
 	ddir.xz*=rot(mouse.x);
 	vec3 from=origin+move(ddir);
   if (!setup_ray(eye, dir, from, ddir)) {  // boxplorify view
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
     return;
   }
 	vec3 color=raymarch(from,ddir);

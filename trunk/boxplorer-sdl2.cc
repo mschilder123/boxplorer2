@@ -365,7 +365,8 @@ enum StereoMode { ST_NONE=0,
                   ST_SIDEBYSIDE,
                   ST_QUADBUFFER,
                   ST_OCULUS,
-                  ST_ANAGLYPH
+                  ST_ANAGLYPH,
+                  ST_COMPUTE_DE_ONLY
 } stereoMode = ST_NONE;
 
 // ogl framebuffer object, one for each eye.
@@ -375,16 +376,20 @@ GLuint texture[2];
 // depth buffer attached to fbo
 GLuint depthBuffer[2];
 
+Shader fractal;
+Shader effects;
+
+Shader de_shader;
+GLuint de_fbo;
+GLuint de_texture;
+
+Uniforms uniforms;
+
 string BaseDir;     // Where our executable and include dirs live.
 string WorkingDir;  // Where current fractal code & data lives.
 string BaseFile;    // Initial argument filename.
 
-Shader fractal;
-Shader effects;
-
 string lifeform;  // Conway's Game of Life creature, if any.
-
-Uniforms uniforms;
 
 // texture holding background image
 GLuint background_texture;
@@ -669,7 +674,7 @@ class Camera : public KeyFrame {
    // Send parameters to gpu.
    void setUniforms(float x_scale, float x_offset,
                     float y_scale, float y_offset,
-                    double spd) {
+                    double spd, GLuint program = 0) {
      #define glSetUniformf(name) \
        glUniform1f(glGetUniformLocation(program, #name), name);
      #define glSetUniformfv(name) \
@@ -677,7 +682,7 @@ class Camera : public KeyFrame {
      #define glSetUniformi(name) \
        glUniform1i(glGetUniformLocation(program, #name), name);
 
-     GLuint program = fractal.program();
+     if (program == 0) program = fractal.program();
 
      // These might be dupes w/ uniforms.send() below.
      // Leave for now until all .cfg got updated.
@@ -763,7 +768,13 @@ class Camera : public KeyFrame {
          setUniforms(2.0, -1.0, 1.0, 0.0, +speed);
          glRectf(0,-1,1,1);  // draw right half of screen
          break;
-      }
+       case ST_COMPUTE_DE_ONLY:
+         setUniforms(1.0, 0.0, 1.0, 0.0, speed, de_shader.program());
+         float xrange = 4.0 / window.width();  // Aim for ~8x8 pixels.
+         float yrange = 4.0 / window.height();
+         glRectf(-1, 1, -1+xrange, 1-yrange);  // Only care about top corner.
+         break;
+     }
    }
 
   void mixHydraOrientation(float* quat) {
@@ -1143,10 +1154,18 @@ unsigned int getBGRpixel(int x, int y) {
   return val;
 }
 
+GLSL::vec3 getPixelColor(int x, int y) {
+  float img[3];
+  int height = config.height;
+  glReadBuffer(GL_COLOR_ATTACHMENT0);
+  glReadPixels(viewportOffset[0] + x, viewportOffset[1] + height - 1 - y, 1, 1, GL_RGB, GL_FLOAT, img);
+  return GLSL::vec3(img);
+}
+
 string glsl_source;
 
 // Compile and activate shader programs. Return the program handle.
-int setupShaders(void) {
+int setupShaders(Shader* fractal, const char* extra_define = NULL) {
   string vertex(default_vs);
   string fragment(default_fs);
 
@@ -1165,9 +1184,13 @@ int setupShaders(void) {
     fragment.replace(inc_pos, line_end - inc_pos, inc);
   }
 
-  glsl_source.assign(defines + fragment);
-
-  return fractal.compile(defines, vertex, fragment);
+  if (extra_define == NULL) {
+    glsl_source.assign(defines + fragment);
+    return fractal->compile(defines, vertex, fragment);
+  } else {
+    string extra_defines = extra_define + defines;
+    return fractal->compile(extra_defines, vertex, fragment);
+  }
 }
 
 // Compile and activate shader programs for frame buffer manipulation.
@@ -1231,6 +1254,8 @@ bool setupDirectories(const char* configFile) {
 //
 // Exits the program if an error occurs.
 bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
+  GLenum status = GL_NO_ERROR;
+
   // Set attributes for the OpenGL window.
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1277,9 +1302,56 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   enableShaderProcs() ||
       die("This program needs support for GLSL shaders.\n");
 
-  (setupShaders()) ||
+  (setupShaders(&fractal)) ||
       die("Error in GLSL fractal shader compilation:\n%s\n",
                       fractal.log().c_str());
+
+  if (!config.disable_de) {
+    // Try compile same shader to get a minimal DE computation version.
+    setupShaders(&de_shader, "#define ST_COMPUTE_DE_ONLY\n");
+
+    if (!de_shader.ok()) {
+      printf(__FUNCTION__ " : de_shader failed to compile: no GPU de.\n");
+      printf(__FUNCTION__ " :\n%s\n", de_shader.log().c_str());
+      while (glGetError() != GL_NO_ERROR); 
+    } else {
+      // Got a shader that can compute DE.
+      // Set-up a float32 fbo for it to write to.
+      glDeleteTextures(1, &de_texture);
+      glGenTextures(1, &de_texture);
+
+      glDeleteFramebuffers(1, &de_fbo);
+      glGenFramebuffers(1, &de_fbo);
+
+      glEnable(GL_TEXTURE_2D);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, de_texture);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
+                   0, GL_RGB, GL_FLOAT, NULL);
+      glBindTexture(GL_TEXTURE_2D, 0);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, de_fbo);
+
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                             GL_TEXTURE_2D, de_texture, 0);
+
+      if ((status = glGetError()) != GL_NO_ERROR) {
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
+
+      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      if (status != GL_FRAMEBUFFER_COMPLETE) {
+        die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
+      }
+
+      glClear(GL_COLOR_BUFFER_BIT);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+  }
 
   if (background.data() != NULL) {
     // Load background image into texture
@@ -1300,8 +1372,6 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     printf(__FUNCTION__ " : background texture at %d\n", background_texture);
     glBindTexture(GL_TEXTURE_2D, 0);
   }
-
-  GLenum status;
 
   if ((status = glGetError()) != GL_NO_ERROR) {
     die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1565,7 +1635,8 @@ int main(int argc, char **argv) {
   bool configSpeed = false;
   bool fixedFov = false;
   char* lifeform_file = NULL;
-  int enableDof = 0;
+  int enableDoF = 0;
+  int disableDE = 0;
   bool xbox360 = true;  // try find xbox360 controller
   int kJOYSTICK = 0;  // joystick by index
 
@@ -1594,10 +1665,14 @@ int main(int argc, char **argv) {
       useTime = true;
     } else if (!strcmp(argv[argc-1], "--speed")) {
       configSpeed = true;
-    } else if (!strcmp(argv[argc-1], "--disabledof")) {
-      enableDof = -1;
-    } else if (!strcmp(argv[argc-1], "--enabledof")) {
-      enableDof = 1;
+    } else if (!strcmp(argv[argc-1], "--disable-dof")) {
+      enableDoF = -1;
+    } else if (!strcmp(argv[argc-1], "--enable-dof")) {
+      enableDoF = 1;
+    } else if (!strcmp(argv[argc-1], "--disable-de")) {
+      disableDE = -1;
+    } else if (!strcmp(argv[argc-1], "--enable-de")) {
+      disableDE = 1;
     } else if (!strcmp(argv[argc-1], "--fixedfov")) {
       fixedFov = true;
     } else if (!strcmp(argv[argc-1], "--loop")) {
@@ -1708,7 +1783,8 @@ int main(int argc, char **argv) {
 
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
-  if (enableDof) config.enable_dof = (enableDof == 1);  // override
+  if (enableDoF) config.enable_dof = (enableDoF == 1);  // override
+  if (disableDE) config.disable_de = (disableDE == -1);  // override
   if (stereoMode == ST_INTERLACED ||
       stereoMode == ST_QUADBUFFER ||
       stereoMode == ST_ANAGLYPH) {
@@ -1720,8 +1796,7 @@ int main(int argc, char **argv) {
     config.fov_y = 110; config.fov_x = 90.0;
     fixedFov = true;
   }
-  if (stereoMode == ST_INTERLACED ||
-      stereoMode == ST_OVERUNDER) {
+  if (stereoMode == ST_INTERLACED || stereoMode == ST_OVERUNDER) {
     // Fix at 1080P
     config.width = 1920; config.height = 1080;
     config.fov_y = 30; config.fov_x = 0.0;
@@ -1729,10 +1804,11 @@ int main(int argc, char **argv) {
   }
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
-  if (stereoMode == ST_XEYED) config.width *= 2;
 
-  int savedWidth = config.width;
-  int savedHeight = config.height;
+  int saveWidth = config.width;
+  int saveHeight = config.height;
+
+  if (stereoMode == ST_XEYED) config.width *= 2;
 
   config.sanitizeParameters();
 
@@ -1902,9 +1978,8 @@ int main(int argc, char **argv) {
 #endif
 
       camera.mixSensorOrientation(view_q);
-  }
 
-    if (!rendering && (de_func || de_func_64)) {
+    if (!config.disable_de && (de_func || de_func_64)) {
       // Get a distance estimate, for navigation and eye separation.
       // Setup just the vars needed for DE. For now, iters and par[0..20]
       // TODO: make de() method of camera?
@@ -1922,7 +1997,31 @@ int main(int argc, char **argv) {
         camera.speed = de / 10.0;
         last_de = de;
       }
+    } else if (!config.disable_de && de_shader.ok()) {
+      // We did not find a CPU based DE; try the GPU based one.
+      glDisable(GL_DEPTH_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, de_fbo);
+
+      // Read previous' round computation, stored as pixel.
+      GLSL::vec3 col = getPixelColor(0, 0);
+      double de = fabs(col.x);
+
+      if (de != 0 && de != last_de) {
+        if (de < camera.min_dist) de = camera.min_dist;
+        printf("de=%12.12e\n", de);
+        camera.speed = de / 10.0;
+        last_de = de;
+      }
+
+      // Compute de using shader.
+      // We'll read the result next round so no costly glFinish needed.
+      glUseProgram(de_shader.program());
+      camera.render(ST_COMPUTE_DE_ONLY);
+      glUseProgram(0);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+  }  // !rendering
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
@@ -1953,9 +2052,9 @@ int main(int argc, char **argv) {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	  camera.speed *= speed_factor;
+    camera.speed *= speed_factor;
     camera.render(stereoMode);  // draw fractal
-	  camera.speed /= speed_factor;
+    camera.speed /= speed_factor;
 
     glUseProgram(0);
 
@@ -2575,10 +2674,10 @@ int main(int argc, char **argv) {
                      & SIXENSE_BUTTON_START;
 
   if (calibrate) {
-	  speed_base = d;
-	  neutral_x = dx;
-	  neutral_y = dy;
-	  neutral_z = dz;
+    speed_base = d;
+    neutral_x = dx;
+    neutral_y = dy;
+    neutral_z = dz;
   }
 
   // distance between controllers is eye separation / speed multiplier.
@@ -2590,9 +2689,9 @@ int main(int argc, char **argv) {
   // flip back&forth through keyframes w/ edge trigger of bumper button presses.
   if ((clbuttons & SIXENSE_BUTTON_BUMPER) &&
      ((clbuttons ^ lbuttons) & SIXENSE_BUTTON_BUMPER)) {
-	  --keyframe;
-	  if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
-	  if (keyframe < keyframes.size()) {
+    --keyframe;
+    if (keyframe >= keyframes.size()) keyframe = keyframes.size() - 1;
+    if (keyframe < keyframes.size()) {
       next_camera = &keyframes[keyframe];
     } else {
       next_camera = &config;
@@ -2602,9 +2701,9 @@ int main(int argc, char **argv) {
 
   if ((crbuttons & SIXENSE_BUTTON_BUMPER) &&
      ((crbuttons ^ rbuttons) & SIXENSE_BUTTON_BUMPER)) {
-	  ++keyframe;
-	  if (keyframe >= keyframes.size()) keyframe = 0;
-	  if (keyframe < keyframes.size()) {
+    ++keyframe;
+    if (keyframe >= keyframes.size()) keyframe = 0;
+    if (keyframe < keyframes.size()) {
       next_camera = &keyframes[keyframe];
     } else {
       next_camera = &config;
@@ -2633,7 +2732,8 @@ int main(int argc, char **argv) {
 
   TwTerminate();
 
-  camera.width = savedWidth; camera.height = savedHeight;
+  camera.width = saveWidth;
+  camera.height = saveHeight;
   camera.saveConfig("last.cfg", &defines);  // Save a config file on exit, just in case.
 
 #if defined(_WIN32)

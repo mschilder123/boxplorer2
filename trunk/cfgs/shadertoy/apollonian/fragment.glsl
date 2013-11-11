@@ -20,10 +20,14 @@ uniform int color_iters;    // {min=1 max=1000} Number of fractal iterations.
 vec2      iResolution = vec2(xres, yres);     // viewport resolution (in pixels)
 float     iGlobalTime = time;     // shader playback time (in seconds)
 
+float de(vec3);
+#define DE_FUNC_VEC3 de
+
 uniform vec3 par[1];
 #define ss par[0].x  // {min=.1 max=2.0 step=.001}
 
 #include "setup.inc"
+#line 30
 
 float de( vec3 p ) {
   float scale = 1.0;  
@@ -78,9 +82,7 @@ vec3 calcNormal( in vec3 pos ) {
 void main(void) {
   vec3 ro;
   vec3 rd;
-  if (!setup_ray(eye, dir, ro, rd)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
+  if (!setup_ray(eye, dir, ro, rd)) {  // boxplorify view
     return;
   }
 
@@ -117,5 +119,5 @@ void main(void) {
   
     col = mix( col, smoothstep( 0.0, 1.0, col ), 0.25 );
   
-    write_pixel(dir, t, col);
+    write_pixel(dir, t, col);  // boxplorify write
 }

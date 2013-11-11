@@ -1,4 +1,7 @@
-// Spudsville w/ knighty tracer
+// Lenord's Spudsville.
+// Bits and pieces from knighty, rrrola, syntopia stitched together.
+
+#define DE_FUNC_VEC3 DE
 
 #define DIST_MULTIPLIER par[9].x  // {min=.01 max=1 step=.01}
 #define MAX_DIST 10.0
@@ -33,10 +36,9 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 #define Scale par[0].x  //{min=-5 max=4 step=.01}
 #define fixedRadius2 par[1].x  //{min=.1 max=2.3 step=.01}
 #define minRadius2 par[1].y  //{min=0 max=2.3 step=.01}
-#define foldingLimit par[2].x  //{min=0 max=5 step=.01}
+#define foldingLimit1 par[2].x  //{min=0 max=5 step=.01}
 #define foldingLimit2 par[2].y  //{min=0 max=5 step=.01}
-#define Scale2 par[3].x  //{min=0.00 max=4.00 step=.01}
-#define MN par[3].y  //{min=-50 max=50 step=1}
+#
 #define Power par[5].x  //{min=0.1 max=12.3 step=.1}
 #define ZMUL par[5].y  //{min=-310 max=310 step=1}
 
@@ -46,19 +48,19 @@ void sphereFold(inout vec3 z, inout float dz) {
     float temp = (fixedRadius2/minRadius2);
     z*= temp;
     dz*=temp;
-  } else if (r2<fixedRadius2) {
-    float temp =(fixedRadius2/r2);
-    z*=temp;
+  } else if (r2 < fixedRadius2) {
+    float temp = (fixedRadius2/r2);
+    z*= temp;
     dz*=temp;
   }
 }
 
-void boxFold(inout vec3 z, inout float dz) {
-  z = clamp(z, -foldingLimit, foldingLimit) * 2.0 - z;
+void boxFold1(inout vec3 z, inout float dz) {
+  z = clamp(z, -foldingLimit1, foldingLimit1) * 2.0 - z;
 }
 
 void boxFold2(inout vec3 z, inout float dz) {
-  z = clamp(z, -foldingLimit2,foldingLimit2) * 2.0 - z;
+  z = clamp(z, -foldingLimit2, foldingLimit2) * 2.0 - z;
 }
 
 void powN2(inout vec3 z, float zr0, inout float dr) {
@@ -74,27 +76,26 @@ void powN2(inout vec3 z, float zr0, inout float dr) {
 
 
 float DE(vec3 z) {
-  vec3 c = z;
-  int n = 0;
   float dz = 1.0;
   float r = length(z);
 
-  for (n = 1; n < iters; ++n) {
+  for (int n = 1; n < iters; ++n) {
     if (r >= 10.0) break;
-    boxFold(z,dz);
+    boxFold1(z,dz);
     sphereFold(z,dz);
-    z = Scale*z;
+    z *= Scale;
     dz *= abs(Scale);
     r = length(z);
   }
 
   if (r < 10.0) {
     boxFold2(z,dz);
+    dz *= abs(Scale);
     r = length(z);
     powN2(z,r,dz);
     r = length(z);
   }
-  
+
   return (r*log(r) / dz) * DIST_MULTIPLIER;
 }
 
@@ -161,15 +162,12 @@ float trace(inout vec3 p, in vec3 dp, inout float D, inout float totalD, in floa
 }
 
 #include "setup.inc"
+#line 166
 
 void main() {
   vec3 eye_in, dp; 
 
-  if (!setup_ray(eye, dir, eye_in, dp)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
-    return;
-  }
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
   vec3 p = eye_in;
 
@@ -190,7 +188,7 @@ void main() {
     if (!cont) break;
 
     float steps=trace(p, dp, D, totalD, side, MINDIST_MULT);
-    if (ray == 0) firstD = totalD + D;
+    if (ray == 0) firstD = totalD;
     vec3 col = backgroundColor;
 
     // We've got a hit or we're not sure.
@@ -202,7 +200,7 @@ void main() {
       col = mix(aoColor, col, ambient_occlusion(p, n, D1, side));
 	
 	    dp=reflect(dp,n);
-	    p -= (totalD+D) * dp;
+	    p -= totalD * dp;
 	    D = 9. * D1;
 
       if (D > max(totalD*8192.0*ULP,ULP)){
@@ -214,9 +212,11 @@ void main() {
 	    cont=false;
 	  }
 
+#if 1
     // Glow is based on the number of steps.
     col = mix(col, glowColor,
               (float(steps))/float(max_steps) * glow_strength);
+#endif
 
     finalcol+=refpart*col;
     refpart*=REFACTOR;

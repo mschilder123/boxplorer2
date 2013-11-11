@@ -1,10 +1,25 @@
-uniform float focus;  // {min=-10 max=30 step=.01} Focal plane devation from 30x speed.
+// Focal plane devation from 30x speed.
+uniform float focus;  // {min=-10 max=30 step=.01}
 
 #ifndef OUT_
 #define OUT_(a,b) out a b
 #endif
 
 bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
+#if defined(ST_COMPUTE_DE_ONLY)
+  // Caller is only interested in DE value as computed by shader.
+  // Write it to output buffer, which better be FLOAT32.
+  float _dist_ = 0.;
+#if defined(DE_FUNC_VEC3)
+  // We have a compatible DE, call it.
+  _dist_ = DE_FUNC_VEC3(eye);
+#else
+  #error "DE_FUNC_VEC3 not defined!"
+#endif
+  gl_FragColor = vec4(_dist_);
+  gl_FragDepth = _dist_;
+  return false;
+#else  // ST_COMPUTE_DE_ONLY
 #if !defined(ST_NONE)
 #if defined ST_OCULUS
   float halfx = xres / 2.0;
@@ -25,7 +40,9 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   float r2 = dot(p, p);  // Radius squared, from center.
   p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
   if (dot(p, p) > 0.10) { 
-    //discard;  // Don't waste time on pixels we can't see.
+    // Don't waste time on pixels we can't see.
+    gl_FragColor = vec4(0.);
+    gl_FragDepth = 0.;
     return false;
   }
 
@@ -34,16 +51,17 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   eye_out = eye + eye_d;
 
   // Note: no asymmetric frustum for Rift.
-  ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));  // z value determines fov. Eyeballed.
-#else
+  // z value (0.35) determines fov. Eyeballed.
+  ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));
+#else  // ST_OCULUS
 #if defined(ST_INTERLACED)
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
 #elif defined(ST_ANAGLYPH)
   float id = -1.0 + 2.0 * mod(gl_FragCoord.x + mod(gl_FragCoord.y, 2.0), 2.0);
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(id * speed, 0, 0, 0));
-#else
+#else  // ST_INTERLACED
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
+#endif  // ST_INTERLACED
   eye_out = eye + eye_d;
   // Construct asymmetric frustum.
   ray_out = normalize(ray * (focus + 30.0) * abs(speed) - eye_d);
@@ -54,6 +72,7 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
 #endif
 
   return true;
+#endif  // ST_COMPUTE_DE_ONLY
 }
 
 void write_pixel(vec3 ray, float z, vec3 finalCol) {

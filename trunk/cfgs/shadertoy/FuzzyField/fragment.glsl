@@ -10,8 +10,10 @@ uniform int max_steps;
 
 vec2 size = vec2(xres, yres);
 
+#define DE_FUNC_VEC3 DE
+float DE(vec3);
 #include "setup.inc"
-#line 15
+#line 16
 
 //const float focalDistance=1.5,aperature=0.01,fudgeFactor=0.9;
 #define aperature par[1].x //{min=.001 max=0.5 step=.001}
@@ -64,8 +66,6 @@ void main() {
 	vec3 rd=lookat(vec3(1.0,1.7-ro.y*0.75,0.7),vec3(0.0,1.0,0.0))*normalize(vec3((2.0*gl_FragCoord.xy-size.xy)/size.y,1.0));
 	vec3 L=normalize(ro+vec3(0.5,2.5,0.5));
   if (!setup_ray(eye, dir, ro, rd)) {  // boxplorify view
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
     return;
   }
 	vec4 col=vec4(0.0);//color accumulator
