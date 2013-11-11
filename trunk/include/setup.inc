@@ -5,19 +5,14 @@ uniform float focus;  // {min=-10 max=30 step=.01}
 #define OUT_(a,b) out a b
 #endif
 
+float de_for_host(vec3);
 bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
 #if defined(ST_COMPUTE_DE_ONLY)
   // Caller is only interested in DE value as computed by shader.
   // Write it to output buffer, which better be FLOAT32.
-  float _dist_ = 0.;
-#if defined(DE_FUNC_VEC3)
-  // We have a compatible DE, call it.
-  _dist_ = DE_FUNC_VEC3(eye);
-#else
-  #error "DE_FUNC_VEC3 not defined!"
-#endif
-  gl_FragColor = vec4(_dist_);
-  gl_FragDepth = _dist_;
+  float dist = de_for_host(eye);
+  gl_FragColor = vec4(dist);
+  gl_FragDepth = dist;
   return false;
 #else  // ST_COMPUTE_DE_ONLY
 #if !defined(ST_NONE)

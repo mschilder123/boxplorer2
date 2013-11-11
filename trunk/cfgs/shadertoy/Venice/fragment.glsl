@@ -16,10 +16,8 @@ uniform sampler2D bg_texture;
 #define iChannel3 bg_texture
 vec2 iResolution = vec2(xres, yres);
 
-#define DE_FUNC_VEC3 myDE
-float myDE(vec3);
 #include "setup.inc"
-#line 22
+#line 20
 
 // #define SHOW_ORNAMENTS
 #define SHOW_GALLERY
@@ -431,9 +429,7 @@ vec3 path( float time ) {
   return vec3( -getXoffset(z)+5.*cos(time*0.1), 1.25, z );  
 }
 
-float myDE(vec3 p) {
-  return mapTerrain(p).x;
-}
+float de_for_host(vec3 p) { return mapTerrain(p).x; }
 
 void main( void ) {
   vec2 q = gl_FragCoord.xy / iResolution.xy;
@@ -460,7 +456,9 @@ void main( void ) {
   vec3 rd = normalize( p.x*cu + p.y*cv + 2.1*cw );
 #else
   vec3 ro, rd;
-  if (!setup_ray(eye, dir, ro, rd)) return;
+  if (!setup_ray(eye, dir, ro, rd)) {  // boxplorify view
+    return;
+  }
 #endif
 
   
@@ -520,23 +518,23 @@ void main( void ) {
     // geometry
     vec3 nor = calcNormal(pos);
         
-        // material
+    // material
     vec3 mate, origmate;
     vec3 matpos = pos*0.3;
     
 #ifdef SHOW_GALLERY
     if( tmat.z == 5. )
-    mate.xyz = texcube(iChannel3, matpos, nor ).xyz*0.2;
-      else
+      mate.xyz = texcube(iChannel3, matpos, nor ).xyz*0.2;
+    else
 #endif
-    origmate = mate.xyz = texcube(iChannel1, matpos, nor ).xyz*0.4;
+      origmate = mate.xyz = texcube(iChannel1, matpos, nor ).xyz*0.4;
     
     bool aboveGallery = false;
     
     if( tmat.z == 3. ) mate.xyz = 160.*vec3(1.30,1.10,0.40);
-    else if( tmat.z == 2. ) mate.xyz *= 
-      clamp( 4.*texture2D( iChannel2, buildingInfo.x*vec2(1.4231153121) ).xyz
-      ,vec3(0.), vec3(1.) );
+    else if( tmat.z == 2. ) {
+      mate.xyz *= clamp( 4.*texture2D( iChannel2, buildingInfo.x*vec2(1.4231153121) ).xyz ,vec3(0.), vec3(1.) );
+    }
       
     // lighting
     float occ = calcAO( pos, nor );
@@ -548,7 +546,7 @@ void main( void ) {
     }
     dif /= dot( lp-pos,lp-pos );
     
-        float bac = max(0.2 + 0.8*dot(nor,normalize(vec3(-lig.x,0.0,-lig.z))),0.0);
+    float bac = max(0.2 + 0.8*dot(nor,normalize(vec3(-lig.x,0.0,-lig.z))),0.0);
     
     if( buildingParams.z == 1. && pos.y > GALLERYHEIGHT ) {
       aboveGallery=true;
@@ -557,7 +555,7 @@ void main( void ) {
     
     // lights
     vec3 brdf = vec3(0.0);
-        brdf += (60.0*dif)*lcol;
+    brdf += (60.0*dif)*lcol;
     brdf += (0.1*amb)*vec3(0.10,0.15,0.30);
     brdf += (0.1*bac)*vec3(0.09,0.03,0.01);
     
@@ -627,5 +625,5 @@ void main( void ) {
   col *= vec3(1.03,1.02,1.0);
   col *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
   
-  write_pixel(dir, totaldist, col);
+  write_pixel(dir, totaldist, col);  // boxplorify write
 }
