@@ -1306,6 +1306,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       die("Error in GLSL fractal shader compilation:\n%s\n",
                       fractal.log().c_str());
 
+#ifdef GL_RGBA32F
   if (!config.disable_de) {
     // Try compile same shader to get a minimal DE computation version.
     setupShaders(&de_shader, "#define ST_COMPUTE_DE_ONLY\n");
@@ -1352,6 +1353,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
   }
+#endif  // GL_RGBA32F
 
   if (background.data() != NULL) {
     // Load background image into texture
