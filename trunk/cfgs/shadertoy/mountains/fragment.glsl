@@ -402,10 +402,7 @@ void main(void)
     vec3 cv = normalize(cross(cu,cw));
     vec3 rd = normalize( s.x*cu + s.y*cv + 1.5*cw );
 
-    // Use boxplorer camera
-    if (!setup_ray( eye, dir, cameraPos, rd )) {
-      gl_FragColor = vec4(0);
-      gl_FragDepth = 0.0;
+    if (!setup_ray( eye, dir, cameraPos, rd )) {  // boxplorify view
       return;
     }
 
@@ -435,7 +432,7 @@ void main(void)
 
     col = PostEffects(col);
     
-    write_pixel(dir, distance, col);
+    write_pixel(dir, distance, col);  // boxplorify write
 }
 
 //--------------------------------------------------------------------------

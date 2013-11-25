@@ -334,10 +334,7 @@ void main(void)
   // create view ray
   vec3 rd = normalize( p.x*uu + p.y*vv + 3.0*ww );
 
-  // Use boxplorer stereo camera instead.
-  if (!setup_ray( eye, dir, ro, rd)) {
-    gl_FragColor = vec4(0);
-    gl_FragDepth = 0.0;
+  if (!setup_ray( eye, dir, ro, rd)) {  // boxplorify view
     return;
   }
 
@@ -486,5 +483,5 @@ void main(void)
   // fade in  
   col *= smoothstep( 0.0, 2.0, iGlobalTime );
 
-  write_pixel(dir, tmat.x, col);
+  write_pixel(dir, tmat.x, col);  // boxplorify write
 }

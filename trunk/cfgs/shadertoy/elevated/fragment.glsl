@@ -11,6 +11,7 @@ float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 
 #include "setup.inc"
+#line 14
 
 mat3 m = mat3( 0.00,  0.80,  0.60,
               -0.80,  0.36, -0.48,
@@ -262,10 +263,7 @@ void main(void)
     vec3 cv = normalize(cross(cu,cw));
     vec3 rd = normalize( s.x*cu + s.y*cv + 1.6*cw );
 
-    // Use boxplorer camera
-    if (!setup_ray( eye, dir, campos, rd )) {
-      gl_FragColor = vec4(0);
-      gl_FragDepth = 0.0;
+    if (!setup_ray( eye, dir, campos, rd )) {  // boxplorify view
       return;
     }
 
@@ -325,5 +323,5 @@ void main(void)
     vec2 uv = xy*0.5+0.5;
     col *= 0.7 + 0.3*pow(16.0*uv.x*uv.y*(1.0-uv.x)*(1.0-uv.y),0.1);
     
-    write_pixel(dir, t, col);
+    write_pixel(dir, t, col);  // boxplorify write
 }

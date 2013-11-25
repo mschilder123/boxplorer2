@@ -14,6 +14,7 @@ vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = dir;
 
 #include "setup.inc"
+#line 17
 
 float fbm( vec3 p, vec3 n )
 {
@@ -396,10 +397,7 @@ void main(void)
   vec3 vv = normalize( cross(uu,ww));
   vec3 rd = normalize( p.x*uu + p.y*vv + 2.0*ww );
 
-  // Use boxplorer camera
-  if (!setup_ray( eye, dir, ro, rd )) {
-    gl_FragColor = vec4(0);
-    gl_FragDepth = 0.0;
+  if (!setup_ray( eye, dir, ro, rd )) {  // boxplorify view
     return;
   }
   
@@ -480,5 +478,5 @@ void main(void)
   // vigneting
   col *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
     
-  write_pixel(dir, dist, col);
+  write_pixel(dir, dist, col);  // boxplorify write
 }

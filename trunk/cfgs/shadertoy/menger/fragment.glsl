@@ -153,11 +153,9 @@ void main(void)
   coord.x *= iResolution.x/iResolution.y;
   
   vec3 rd;
-  if (!setup_ray(eye, dir, camPos, rd)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
+  if (!setup_ray(eye, dir, camPos, rd)) {  // boxplorify view
     return;
   }
   vec4 col = rayMarch(camPos, rd);
-  write_pixel(dir, col.w, col.xyz);
+  write_pixel(dir, col.w, col.xyz);  // boxplorify write
 }

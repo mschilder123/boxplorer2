@@ -726,9 +726,7 @@ void main( void )
 #if 0
     GetCameraRayLookat( OrbitPoint(iGlobalTime * 0.3, cos(iGlobalTime * 0.2) * 0.3 + 0.4) * 7.0, vec3(0.0, 0.0, 0.0), ray);
 #else
-   if (!setup_ray(eye, dir, ray.vOrigin, ray.vDir)) {
-     gl_FragColor = vec4(0.);
-     gl_FragDepth = 0.;
+   if (!setup_ray(eye, dir, ray.vOrigin, ray.vDir)) {  // boxplorify view
      return;
    }
    ray.fStartDistance = 0.;
@@ -738,5 +736,5 @@ void main( void )
     vec3 cScene = GetSceneColourPrimary( ray );  
 
     const float fExposure = 1.5;    
-    gl_FragColor = vec4( Tonemap(cScene * fExposure), 1.0 );
+    write_pixel(dir, 1.0, Tonemap(cScene * fExposure));  // boxplorify write
 }

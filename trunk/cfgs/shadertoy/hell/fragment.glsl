@@ -59,9 +59,7 @@ void main(void)
 	vec3 ray=vec3(ground_x,ground_y,ground_z-mspeed*2.5);
 #if 1
   vec3 pos;  // not used; DE is picky. Only expose dynamic orientation.
-  if (!setup_ray(eye, dir, pos, raydir)) {
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
+  if (!setup_ray(eye, dir, pos, raydir)) {  // boxplorify view
     return;
   }
 #endif
@@ -77,5 +75,6 @@ void main(void)
 	vec3 n=normalize(vec3(draw_scene(hit+h.xyx),draw_scene(hit+h.yxy),draw_scene(hit+h.yyx)));
 	float c=(n.x+n.y+n.z)*0.35;
 	vec3 color=vec3(c,c,c)+t*0.0625;
-	gl_FragColor=vec4(vec3(c-t*0.0375+p.y*0.05,c-t*0.025-p.y*0.0625,c+t*0.025-p.y*0.025)+color*color,1.0);
+	color = vec3(c-t*0.0375+p.y*0.05,c-t*0.025-p.y*0.0625,c+t*0.025-p.y*0.025)+color*color;
+  write_pixel(dir, 1.0, color);  // boxplorify write
 	}
