@@ -183,8 +183,6 @@ void main() {
 #else
   vec3 rayOrigin, rayDirection;
   if (!setup_ray(eye, dir, rayOrigin, rayDirection)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
     return;
   }
 #endif
