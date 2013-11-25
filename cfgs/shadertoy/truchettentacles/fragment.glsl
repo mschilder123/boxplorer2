@@ -9,6 +9,7 @@ float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 
 #include "setup.inc"
+#line 12
 
 float rand(vec3 r) { return fract(sin(dot(r.xy,vec2(1.38984*sin(r.z),1.13233*cos(r.z))))*653758.5453); }
 
@@ -82,10 +83,7 @@ void main()
     2.0*(sin(t-sin(2.0*t)/2.0-pi/2.0)/2.0+0.5),
     2.0*((-2.0*(t-sin(4.0*t)/4.0)/pi)+0.5+0.5));
 
-    // Use boxplorer camera
-    if (!setup_ray( eye, dir, ray_pos, ray_dir )) {
-      gl_FragColor = vec4(0);
-      gl_FragDepth = 0.0;
+    if (!setup_ray( eye, dir, ray_pos, ray_dir )) {  // boxplorify view
       return;
     }
 
@@ -115,5 +113,5 @@ void main()
 	vec3 env= vec3(.5); //textureCube(iChannel0,reflected*reflected*reflected).xyz;
 
 	col=col*light+0.1*env;
-  write_pixel(dir, totalDist, col);
+  write_pixel(dir, totalDist, col);  // boxplorify write
 }

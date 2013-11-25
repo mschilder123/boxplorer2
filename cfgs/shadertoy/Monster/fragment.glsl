@@ -189,9 +189,7 @@ void main(void)
   vec3 rd = normalize( p.x*uu + p.y*vv + 3.0*ww );
 #else
   vec3 ro, rd;
-  if (!setup_ray(eye, dir, ro, rd)) {
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
+  if (!setup_ray(eye, dir, ro, rd)) {  // boxplorify view
     return;
   }
 #endif
@@ -252,9 +250,5 @@ void main(void)
   // vigneting
   col *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
   
-#if 0
-  gl_FragColor = vec4( col, 1.0 );
-#else
-  write_pixel(dir, tmat.x, col);
-#endif
+  write_pixel(dir, tmat.x, col);  // boxplorify write
 }

@@ -92,7 +92,9 @@ vec2 de(vec3 pos) {
   if (abs(d-fl)<.001) hid=1.;
   return vec2(d,hid);
 }
-
+float de_for_host(vec3 p) {
+  return de(p).x;
+}
 
 vec3 normal(vec3 p) {
   vec3 e = vec3(0.0,det,0.0);
@@ -284,9 +286,7 @@ void main(void)
   ddir.xz*=rotview1;
 #else
   vec3 from, ddir;
-  if (!setup_ray(eye, dir, from, ddir)) {
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
+  if (!setup_ray(eye, dir, from, ddir)) {  // boxplorify view
     return;
   }
 #endif
@@ -303,6 +303,5 @@ void main(void)
   color.b*=(.5+abs(.5-mod(uv2.y+.014,.021)/.021)*.5)*1.5;
   color*=.8+rain*.5;
 #endif
-  gl_FragColor = vec4(color,1.);
-  gl_FragDepth = 0.;
+  write_pixel(dir, 1.0, color);  // boxplorify write
 }

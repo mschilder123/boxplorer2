@@ -148,10 +148,7 @@ void main(void)
     p *= (7.0-sqrt(37.5-11.5*r2))/(r2+1.0);
     vec3 rd = normalize( p.x*uu + p.y*vv + 1.5*ww );
 
-    // Use boxplorer camera
-    if (!setup_ray( eye, dir, ro, rd )) {
-      gl_FragColor = vec4(0);
-      gl_FragDepth = 0.0;
+    if (!setup_ray( eye, dir, ro, rd )) {  // boxplorify view
       return;
     }
   
@@ -218,5 +215,5 @@ void main(void)
     // vigneting
     col *= pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
     
-    write_pixel(dir, tmat.x, col);
+    write_pixel(dir, tmat.x, col);  // boxplorify write
 }

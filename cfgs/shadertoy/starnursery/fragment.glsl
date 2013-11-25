@@ -74,7 +74,7 @@ vec4 map( in vec3 p )
 {
 	float d = 0.2 - p.y;
 
-	float f= fbm( p*1.0 - vec3(.4,0.3,-0.3)*time);
+	float f = fbm( p*1.0 - vec3(.4,0.3,-0.3)*time);
 	d += 4.0 * f;
 
 	d = clamp( d, 0.0, 1.0 );
@@ -120,6 +120,7 @@ vec4 raymarch( in vec3 ro, in vec3 rd )
 //----------------------------------------------------------------------
 void main(void)
 {
+#if 0
 	vec2 q = gl_FragCoord.xy / iResolution.xy;
   vec2 p = -1.0 + 2.0*q;
   p.x *= iResolution.x/ iResolution.y;
@@ -132,13 +133,12 @@ void main(void)
   vec3 uu = normalize(cross( vec3(0.0,1.0,0.0), ww ));
   vec3 vv = normalize(cross(ww,uu));
   vec3 rd = normalize( p.x*uu + p.y*vv + 1.5*ww );
-
-  // Use boxplorer camera
-  if (!setup_ray( eye, dir, ro, rd )) {
-    gl_FragColor = vec4(0);
-    gl_FragDepth = 0.0;
+#else
+  vec3 ro, rd;
+  if (!setup_ray( eye, dir, ro, rd )) {  // boxplorify view
     return;
   }
+#endif
 
 	// Ray march into the clouds adding up colour...
   vec4 res = raymarch( ro, rd );
@@ -166,5 +166,5 @@ void main(void)
 	// Mix in the clouds...
 	col = mix( col, res.xyz, res.w*1.3);
 	
-  write_pixel(dir, res.w, col);
+  write_pixel(dir, res.w, col);  // boxplorify write
 }

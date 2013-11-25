@@ -95,8 +95,6 @@ void main() {
 	vec3 L=normalize(ro+vec3(0.5,2.5,-0.5));
 	vec3 rd=lookat(-ro*vec3(1.0,2.0,1.0)-vec3(1.0,0.0,0.0),vec3(0.0,1.0,0.0))*normalize(vec3((2.0*gl_FragCoord.xy-size.xy)/size.y,1.0));
   if (!setup_ray(eye, dir, ro, rd)) {  // boxplorify view
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
     return;
   }
 	vec4 col=vec4(0.0);//color accumulator

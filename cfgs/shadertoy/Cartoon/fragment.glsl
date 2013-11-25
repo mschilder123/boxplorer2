@@ -100,7 +100,6 @@ vec3 normal(vec3 p) {
 // Raymarching and 2D graphics
 
 vec3 raymarch(in vec3 from, in vec3 dir) 
-
 {
   edge=0.;
   vec3 p, norm;

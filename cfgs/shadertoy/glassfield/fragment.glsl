@@ -84,10 +84,7 @@ void main(void) {
 	vec3 light1=normalize(vec3(cos(time),sin(time*3.)*.5,sin(time)));
 	vec3 light2=normalize(vec3(cos(time),sin(time*3.)*.5,-sin(time)));
 
-  // Use boxplorer camera
-  if (!setup_ray( eye, dir, from, raydir )) {
-    gl_FragColor = vec4(0);
-    gl_FragDepth = 0.0;
+  if (!setup_ray( eye, dir, from, raydir )) {  // boxplorify view
     return;
   }
 
@@ -133,5 +130,5 @@ void main(void) {
 
 	col*=min(1.,time); //fade in
 
-  write_pixel(dir, totdist, col);
+  write_pixel(dir, totdist, col);  // boxplorify write
 }

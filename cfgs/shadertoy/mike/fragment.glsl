@@ -14,6 +14,7 @@ float iGlobalTime = time;
 #define iChannel0 bg_texture
 
 #include "setup.inc"
+#line 18
 
 //uniform vec2      iResolution;     // viewport resolution (in pixels)
 //uniform float     iGlobalTime;     // shader playback time (in seconds)
@@ -280,8 +281,6 @@ void main(void) {
   vec2 q = gl_FragCoord.xy / iResolution.xy;
   vec2 p = -1.0 + 2.0 * q;
   p.x *= iResolution.x/iResolution.y;
-//  vec2 m = vec2(0.5);
-//  if( iMouse.z>0.0 ) m = iMouse.xy/iResolution.xy;
 
     //-----------------------------------------------------
     // animate
@@ -297,9 +296,7 @@ void main(void) {
 
   vec3 ro;
   vec3 rd;
-  if (!setup_ray(eye, dir, ro, rd)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
+  if (!setup_ray(eye, dir, ro, rd)) {  // boxplorify view
     return;
   }
 
@@ -421,5 +418,5 @@ void main(void) {
   // vigneting
   col *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.25 );
 
-  write_pixel(dir, tmat.x, col);
+  write_pixel(dir, tmat.x, col);  // boxplorify write
 }

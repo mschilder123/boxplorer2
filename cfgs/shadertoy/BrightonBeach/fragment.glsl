@@ -364,8 +364,7 @@ void main(void)
   vec3 cv = normalize(cross(cu,cw));
   vec3 direction = normalize( uv.x*cu + uv.y*cv + 1.5*cw );
 
-  if (!setup_ray(eye, dir, cameraPos, direction)) {
-     gl_FragColor = vec4(0.0);
+  if (!setup_ray(eye, dir, cameraPos, direction)) {  // boxplorify view
      return;
   }
 
@@ -399,5 +398,5 @@ void main(void)
 
   col = PostEffects(col, xy);
   
-  write_pixel(dir, distance, col);
+  write_pixel(dir, distance, col);  // boxplorify write
 }

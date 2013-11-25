@@ -20,9 +20,7 @@ void main(void)
 	float fov=1.5+sin(t);
 	vec3 ddir=normalize(vec3(uv*fov*mat2(cos(t),sin(t),-sin(t),cos(t)),1.));
 	vec3 from=vec3(t*-5.,sin(t*1.28352),0.)*.005;
-  if (!setup_ray(eye, dir, from, ddir)) {
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
+  if (!setup_ray(eye, dir, from, ddir)) {  // boxplorify view
     return;
   }
 	float dist=-0.015; 
@@ -35,5 +33,5 @@ void main(void)
 			*(.7+normalize(disp)*.3)*exp(-500.*dist*dist);
 	}
 	vol=(vol+.2)*min(1.,t-.05)*vec3(1.,.8,.7);
-	gl_FragColor = vec4(pow(vol,vec3(1.3)),1.0);
+  write_pixel(dir, 1.0, pow(vol, vec3(1.3)));  // boxplorify write
 }
