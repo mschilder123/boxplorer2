@@ -89,13 +89,22 @@ float de_mandelbox(vec3 pos) {
   vec4 p = vec4(pos,1.0);  // p.w is the distance estimate
   vec4 P0;
   if (julia) P0 = vec4(JuliaVector, 1.0); else P0 = p;
+if (rotationAngle == 0.)
+  for (int i=0; i<iters; i++) {
+    p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
+    float r2 = dot(p.xyz, p.xyz);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale + P0;
+    //if (r2 > 1000.0) break;
+  }
+else
   for (int i=0; i<iters; i++) {
     p = vec4(rotationMatrix * p.xyz, p.w);
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + P0;
-// if (r2 > 100.0) break;
+    //if (r2 > 1000.0) break;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
             - absScalePowIters) * 0.95 * DIST_MULTIPLIER;
@@ -104,18 +113,25 @@ DECLARE_DE(de_mandelbox)
 
 // Compute the color at `pos`.
 vec3 c_mandelbox(vec3 pos) {
-  float minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  vec3 scale = vec3(MB_SCALE, MB_SCALE, MB_SCALE) / minRad2;
   vec3 p = pos;
   vec3 P0;
   if (julia) P0 = JuliaVector; else P0 = p;
   float trap = 1.0;
+if (rotationAngle == 0.)
+  for (int i=0; i<color_iters; i++) {
+    p = clamp(p, -1.0, 1.0) * 2.0 - p;
+    float r2 = dot(p, p);
+    p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+    p = p*scale.xyz + P0;
+    trap = min(trap, r2);
+  }
+else
   for (int i=0; i<color_iters; i++) {
     p = vec3(rotationMatrix * p.xyz);
     p = clamp(p, -1.0, 1.0) * 2.0 - p;
     float r2 = dot(p, p);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
-    p = p*scale + P0;
+    p = p*scale.xyz + P0;
     trap = min(trap, r2);
   }
   // c.x: log final distance (fractional iteration count)
