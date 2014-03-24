@@ -81,6 +81,6 @@ void write_pixel(vec3 ray, float z, vec3 finalCol) {
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(z/length(ray), zNear, zFar));
-  gl_FragDepth = depth;
   gl_FragColor = vec4(finalCol, depth);
+  gl_FragDepth = depth;
 }

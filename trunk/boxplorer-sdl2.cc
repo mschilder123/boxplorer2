@@ -81,6 +81,8 @@ using namespace std;
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
 #define EFFECTS_VERTEX_SHADER_FILE   "effects_vertex.glsl"
 #define EFFECTS_FRAGMENT_SHADER_FILE "effects_fragment.glsl"
+#define GAUSSIAN_VERTEX_SHADER_FILE   "gaussian_vertex.glsl"
+#define GAUSSIAN_FRAGMENT_SHADER_FILE "gaussian_fragment.glsl"
 
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), _exit(1), 1 )
 #ifndef ARRAYSIZE
@@ -369,15 +371,24 @@ enum StereoMode { ST_NONE=0,
                   ST_COMPUTE_DE_ONLY
 } stereoMode = ST_NONE;
 
-// ogl framebuffer object, one for each eye.
-GLuint fbo[2];
+#define NFBO 2
+// ogl framebuffer object(s).
+// At least two are needed for the life and accumulation shaders.
+GLuint mainFbo[NFBO];
 // texture that frame got rendered to
-GLuint texture[2];
+GLuint mainTex[NFBO];
 // depth buffer attached to fbo
-GLuint depthBuffer[2];
+GLuint mainDepth[NFBO];
+
+// framebuffers for post-process blur.
+#define NBLUR 2
+GLuint blurFbo[NBLUR];
+GLuint blurTex[NBLUR];
+GLuint blurDepth[NBLUR];
 
 Shader fractal;
 Shader effects;
+Shader gaussian;
 
 Shader de_shader;
 GLuint de_fbo;
@@ -1165,7 +1176,7 @@ GLSL::vec3 getPixelColor(int x, int y) {
 string glsl_source;
 
 // Compile and activate shader programs. Return the program handle.
-int setupShaders(Shader* fractal, const char* extra_define = NULL) {
+bool setupShaders(Shader* fractal, const char* extra_define = NULL) {
   string vertex(default_vs);
   string fragment(default_fs);
 
@@ -1186,16 +1197,15 @@ int setupShaders(Shader* fractal, const char* extra_define = NULL) {
 
   if (extra_define == NULL) {
     glsl_source.assign(defines + fragment);
-    return fractal->compile(defines, vertex, fragment);
+    return fractal->compile(defines, vertex, fragment) != 0;
   } else {
     string extra_defines = extra_define + defines;
-    return fractal->compile(extra_defines, vertex, fragment);
+    return fractal->compile(extra_defines, vertex, fragment) != 0;
   }
 }
 
 // Compile and activate shader programs for frame buffer manipulation.
-// Return the program handle.
-int setupShaders2(void) {
+bool setupShaders2(void) {
   string vertex(effects_default_vs);
   string fragment(effects_default_fs);
 
@@ -1204,7 +1214,19 @@ int setupShaders2(void) {
 
   glsl_source.append(fragment);
 
-  return effects.compile(defines, vertex, fragment);
+  bool ok = (effects.compile(defines, vertex, fragment) != 0);
+
+  string gauss_vertex;
+  string gauss_fragment;
+
+  readFile(GAUSSIAN_VERTEX_SHADER_FILE, &gauss_vertex);
+  readFile(GAUSSIAN_FRAGMENT_SHADER_FILE, &gauss_fragment);
+
+  if (!gauss_vertex.empty() && !gauss_fragment.empty()) {
+    ok &= (gaussian.compile(defines, gauss_vertex, gauss_fragment) != 0);
+  }
+
+  return ok;
 }
 
 bool setupDirectories(const char* configFile) {
@@ -1382,24 +1404,23 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   if (config.enable_dof || config.backbuffer) {
     // Compile DoF shader, setup FBO as render target.
 
-    (setupShaders2()) ||
-        die("Error in GLSL effects shader compilation:\n%s\n",
+    (setupShaders2()) || die("Error in GLSL effects shader compilation:\n%s\n",
             effects.log().c_str());
 
     // Create depth buffer(s)
-    glDeleteRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);
-    glGenRenderbuffers(ARRAYSIZE(depthBuffer), depthBuffer);
+    glDeleteRenderbuffers(ARRAYSIZE(mainDepth), mainDepth);
+    glGenRenderbuffers(ARRAYSIZE(mainDepth), mainDepth);
 
     // Create textures to render to
-    glDeleteTextures(ARRAYSIZE(texture), texture);
-    glGenTextures(ARRAYSIZE(texture), texture);
+    glDeleteTextures(ARRAYSIZE(mainTex), mainTex);
+    glGenTextures(ARRAYSIZE(mainTex), mainTex);
 
     // Create framebuffers
-    glDeleteFramebuffers(ARRAYSIZE(fbo), fbo);
-    glGenFramebuffers(ARRAYSIZE(fbo), fbo);
+    glDeleteFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
+    glGenFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
 
-    for (size_t i = 0; i < ARRAYSIZE(fbo); ++i) {
-      glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer[i]);
+    for (size_t i = 0; i < ARRAYSIZE(mainFbo); ++i) {
+      glBindRenderbuffer(GL_RENDERBUFFER, mainDepth[i]);
       glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
                             config.width, config.height);
       glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -1409,13 +1430,17 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       }
 
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, texture[i]);
+      glBindTexture(GL_TEXTURE_2D, mainTex[i]);
 
       GLint clamp = config.backbuffer ? GL_REPEAT:GL_CLAMP_TO_EDGE;
-      GLint minfilter = config.backbuffer ? GL_NEAREST:GL_LINEAR_MIPMAP_LINEAR;
+      GLint minfilter = config.backbuffer ? GL_NEAREST:
+              GL_LINEAR_MIPMAP_NEAREST;
+              //GL_LINEAR_MIPMAP_LINEAR;
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                      GL_LINEAR);
+                      //GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
     // Allocate storage, float rgba if available. Pick max alpha width.
@@ -1436,11 +1461,11 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
 
       glBindTexture(GL_TEXTURE_2D, 0);
 
-      glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+      glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[i]);
 
       // Attach texture to framebuffer as colorbuffer
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, texture[i], 0);
+                             GL_TEXTURE_2D, mainTex[i], 0);
 
       if ((status = glGetError()) != GL_NO_ERROR) {
         die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1448,7 +1473,93 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
 
       // Attach depthbuffer to framebuffer
       glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                GL_RENDERBUFFER, depthBuffer[i]);
+                                GL_RENDERBUFFER, mainDepth[i]);
+
+      if ((status = glGetError()) != GL_NO_ERROR) {
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
+
+      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+      if (status != GL_FRAMEBUFFER_COMPLETE) {
+        die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
+      }
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      // Back to normal framebuffer.
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    if ((status = glGetError()) != GL_NO_ERROR) {
+      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    }
+
+    // Create depth buffer(s)
+    glDeleteRenderbuffers(ARRAYSIZE(blurDepth), blurDepth);
+    glGenRenderbuffers(ARRAYSIZE(blurDepth), blurDepth);
+
+    // Create textures to render to
+    glDeleteTextures(ARRAYSIZE(blurTex), blurTex);
+    glGenTextures(ARRAYSIZE(blurTex), blurTex);
+
+    // Create framebuffers for gaussian blur post-processing.
+    glDeleteFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
+    glGenFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
+
+    for (size_t i = 0; i < ARRAYSIZE(blurFbo); ++i) {
+      glBindRenderbuffer(GL_RENDERBUFFER, blurDepth[i]);
+      glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
+                            config.width, config.height);
+      glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+      if ((status = glGetError()) != GL_NO_ERROR) {
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
+
+      glActiveTexture(GL_TEXTURE0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, blurTex[i]);
+
+      GLint clamp = config.backbuffer ? GL_REPEAT:GL_CLAMP_TO_EDGE;
+      GLint minfilter = config.backbuffer ? GL_NEAREST:
+              GL_LINEAR_MIPMAP_NEAREST;
+              //GL_LINEAR_MIPMAP_LINEAR;
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                      GL_LINEAR);
+                      //GL_NEAREST);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
+
+      // Allocate storage, float rgb if available.
+#ifdef GL_RGBA32F
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
+                   0, GL_BGR, GL_FLOAT, NULL);
+#else
+#ifdef GL_RGBA16
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
+                   0, GL_BGR, GL_UNSIGNED_SHORT, NULL);
+#else
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, config.width, config.height,
+                   0, GL_BGR, GL_UNSIGNED_BYTE, NULL);
+#endif
+#endif
+
+      glBindTexture(GL_TEXTURE_2D, 0);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, blurFbo[i]);
+
+      // Attach texture to framebuffer as colorbuffer
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                             GL_TEXTURE_2D, blurTex[i], 0);
+
+      if ((status = glGetError()) != GL_NO_ERROR) {
+        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+      }
+
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                GL_RENDERBUFFER, blurDepth[i]);
 
       if ((status = glGetError()) != GL_NO_ERROR) {
         die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
@@ -1473,7 +1584,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
 
   // Fill backbuffer w/ starting lifeform, if we have one.
   if (config.backbuffer && !lifeform.empty()) {
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo[(frameno-1)&1]);
+    glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[(frameno-1)&1]);
     // Ortho projection, entire screen in regular pixel coordinates.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -2038,7 +2149,7 @@ int main(int argc, char **argv) {
         glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
                     background_texture);
       } else if (config.backbuffer) {
-        glBindTexture(GL_TEXTURE_2D, texture[(frameno-1)&1]);
+        glBindTexture(GL_TEXTURE_2D, mainTex[(frameno-1)&1]);
         glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
                     lifeform_file != NULL);
       }
@@ -2049,7 +2160,7 @@ int main(int argc, char **argv) {
     if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
       // Render to different back buffer to compute DoF effects later,
       // using alpha as depth channel.
-      glBindFramebuffer(GL_FRAMEBUFFER, fbo[frameno&1]);
+      glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[frameno&1]);
     }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -2059,22 +2170,85 @@ int main(int argc, char **argv) {
     camera.speed /= speed_factor;
 
     glUseProgram(0);
-
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // If we're rendering some DoF effects, draw from buffer to screen.
     if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      // Ortho projection, entire screen in regular pixel coordinates.
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      glOrtho(0, config.width, config.height, 0, -1, 1);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
 
+#if 1
+      if (gaussian.ok())  // Compute multiple levels of blur.
+      for (int i = 0; i < NBLUR * 2; ++i) {
+      // setup input texture
       glEnable(GL_TEXTURE_2D);
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, texture[frameno&1]);
-      if (!config.backbuffer)
-        glGenerateMipmap(GL_TEXTURE_2D);  // generate mipmaps of our rendered frame.
+      glBindTexture(GL_TEXTURE_2D,
+                    (i == 0)
+                      ? mainTex[frameno&1]  // first input is current frame
+                      : (((i&1) == 1)
+                          ? mainTex[(frameno+1)&1]  // scratch as input
+                          : blurTex[(i-1)/2]));  // previous blur as input
+      // setup output buffer
+      glBindFramebuffer(GL_FRAMEBUFFER, ((i&1) == 0)
+                              ? mainFbo[(frameno+1)&1]  // scratch as output
+                              : blurFbo[i/2]);  // current blur as output
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      GLuint gauss_program = gaussian.program();
+      glUseProgram(gauss_program);
+      glUniform1i(glGetUniformLocation(gauss_program, "iTexture"), 0);
+      glUniform1i(glGetUniformLocation(gauss_program, "iXorY"), (i&1));
+      glUniform1f(glGetUniformLocation(gauss_program, "xres"), config.width);
+      glUniform1f(glGetUniformLocation(gauss_program, "yres"), config.height);
+
+      // Draw our texture covering entire screen, running the frame shader.
+      glBegin(GL_QUADS);
+        glTexCoord2f(0,1);
+        glVertex2f(0,0);
+        glTexCoord2f(0,0);
+        glVertex2f(0,config.height);
+        glTexCoord2f(1,0);
+        glVertex2f(config.width,config.height);
+        glTexCoord2f(1,1);
+        glVertex2f(config.width,0);
+      glEnd();
+
+      glUseProgram(0);  // no program
+      glDisable(GL_TEXTURE_2D);  // no texture
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);  // default framebuffer
+      //glFinish();  // appears not needed and costly.
+      }
+#endif
 
       GLuint dof_program = effects.program();
       glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
+
+      glEnable(GL_TEXTURE_2D);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mainTex[frameno&1]);
+      if (!config.backbuffer) {
+        glGenerateMipmap(GL_TEXTURE_2D);
+      }
+
+#if 1
+      if (gaussian.ok()) {
+        GLint blurIds[NBLUR + 1] = {0};
+        for (int i = 0; i < NBLUR; ++i) {
+          glActiveTexture(GL_TEXTURE0 + i + 1);
+          glBindTexture(GL_TEXTURE_2D, blurTex[i]);
+          blurIds[i + 1] = i + 1;
+        }
+        glUniform1iv(glGetUniformLocation(dof_program, "iBlur"),
+                     ARRAYSIZE(blurIds), blurIds);
+      }
+#endif
 
       glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
       glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
@@ -2085,33 +2259,27 @@ int main(int argc, char **argv) {
                   camera.speed * speed_factor);
 
       // Also pass in double precision speed, if supported.
-      if (glUniform1d)
-        glUniform1d(glGetUniformLocation(dof_program, "dspeed"), camera.speed * speed_factor);
+      if (glUniform1d) {
+        glUniform1d(glGetUniformLocation(dof_program, "dspeed"),
+                        camera.speed * speed_factor);
+      }
 
       glUniform1f(glGetUniformLocation(dof_program, "xres"), config.width);
       glUniform1f(glGetUniformLocation(dof_program, "yres"), config.height);
-
-      // Ortho projection, entire screen in regular pixel coordinates.
-      glMatrixMode(GL_PROJECTION);
-      glLoadIdentity();
-      glOrtho(0, config.width, config.height, 0, -1, 1);
-      glMatrixMode(GL_MODELVIEW);
-      glLoadIdentity();
 
       // Draw our texture covering entire screen, running the frame shader.
       glBegin(GL_QUADS);
         glTexCoord2f(0,1);
         glVertex2f(0,0);
         glTexCoord2f(0,0);
-        glVertex2f(0,config.height-1);
+        glVertex2f(0,config.height);
         glTexCoord2f(1,0);
-        glVertex2f(config.width-1,config.height-1);
+        glVertex2f(config.width,config.height);
         glTexCoord2f(1,1);
-        glVertex2f(config.width-1,0);
+        glVertex2f(config.width,0);
       glEnd();
 
       glUseProgram(0);
-
       glDisable(GL_TEXTURE_2D);
     }
 
