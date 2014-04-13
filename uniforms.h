@@ -2,7 +2,12 @@
 #define _F_UNIFORMS_H_
 
 #include <string>
-#if defined(__GNUC__) || defined(__APPLE__)
+
+#if defined(__APPLE__)
+#include <unordered_map>
+#define hash_map std::unordered_map
+using namespace std;
+#elif defined(__GNUC__)
 #include <ext/hash_map>
 using namespace __gnu_cxx;
 namespace __gnu_cxx {
@@ -14,7 +19,7 @@ namespace __gnu_cxx {
                 }
         };
 }
-#else
+#else  // WIN32
 #include <hash_map>
 #endif
 
