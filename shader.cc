@@ -6,7 +6,7 @@
 using namespace std;
 
 void Shader::clear() {
-  if (glIsProgram(program_)) {
+  if (program_ != 0 && glIsProgram(program_)) {
     GLuint shaders[2];
     GLsizei count = 2;
     glGetAttachedShaders(program_, count, &count, shaders);
