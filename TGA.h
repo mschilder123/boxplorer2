@@ -9,7 +9,7 @@ class TGA {
 public:
   TGA() : data_(NULL) {}
   ~TGA() { delete[] data_; }
-  TGA(int width, int height) :
+  TGA(size_t width, size_t height) :
       width_(width), height_(height),
       data_(new unsigned char[width*height*3]) {}
   bool readFile(const char* filename) {
@@ -28,8 +28,8 @@ public:
                 " : unsupported TGA format, only 24bpp supported\n");
         break;
       }
-      int width = header[13] * 256 + header[12];
-      int height = header[15] * 256 + header[14];
+      size_t width = header[13] * 256 + header[12];
+      size_t height = header[15] * 256 + header[14];
       if (width > 32768 || height > 32768) {
         fprintf(stderr, __FUNCTION__
                 " : oversized TGA image not supported\n");
@@ -39,10 +39,10 @@ public:
       if (fread(data, width * height * 3, 1, f) != 1) {
         fprintf(stderr, __FUNCTION__
                 " : failed to load TGA pixel data\n");
-        delete data;
+        delete[] data;
         break;
       }
-      delete data_;
+      delete[] data_;
       data_ = data;
       width_ = width;
       height_ = height;
@@ -68,10 +68,10 @@ public:
     return result;
   }
 #ifdef GL_BGR
-  bool readFramebuffer(int width, int height, int viewportOffset[2]) {
+  bool readFramebuffer(size_t width, size_t height, int viewportOffset[2]) {
     width_ = width;
     height_ = height;
-    delete data_;
+    delete[] data_;
     data_ = new unsigned char[width_ * height_ * 3];
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadBuffer(GL_FRONT);
@@ -89,13 +89,13 @@ public:
     data_[x*3+width_*3*y+2] = GLSL::clamp(256*col.x, 0, 255);  // R
   }
 #endif
-  int width() { return width_; }
-  int height() { return height_; }
+  size_t width() { return width_; }
+  size_t height() { return height_; }
   const unsigned char* data() { return data_; }
 
 private:
-  int width_;
-  int height_;
+  size_t width_;
+  size_t height_;
   unsigned char* data_;
 };
 
