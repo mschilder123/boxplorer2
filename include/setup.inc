@@ -1,5 +1,7 @@
 // Focal plane devation from 30x speed.
 uniform float focus;  // {min=-10 max=30 step=.01}
+uniform float dof_scale;  // {min=0 max=10 step=.01}
+//uniform float focalLength;  // {min=0 max=10 step=.01}
 
 #ifndef OUT_
 #define OUT_(a,b) out a b
@@ -77,10 +79,18 @@ void write_pixel(vec3 ray, float z, vec3 finalCol) {
 #endif
 
   float zNear = abs(speed);
+
+  // compute CoC, thin lens model
+  float P = abs(focus + 30.0) * zNear;
+  float D = z;
+  float A = dof_scale;  //~aperture;
+  float F = 8.*abs(speed); //~focalLength;
+  float CoC = abs(A*(F*(P-D))/(D*(P-F)));
+
   float zFar = 65535.0 * zNear;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
   float depth = (a + b / clamp(z/length(ray), zNear, zFar));
-  gl_FragColor = vec4(finalCol, depth);
+  gl_FragColor = vec4(finalCol, clamp(CoC, float(0.0), float(1.0)));
   gl_FragDepth = depth;
 }

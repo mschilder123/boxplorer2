@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 #define _strdup strdup
-#define __FUNCTION__ "boxplorer"
+#define __FUNCTION__ "boxplorer2"
 #define MAX_PATH 256
 
 #else  // _WIN32
@@ -81,13 +81,29 @@ using namespace std;
 #define FRAGMENT_SHADER_FILE "fragment.glsl"
 #define EFFECTS_VERTEX_SHADER_FILE   "effects_vertex.glsl"
 #define EFFECTS_FRAGMENT_SHADER_FILE "effects_fragment.glsl"
-#define GAUSSIAN_VERTEX_SHADER_FILE   "gaussian_vertex.glsl"
-#define GAUSSIAN_FRAGMENT_SHADER_FILE "gaussian_fragment.glsl"
+#define DOF_VERTEX_SHADER_FILE   "dof_vertex.glsl"
+#define DOF_FRAGMENT_SHADER_FILE "dof_fragment.glsl"
+#define FXAA_VERTEX_SHADER_FILE   "fxaa_vertex.glsl"
+#define FXAA_FRAGMENT_SHADER_FILE "fxaa_fragment.glsl"
 
 #define die(...)    ( fprintf(stderr, __VA_ARGS__), _exit(1), 1 )
+
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(x) ( sizeof(x)/sizeof((x)[0]) )
 #endif
+
+#define CHECK_STATUS(f, v) { \
+    GLenum __s; \
+    if ((__s = (f)) != (v)) { \
+      die(__FUNCTION__ "[%d] : %s() : %04x\n", __LINE__, #f, __s); \
+    }}
+
+#define CHECK_ERROR \
+      CHECK_STATUS(glGetError(), GL_NO_ERROR)
+
+#define CHECK_FRAMEBUFFER \
+      CHECK_STATUS(glCheckFramebufferStatus(GL_FRAMEBUFFER), \
+                      GL_FRAMEBUFFER_COMPLETE)
 
 #ifdef max
 #undef max
@@ -211,6 +227,8 @@ static SDL_Cursor *init_system_cursor(const char *image[]) {
 SDL_Cursor* arrow_cursor;
 SDL_Cursor* hand_cursor;
 
+void clearGlContext();  // fwd decl.
+
 // Our OpenGL SDL2 window.
 static const int kMAXDISPLAYS = 6;
 class GFX {
@@ -237,9 +255,15 @@ class GFX {
   }
 
   void reset() {
-    SDL_GL_DeleteContext(glcontext_);
-    SDL_DestroyWindow(window_);
-    window_ = NULL;
+    if (glcontext_) {
+      clearGlContext();
+      SDL_GL_DeleteContext(glcontext_);
+      glcontext_ = 0;
+    }
+    if (window_) {
+      SDL_DestroyWindow(window_);
+      window_ = NULL;
+    }
     display_ = -1;
   }
 
@@ -270,11 +294,11 @@ class GFX {
     display_ = d;
     last_width_ = width_ = w;
     last_height_ = height_ = h;
-    return true;
+    return enableShaderProcs();  // re-fetch ptrs in new context.
   }
 
-  void toggleFullscreen() {
-    if (!window_) return;
+  bool toggleFullscreen() {
+    if (!window_) return false;
 
     // capture current display.
     int d = SDL_GetWindowDisplayIndex(window_);
@@ -337,6 +361,7 @@ class GFX {
     display_ = d;
 
     fullscreen_ = !fullscreen_;
+    return enableShaderProcs();  // re-fetch ptrs in new context.
   }
 
   SDL_Window* window() { return window_; }
@@ -380,19 +405,30 @@ GLuint mainTex[NFBO];
 // depth buffer attached to fbo
 GLuint mainDepth[NFBO];
 
-// framebuffers for post-process blur.
+// Fbo and texture for fxaa output.
+GLuint fxaaFbo;
+GLuint fxaaTex;
+
+// Fbo and texture for tmp rendering pass.
+GLuint scratchFbo;
+GLuint scratchTex;
+
+// framebuffer(s) for post-process blur.
+// We have 2: one holding square and one a diamond.
 #define NBLUR 2
+
 GLuint blurFbo[NBLUR];
 GLuint blurTex[NBLUR];
-GLuint blurDepth[NBLUR];
 
 Shader fractal;
 Shader effects;
-Shader gaussian;
+Shader dof;
 
 Shader de_shader;
 GLuint de_fbo;
 GLuint de_texture;
+
+Shader fxaa;
 
 Uniforms uniforms;
 
@@ -404,6 +440,36 @@ string lifeform;  // Conway's Game of Life creature, if any.
 
 // texture holding background image
 GLuint background_texture;
+
+// Try release everything that might have been allocated within
+// current glContext. Leaks detected with AMD CodeXL.
+void clearGlContext() {
+    // release shaders.
+    fractal.clear();
+    effects.clear();
+    dof.clear();
+    de_shader.clear();
+    fxaa.clear();
+
+    // delete fbos and textures.
+    glDeleteTextures(1, &de_texture);
+    glDeleteFramebuffers(1, &de_fbo);
+
+    glDeleteTextures(1, &background_texture);  // free existing
+
+    glDeleteFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
+    glDeleteTextures(ARRAYSIZE(mainDepth), mainDepth);
+    glDeleteTextures(ARRAYSIZE(mainTex), mainTex);
+
+    glDeleteFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
+    glDeleteTextures(ARRAYSIZE(blurTex), blurTex);
+
+    glDeleteFramebuffers(1, &scratchFbo);
+    glDeleteTextures(1, &scratchTex);
+
+    glDeleteFramebuffers(1, &fxaaFbo);
+    glDeleteTextures(1, &fxaaTex);
+}
 
 // DLP-Link or interlaced L/R eye polarity
 int polarity = 1;
@@ -624,9 +690,12 @@ class Camera : public KeyFrame {
      if (height < 1) height = width*3/4;
 
      // FOV: keep pixels square unless stated otherwise.
-     // Default FOV_y is 75 degrees.
+     // Default FOV_y is 42 degrees.
      if (fov_x <= 0) {
-       if (fov_y <= 0) { fov_y = 75; }
+       if (fov_y <= 0) {
+         // ~60x42 degrees is fov for normal position in front of a monitor.
+         fov_y = 42;
+       }
        fov_x = atan(tan(fov_y*PI/180/2)*width/height)/PI*180*2;
      }
      if (fov_y <= 0) fov_y = atan(tan(fov_x*PI/180/2)*height/width)/PI*180*2;
@@ -716,10 +785,16 @@ class Camera : public KeyFrame {
      glUniform1f(glGetUniformLocation(program, "yres"), window.height());
 
      // Also pass in some double precision values, if supported.
-     if (glUniform1d)
+     if (glUniform1d) {
        glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
-     if (glUniform3dv)
+       // For some reason 3dv below stopped working reliably..
+       glUniform1d(glGetUniformLocation(program, "deyex"), pos()[0]);
+       glUniform1d(glGetUniformLocation(program, "deyey"), pos()[1]);
+       glUniform1d(glGetUniformLocation(program, "deyez"), pos()[2]);
+     }
+     if (glUniform3dv) {
        glUniform3dv(glGetUniformLocation(program, "deye"), 3, pos());
+     }
 
      // Old-style par[] list.
      glSetUniformfv(par);
@@ -1204,7 +1279,9 @@ bool setupShaders(Shader* fractal, const char* extra_define = NULL) {
   }
 }
 
-// Compile and activate shader programs for frame buffer manipulation.
+// Try load various helper shaders.
+// We expect effects to be there and be ok.
+// DoF and fxaa are optional.
 bool setupShaders2(void) {
   string vertex(effects_default_vs);
   string fragment(effects_default_fs);
@@ -1216,14 +1293,24 @@ bool setupShaders2(void) {
 
   bool ok = (effects.compile(defines, vertex, fragment) != 0);
 
-  string gauss_vertex;
-  string gauss_fragment;
+  string dof_vertex;
+  string dof_fragment;
 
-  readFile(GAUSSIAN_VERTEX_SHADER_FILE, &gauss_vertex);
-  readFile(GAUSSIAN_FRAGMENT_SHADER_FILE, &gauss_fragment);
+  readFile(DOF_VERTEX_SHADER_FILE, &dof_vertex);
+  readFile(DOF_FRAGMENT_SHADER_FILE, &dof_fragment);
 
-  if (!gauss_vertex.empty() && !gauss_fragment.empty()) {
-    ok &= (gaussian.compile(defines, gauss_vertex, gauss_fragment) != 0);
+  if (!dof_vertex.empty() && !dof_fragment.empty()) {
+    ok &= (dof.compile(defines, dof_vertex, dof_fragment) != 0);
+  }
+
+  string fxaa_vertex;
+  string fxaa_fragment;
+
+  readFile(FXAA_VERTEX_SHADER_FILE, &fxaa_vertex);
+  readFile(FXAA_FRAGMENT_SHADER_FILE, &fxaa_fragment);
+
+  if (!fxaa_vertex.empty() && !fxaa_fragment.empty()) {
+    ok &= (fxaa.compile(defines, fxaa_vertex, fxaa_fragment) != 0);
   }
 
   return ok;
@@ -1276,8 +1363,6 @@ bool setupDirectories(const char* configFile) {
 //
 // Exits the program if an error occurs.
 bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
-  GLenum status = GL_NO_ERROR;
-
   // Set attributes for the OpenGL window.
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1291,7 +1376,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   }
 
   if (fullscreenToggle) {
-    window.toggleFullscreen();
+    if (!window.toggleFullscreen()) {
+      return false;
+    }
   } else {
     if (!window.resize(w, h)) {
       // Spurious SDL resize? Ignore.
@@ -1324,11 +1411,15 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   enableShaderProcs() ||
       die("This program needs support for GLSL shaders.\n");
 
-  (setupShaders(&fractal)) ||
+
+  setupShaders(&fractal) ||
       die("Error in GLSL fractal shader compilation:\n%s\n",
                       fractal.log().c_str());
 
-#ifdef GL_RGBA32F
+  setupShaders2() ||
+      die("Error in GLSL effects shader compilation:\n%s\n",
+                      effects.log().c_str());
+
   if (!config.disable_de) {
     // Try compile same shader to get a minimal DE computation version.
     setupShaders(&de_shader, "#define ST_COMPUTE_DE_ONLY\n");
@@ -1340,10 +1431,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     } else {
       // Got a shader that can compute DE.
       // Set-up a float32 fbo for it to write to.
-      glDeleteTextures(1, &de_texture);
       glGenTextures(1, &de_texture);
 
-      glDeleteFramebuffers(1, &de_fbo);
       glGenFramebuffers(1, &de_fbo);
 
       glEnable(GL_TEXTURE_2D);
@@ -1362,24 +1451,18 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                              GL_TEXTURE_2D, de_texture, 0);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-      }
-
-      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-      if (status != GL_FRAMEBUFFER_COMPLETE) {
-        die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
-      }
+      CHECK_ERROR;
+      CHECK_FRAMEBUFFER;
 
       glClear(GL_COLOR_BUFFER_BIT);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
   }
-#endif  // GL_RGBA32F
 
   if (background.data() != NULL) {
-    // Load background image into texture
-    glDeleteTextures(1, &background_texture);  // free existing
+
+    // Load background image into texture.
+
     glGenTextures(1, &background_texture);
     glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
@@ -1389,200 +1472,188 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                     GL_LINEAR_MIPMAP_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8,  // assume tga is srgb
                  background.width(), background.height(),
                  0, GL_BGR, GL_UNSIGNED_BYTE, background.data());
     glGenerateMipmap(GL_TEXTURE_2D);
     printf(__FUNCTION__ " : background texture at %d\n", background_texture);
     glBindTexture(GL_TEXTURE_2D, 0);
-  }
-
-  if ((status = glGetError()) != GL_NO_ERROR) {
-    die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+    CHECK_ERROR;
   }
 
   if (config.enable_dof || config.backbuffer) {
-    // Compile DoF shader, setup FBO as render target.
-
-    (setupShaders2()) || die("Error in GLSL effects shader compilation:\n%s\n",
-            effects.log().c_str());
+    // Set up fbos for multipass rendering.
 
     // Create depth buffer(s)
-    glDeleteRenderbuffers(ARRAYSIZE(mainDepth), mainDepth);
-    glGenRenderbuffers(ARRAYSIZE(mainDepth), mainDepth);
+    glGenTextures(ARRAYSIZE(mainDepth), mainDepth);
 
     // Create textures to render to
-    glDeleteTextures(ARRAYSIZE(mainTex), mainTex);
     glGenTextures(ARRAYSIZE(mainTex), mainTex);
 
     // Create framebuffers
-    glDeleteFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
     glGenFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
 
     for (size_t i = 0; i < ARRAYSIZE(mainFbo); ++i) {
-      glBindRenderbuffer(GL_RENDERBUFFER, mainDepth[i]);
-      glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
-                            config.width, config.height);
-      glBindRenderbuffer(GL_RENDERBUFFER, 0);
+      // Initialize depth texture
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mainDepth[i]);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-      }
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
+                      config.width, config.height,
+                      0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
+      CHECK_ERROR;
+
+      // Initialize color texture
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mainTex[i]);
 
       GLint clamp = config.backbuffer ? GL_REPEAT:GL_CLAMP_TO_EDGE;
-      GLint minfilter = config.backbuffer ? GL_NEAREST:
-              GL_LINEAR_MIPMAP_NEAREST;
-              //GL_LINEAR_MIPMAP_LINEAR;
+      GLint minfilter = config.backbuffer ?
+              GL_NEAREST : GL_LINEAR_MIPMAP_LINEAR;
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-                      GL_LINEAR);
-                      //GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
-    // Allocate storage, float rgba if available. Pick max alpha width.
-#ifdef GL_RGBA32F
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
                    0, GL_BGRA, GL_FLOAT, NULL);
-#else
-#ifdef GL_RGBA16
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
-                   0, GL_BGRA, GL_UNSIGNED_SHORT, NULL);
-#else
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, config.width, config.height,
-                   0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-      fprintf(stderr, __FUNCTION__ " : 8 bit alpha, "
-                                   "very granular DoF experience ahead..\n");
-#endif
-#endif
 
       glBindTexture(GL_TEXTURE_2D, 0);
 
+      // Initialize render buffer
       glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[i]);
 
-      // Attach texture to framebuffer as colorbuffer
+      // Attach colorbuffer
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                              GL_TEXTURE_2D, mainTex[i], 0);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-      }
+      CHECK_ERROR;
 
-      // Attach depthbuffer to framebuffer
-      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                GL_RENDERBUFFER, mainDepth[i]);
+      // Attach depthbuffer
+      glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                      GL_TEXTURE_2D, mainDepth[i], 0);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-      }
+      CHECK_ERROR;
+      CHECK_FRAMEBUFFER;
 
-      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-      if (status != GL_FRAMEBUFFER_COMPLETE) {
-        die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
-      }
-
+      // Clear it all.
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      // Back to normal framebuffer.
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    if ((status = glGetError()) != GL_NO_ERROR) {
-      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-    }
+    if (dof.ok()) {
 
-    // Create depth buffer(s)
-    glDeleteRenderbuffers(ARRAYSIZE(blurDepth), blurDepth);
-    glGenRenderbuffers(ARRAYSIZE(blurDepth), blurDepth);
+      // Create and initialize blur fbos.
 
-    // Create textures to render to
-    glDeleteTextures(ARRAYSIZE(blurTex), blurTex);
-    glGenTextures(ARRAYSIZE(blurTex), blurTex);
+      glGenTextures(ARRAYSIZE(blurTex), blurTex);
 
-    // Create framebuffers for gaussian blur post-processing.
-    glDeleteFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
-    glGenFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
+      for (size_t i = 0; i < ARRAYSIZE(blurTex); ++i) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, blurTex[i]);
 
-    for (size_t i = 0; i < ARRAYSIZE(blurFbo); ++i) {
-      glBindRenderbuffer(GL_RENDERBUFFER, blurDepth[i]);
-      glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT,
-                            config.width, config.height);
-      glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+                        config.width, config.height,
+                        0, GL_BGRA, GL_FLOAT, NULL);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        CHECK_ERROR;
       }
 
+      // Create framebuffers to render to blur array texture.
+      glGenFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
+
+      for (size_t i = 0; i < ARRAYSIZE(blurFbo); ++i) {
+        glBindFramebuffer(GL_FRAMEBUFFER, blurFbo[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                        GL_TEXTURE_2D, blurTex[i], 0);
+
+        CHECK_FRAMEBUFFER;
+        CHECK_ERROR;
+
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // Back to normal framebuffer.
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      }
+    }
+
+    if (dof.ok() || fxaa.ok()) {
+
+      // Create and initialize scratch fbo.
+
+      glGenTextures(1, &scratchTex);
+      glGenFramebuffers(1, &scratchFbo);
+  
       glActiveTexture(GL_TEXTURE0);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, blurTex[i]);
+      glBindTexture(GL_TEXTURE_2D, scratchTex);
 
-      GLint clamp = config.backbuffer ? GL_REPEAT:GL_CLAMP_TO_EDGE;
-      GLint minfilter = config.backbuffer ? GL_NEAREST:
-              GL_LINEAR_MIPMAP_NEAREST;
-              //GL_LINEAR_MIPMAP_LINEAR;
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-                      GL_LINEAR);
-                      //GL_NEAREST);
-      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-      // Allocate storage, float rgb if available.
-#ifdef GL_RGBA32F
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
-                   0, GL_BGR, GL_FLOAT, NULL);
-#else
-#ifdef GL_RGBA16
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, config.width, config.height,
-                   0, GL_BGR, GL_UNSIGNED_SHORT, NULL);
-#else
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, config.width, config.height,
-                   0, GL_BGR, GL_UNSIGNED_BYTE, NULL);
-#endif
-#endif
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+                      config.width, config.height,
+                      0, GL_BGRA, GL_FLOAT, NULL);
 
-      glBindTexture(GL_TEXTURE_2D, 0);
-
-      glBindFramebuffer(GL_FRAMEBUFFER, blurFbo[i]);
-
-      // Attach texture to framebuffer as colorbuffer
+      glBindFramebuffer(GL_FRAMEBUFFER, scratchFbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, blurTex[i], 0);
+                      GL_TEXTURE_2D, scratchTex, 0);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-      }
+      CHECK_FRAMEBUFFER;
+      CHECK_ERROR;
 
-      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                GL_RENDERBUFFER, blurDepth[i]);
+      glClear(GL_COLOR_BUFFER_BIT);
 
-      if ((status = glGetError()) != GL_NO_ERROR) {
-        die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-      }
-
-      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-      if (status != GL_FRAMEBUFFER_COMPLETE) {
-        die(__FUNCTION__ " : glCheckFramebufferStatus() : %04x\n", status);
-      }
-
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      // Back to normal framebuffer.
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
+      glBindTexture(GL_TEXTURE_2D, 0);
+    }  // dof.ok() || fxaa.ok()
 
-    if ((status = glGetError()) != GL_NO_ERROR) {
-      die(__FUNCTION__ "[%d] : glGetError() : %04x\n", __LINE__, status);
-    }
+    if (fxaa.ok()) {
+
+      // Create and initialize fxaa fbo
+
+      glGenTextures(1, &fxaaTex);
+      glGenFramebuffers(1, &fxaaFbo);
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, fxaaTex);
+
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+                      config.width, config.height,
+                      0, GL_BGRA, GL_FLOAT, NULL);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, fxaaFbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                      GL_TEXTURE_2D, fxaaTex, 0);
+
+      CHECK_FRAMEBUFFER;
+      CHECK_ERROR;
+
+      glClear(GL_COLOR_BUFFER_BIT);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+    }  // fxaa.ok()
   }
 
   // Fill backbuffer w/ starting lifeform, if we have one.
+
   if (config.backbuffer && !lifeform.empty()) {
     glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[(frameno-1)&1]);
     // Ortho projection, entire screen in regular pixel coordinates.
@@ -1600,13 +1671,59 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     {
       istringstream in(lifeform);
       string line;
-      while (getline(in, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        istringstream is(line);
-        int x,y;
-        is >> x;
-        is >> y;
-        glVertex2f(.5 + config.width / 2 + x, .5 + config.height / 2 + y);
+      bool isRLE = false, done = !in.good();
+      int x = 0, y = 0, accu = 0, xo = 0, yo = 0;
+      while (!done) {
+        if (!isRLE) {
+          if (!getline(in, line)) { done = true; continue; }
+          if (line.empty() || line[0] == '#') continue;
+          if (line[0] == 'x') {
+            // Try parse RLE format lifeform dimensions and center it.
+            sscanf(line.c_str(), "x = %d, y = %d,", &xo, &yo);
+            xo = (config.width - xo) / 2;
+            yo = (config.height - yo) / 2;
+            if (xo < 0) xo = 0;
+            if (yo < 0) yo = 0;
+            isRLE = true;
+            continue;
+          }
+          // Life 0.6 format.
+          istringstream is(line);
+          is >> x;
+          is >> y;
+          glVertex2f(.5 + config.width / 2 + x, .5 + config.height / 2 + y);
+        } else {
+          // RLE format.
+          char c = in.get();
+          if (!in.good()) { done = true; continue; }
+          switch (c) {
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9': {
+                 accu *= 10;
+                 accu += c - '0';
+               } continue;
+            case '$': {
+                 if (!accu) accu = 1;
+                 x = 0;
+                 y += accu;
+                 accu = 0;
+               } continue;
+            case 'b': {
+                 if (!accu) accu = 1;
+                 x += accu;
+                 accu = 0;
+               } continue;
+            case 'o': {
+                if (!accu) accu = 1;
+                for (int xx = x; xx < x + accu; ++xx) {
+                  glVertex2f(.5 + xx + xo, .5 + y + yo);
+                }
+                x += accu;
+                accu = 0;
+              } continue;
+            case '!': done = true; continue;
+          }
+        }
       }
     }
 
@@ -1707,6 +1824,16 @@ void initTwBar() {
   TwDefine("GLOBAL fontsize=3");
   }
 
+  if (fxaa.ok()) TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "");
+  if (dof.ok()) {
+    TwAddVarRW(bar, "DoF", TW_TYPE_BOOL32, &camera.enable_dof, "");
+    TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.dof_scale,
+                    "min=0.0 max=10.0 step=0.01");
+  }
+  if (fxaa.ok() || dof.ok()) {
+    TwAddSeparator(bar, NULL, NULL);
+  }
+
 #if 0
   // Add TW UI for common parameters.
 #define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
@@ -1738,6 +1865,22 @@ void LoadKeyFrames(bool fixedFov) {
       (unsigned long)keyframes.size());
 }
 
+void drawScreen() {
+      // Draw our texture covering entire screen, running the frame shader.
+      glBegin(GL_QUADS);  // left
+        glTexCoord2f(0,1); glVertex2f(0,0);
+        glTexCoord2f(0,0); glVertex2f(0,config.height);
+        glTexCoord2f(.5,0); glVertex2f(config.width/2,config.height);
+        glTexCoord2f(.5,1); glVertex2f(config.width/2,0);
+      glEnd();
+      glBegin(GL_QUADS);  // right
+        glTexCoord2f(0.5,1); glVertex2f(config.width/2,0);
+        glTexCoord2f(0.5,0); glVertex2f(config.width/2,config.height);
+        glTexCoord2f(1,0); glVertex2f(config.width,config.height);
+        glTexCoord2f(1,1); glVertex2f(config.width,0);
+      glEnd();
+}
+
 ////////////////////////////////////////////////////////////////
 // Setup, input handling and drawing.
 
@@ -1750,6 +1893,7 @@ int main(int argc, char **argv) {
   char* lifeform_file = NULL;
   int enableDoF = 0;
   int disableDE = 0;
+  int disableSpline = 0;
   bool xbox360 = true;  // try find xbox360 controller
   int kJOYSTICK = 0;  // joystick by index
 
@@ -1786,6 +1930,10 @@ int main(int argc, char **argv) {
       disableDE = -1;
     } else if (!strcmp(argv[argc-1], "--enable-de")) {
       disableDE = 1;
+    } else if (!strcmp(argv[argc-1], "--disable-spline")) {
+      disableSpline = -1;
+    } else if (!strcmp(argv[argc-1], "--enable-spline")) {
+      disableSpline = 1;
     } else if (!strcmp(argv[argc-1], "--fixedfov")) {
       fixedFov = true;
     } else if (!strcmp(argv[argc-1], "--loop")) {
@@ -1837,7 +1985,7 @@ int main(int argc, char **argv) {
 
   if (lifeform_file) {
     // Load definition into our global string.
-      readFile(lifeform_file, &lifeform);
+    readFile(lifeform_file, &lifeform);
   }
 
 #if defined(_WIN32)
@@ -1897,16 +2045,18 @@ int main(int argc, char **argv) {
   // Sanitize / override config parameters.
   if (loop) config.loop = true;
   if (enableDoF) config.enable_dof = (enableDoF == 1);  // override
-  if (disableDE) config.disable_de = (disableDE == -1);  // override
   if (stereoMode == ST_INTERLACED ||
       stereoMode == ST_QUADBUFFER ||
       stereoMode == ST_ANAGLYPH) {
     config.enable_dof = 0;  // fxaa post does not work for these.
   }
+  if (disableDE) config.disable_de = (disableDE == -1);  // override
+  if (disableSpline) config.no_spline = (disableSpline == -1);  // override
   if (stereoMode == ST_OCULUS) {
     // Fix resolution for optimal performance.
     config.width = 1280; config.height = 800;
-    config.fov_y = 110; config.fov_x = 90.0;
+    //config.width = 1920; config.height = 1080;
+    config.fov_x = 110; config.fov_y = 90.0;
     fixedFov = true;
   }
   if (stereoMode == ST_INTERLACED || stereoMode == ST_OVERUNDER) {
@@ -1930,7 +2080,6 @@ int main(int argc, char **argv) {
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
       die("SDL initialization failed: %s\n", SDL_GetError());
-  atexit(SDL_Quit);
 
   if (kJOYSTICK) {
     // open a joystick by explicit index.
@@ -1951,12 +2100,12 @@ int main(int argc, char **argv) {
       string name(SDL_JoystickName(joystick));
       printf(__FUNCTION__ " : JoystickName '%s'\n",
              name.c_str());
-      if (name.find("XBOX 360") != string::npos) break;  // got it
+      if (name.find("X") == 0) break;  // got it
       SDL_JoystickClose(joystick);
     }
   }
 
-   // Set up the video mode, OpenGL state, shaders and shader parameters.
+  // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics(false, config.width, config.height);
 
   // Parse as many uniforms from glsl source as we can find.
@@ -2029,7 +2178,8 @@ int main(int argc, char **argv) {
 
     int ctlXChanged = 0, ctlYChanged = 0;
 
-    // Splined keyframes playback logic. Messy. Sets up next camera.
+    // Set up current camera from spline.
+    // Splined keyframes playback logic. Messy.
     if (!splines.empty()) {
       if (rendering && splines_index >= splines.size()) break;  // done
 
@@ -2080,11 +2230,10 @@ int main(int argc, char **argv) {
 
     next_camera = &camera;
 
-  if (!rendering) {
+    if (!rendering) {
 #if defined(_WIN32)
-      // When not rendering a sequence, now mix in orientation (and translation)
-      // external sensors might have to add (e.g. Oculus orientation) into the view
-      // we are about to render.
+      // When not rendering a sequence,
+      // now mix in orientation (and translation.. where's my DK2 Oculus?)
       if (stereoMode == ST_OCULUS) {
         GetOculusQuat(view_q);
       }
@@ -2092,49 +2241,51 @@ int main(int argc, char **argv) {
 
       camera.mixSensorOrientation(view_q);
 
-    if (!config.disable_de && (de_func || de_func_64)) {
-      // Get a distance estimate, for navigation and eye separation.
-      // Setup just the vars needed for DE. For now, iters and par[0..20]
-      // TODO: make de() method of camera?
-      GLSL::iters = camera.iters;
-      GLSL::julia = camera.julia;
-      for (int i = 0; i < 20; ++i) {
-        GLSL::par[i] = GLSL::vec3(camera.par[i]);
-      }
+      if (!config.disable_de) {
+        // Try get a DE for current position.
+        // We use DE as speed and interpupillairy distance (aka head size).
+        double de = 0.0;
+        if (de_func || de_func_64) {
+          // Get a distance estimate, for navigation and eye separation.
+          // Setup just the vars needed for DE. For now, iters and par[0..20]
+          // TODO: make de() method of camera?
+          GLSL::iters = camera.iters;
+          GLSL::julia = camera.julia;
+          for (int i = 0; i < 20; ++i) {
+            GLSL::par[i] = GLSL::vec3(camera.par[i]);
+          }
 
-      GLSL::dvec3 pos(camera.pos());
-      double de = de_func_64?GLSL::abs(de_func_64(pos)):GLSL::abs(de_func(pos));
+          GLSL::dvec3 pos(camera.pos());
+          de = de_func_64 ?
+                  GLSL::abs(de_func_64(pos)) :
+                  GLSL::abs(de_func(pos));
 
-      if (de != last_de) {
-        printf("de=%12.12e\n", de);
-        camera.speed = de / 10.0;
-        last_de = de;
-      }
-    } else if (!config.disable_de && de_shader.ok()) {
-      // We did not find a CPU based DE; try the GPU based one.
-      glDisable(GL_DEPTH_TEST);
-      glBindFramebuffer(GL_FRAMEBUFFER, de_fbo);
+        } else if (de_shader.ok()) {
+          // We did not find a CPU based DE; try the GPU based one.
+          glDisable(GL_DEPTH_TEST);
+          glBindFramebuffer(GL_FRAMEBUFFER, de_fbo);
 
-      // Read previous' round computation, stored as pixel.
-      GLSL::vec3 col = getPixelColor(0, 0);
-      double de = fabs(col.x);
+          // Read previous' round computation, stored as pixel.
+          GLSL::vec3 col = getPixelColor(0, 0);
+          de = fabs(col.x);
 
-      if (de != 0 && de != last_de) {
-        if (de < camera.min_dist) de = camera.min_dist;
-        printf("de=%12.12e\n", de);
-        camera.speed = de / 10.0;
-        last_de = de;
-      }
+          // Compute DE using shader.
+          // We'll read the result next round so no costly glFinish needed.
+          // TODO: use for auto-focus using center-weighted samples?
+          glUseProgram(de_shader.program());
+          camera.render(ST_COMPUTE_DE_ONLY);
+  
+          glUseProgram(0);
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
 
-      // Compute de using shader.
-      // We'll read the result next round so no costly glFinish needed.
-      glUseProgram(de_shader.program());
-      camera.render(ST_COMPUTE_DE_ONLY);
-      glUseProgram(0);
-
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-  }  // !rendering
+        if (de != 0.0 && de != last_de) {
+          printf("de=%12.12e\n", de);
+          camera.speed = de / 10.0;
+          last_de = de;
+        }
+      }  // !config.disable_de
+    }  // !rendering
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
@@ -2142,6 +2293,18 @@ int main(int argc, char **argv) {
     GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
 
+    // Figure out whether to render direct or via fbo.
+    // A backbuffer (e.g. previous frame), or dof or fxaa
+    // requires rendering to fbo.
+    bool multiPass =
+            (config.enable_dof &&
+               ((dof.ok() && camera.enable_dof && camera.dof_scale != 0) ||
+                (fxaa.ok() && camera.fxaa))) ||
+            config.backbuffer;
+
+    // Set up input texture to fractal shader.
+    // This is either previous frame or some file from disk.
+    // TODO: provide both or at least previous if multiPass?
     if (background_texture || config.backbuffer) {
       glActiveTexture(GL_TEXTURE0);
       if (background_texture) {
@@ -2153,141 +2316,180 @@ int main(int argc, char **argv) {
         glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
                     lifeform_file != NULL);
       }
+      glUniform1i(glGetUniformLocation(program, "iChannel0"), 0);
     }
 
-    glUniform1i(glGetUniformLocation(program, "bg_texture"), 0);
-
-    if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
-      // Render to different back buffer to compute DoF effects later,
-      // using alpha as depth channel.
+    if (multiPass) {
+      // Render to texture for post-processing.
       glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[frameno&1]);
     }
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     camera.speed *= speed_factor;
-    camera.render(stereoMode);  // draw fractal
+    camera.render(stereoMode);  // Draw fractal; this is where the tflops go.
     camera.speed /= speed_factor;
 
     glUseProgram(0);
+
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // If we're rendering some DoF effects, draw from buffer to screen.
-    if ((config.enable_dof && camera.dof_scale != 0) || config.backbuffer) {
-      // Ortho projection, entire screen in regular pixel coordinates.
+    if (multiPass) {
+      // We are post-processing of sorts.
+      // Ortho projection; entire screen in regular pixel coordinates.
       glMatrixMode(GL_PROJECTION);
       glLoadIdentity();
       glOrtho(0, config.width, config.height, 0, -1, 1);
       glMatrixMode(GL_MODELVIEW);
       glLoadIdentity();
 
-#if 1
-      if (gaussian.ok())  // Compute multiple levels of blur.
-      for (int i = 0; i < NBLUR * 2; ++i) {
-      // setup input texture
-      glEnable(GL_TEXTURE_2D);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D,
-                    (i == 0)
-                      ? mainTex[frameno&1]  // first input is current frame
-                      : (((i&1) == 1)
-                          ? mainTex[(frameno+1)&1]  // scratch as input
-                          : blurTex[(i-1)/2]));  // previous blur as input
-      // setup output buffer
-      glBindFramebuffer(GL_FRAMEBUFFER, ((i&1) == 0)
-                              ? mainFbo[(frameno+1)&1]  // scratch as output
-                              : blurFbo[i/2]);  // current blur as output
+      GLuint currentFrame = mainTex[frameno&1];
 
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      GLuint gauss_program = gaussian.program();
-      glUseProgram(gauss_program);
-      glUniform1i(glGetUniformLocation(gauss_program, "iTexture"), 0);
-      glUniform1i(glGetUniformLocation(gauss_program, "iXorY"), (i&1));
-      glUniform1f(glGetUniformLocation(gauss_program, "xres"), config.width);
-      glUniform1f(glGetUniformLocation(gauss_program, "yres"), config.height);
-
-      // Draw our texture covering entire screen, running the frame shader.
-      glBegin(GL_QUADS);
-        glTexCoord2f(0,1);
-        glVertex2f(0,0);
-        glTexCoord2f(0,0);
-        glVertex2f(0,config.height);
-        glTexCoord2f(1,0);
-        glVertex2f(config.width,config.height);
-        glTexCoord2f(1,1);
-        glVertex2f(config.width,0);
-      glEnd();
-
-      glUseProgram(0);  // no program
-      glDisable(GL_TEXTURE_2D);  // no texture
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);  // default framebuffer
-      //glFinish();  // appears not needed and costly.
-      }
-#endif
-
-      GLuint dof_program = effects.program();
-      glUseProgram(dof_program);  // Activate our alpha channel DoF shader.
-
-      glEnable(GL_TEXTURE_2D);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, mainTex[frameno&1]);
       if (!config.backbuffer) {
+        // Mipmap the frame.
+        // TODO: not needed by default. Costly?
+        glEnable(GL_TEXTURE_2D);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, currentFrame);
         glGenerateMipmap(GL_TEXTURE_2D);
       }
 
-#if 1
-      if (gaussian.ok()) {
-        GLint blurIds[NBLUR + 1] = {0};
-        for (int i = 0; i < NBLUR; ++i) {
-          glActiveTexture(GL_TEXTURE0 + i + 1);
-          glBindTexture(GL_TEXTURE_2D, blurTex[i]);
-          blurIds[i + 1] = i + 1;
+      if (fxaa.ok() && camera.fxaa) {
+        // We have a fxaa shader.
+        // Compute and point currentFrame at output.
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, currentFrame);
+        glBindFramebuffer(GL_FRAMEBUFFER, fxaaFbo);
+        GLuint program = fxaa.program();
+        glUseProgram(program);
+        glUniform1i(glGetUniformLocation(program, "iTexture"), 0);
+        glUniform1f(glGetUniformLocation(program, "xres"), config.width);
+        glUniform1f(glGetUniformLocation(program, "yres"), config.height);
+        drawScreen();
+        glUseProgram(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        currentFrame = fxaaTex;  // Our output is input for next stage.
+      }  // fxaa
+
+      if (dof.ok() && camera.enable_dof && camera.dof_scale != 0) {
+        // We have a DoF shader.
+        // Compute iBlur0 and iBlur1
+        for (int i = 0; i < NBLUR * 2; ++i) {
+
+          // Setup input texture.
+          int readLevel = 0;
+          int writeLevel = 0;
+
+          switch (i) {
+            case 0: {
+              // First input is current frame.
+              glActiveTexture(GL_TEXTURE0);
+              glBindTexture(GL_TEXTURE_2D, currentFrame);
+            } break;
+            default: {
+              int odd = (i&1);
+              if (odd) {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, scratchTex);
+              } else {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, currentFrame);
+              }
+              writeLevel = (i+1)/2 - 1;
+              readLevel = (i/2);
+            } break;
+          } 
+
+          // setup output buffer
+          glBindFramebuffer(GL_FRAMEBUFFER, ((i&1) == 0)
+                              ? scratchFbo  // scratch as output
+                              : blurFbo[writeLevel]);  // target blur as output
+
+          glActiveTexture(GL_TEXTURE2);
+          glBindTexture(GL_TEXTURE_2D, mainDepth[frameno&1]);  // current depth
+
+          GLuint dof_program = dof.program();
+          glUseProgram(dof_program);
+
+          glUniform1i(glGetUniformLocation(dof_program, "iTexture"), 0);
+          glUniform1i(glGetUniformLocation(dof_program, "iDepth"), 2);
+
+          glUniform1i(glGetUniformLocation(dof_program, "iXorY"), (i&1));
+
+          glUniform1i(glGetUniformLocation(dof_program, "iBlurLevel"),
+                          readLevel);
+
+          glUniform1f(glGetUniformLocation(dof_program, "xres"), config.width);
+          glUniform1f(glGetUniformLocation(dof_program, "yres"), config.height);
+
+          drawScreen();
+
+          glUseProgram(0);  // no program
+          glDisable(GL_TEXTURE_2D);  // no texture
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);  // default framebuffer
         }
-        glUniform1iv(glGetUniformLocation(dof_program, "iBlur"),
-                     ARRAYSIZE(blurIds), blurIds);
+      }  // dof
+
+      // Combine input(s) into final frame.
+      GLuint final_program = effects.program();
+      glUseProgram(final_program);
+
+      glEnable(GL_TEXTURE_2D);
+
+      // Pass main render as texture 0
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, currentFrame);
+      glUniform1i(glGetUniformLocation(final_program, "iTexture"), 0);
+
+      // Pass main depth as texture 1
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, mainDepth[frameno&1]);
+      glUniform1i(glGetUniformLocation(final_program, "iDepth"), 1);
+
+      if (dof.ok() && camera.enable_dof && camera.dof_scale != 0) {
+        // Pass blur textures as 2 and 3, if we computed them.
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, blurTex[0]);
+        glUniform1i(glGetUniformLocation(final_program, "iBlur0"), 2);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, blurTex[1]);
+        glUniform1i(glGetUniformLocation(final_program, "iBlur1"), 3);
+        glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 1);
+      } else {
+        // No DoF textures got computed.
+        glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 0);
       }
-#endif
 
-      glUniform1i(glGetUniformLocation(dof_program, "my_texture"), 0);
-      glUniform1f(glGetUniformLocation(dof_program, "dof_scale"),
-                  camera.dof_scale);
-      glUniform1f(glGetUniformLocation(dof_program, "dof_offset"),
-                  camera.dof_offset);
-      glUniform1f(glGetUniformLocation(dof_program, "speed"),
-                  camera.speed * speed_factor);
+      // These are not actually used by default,
+      // but might be handy for override effects_fragment.glsl?
+      glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
+      glUniform1f(glGetUniformLocation(final_program, "yres"), config.height);
 
-      // Also pass in double precision speed, if supported.
-      if (glUniform1d) {
-        glUniform1d(glGetUniformLocation(dof_program, "dspeed"),
-                        camera.speed * speed_factor);
-      }
-
-      glUniform1f(glGetUniformLocation(dof_program, "xres"), config.width);
-      glUniform1f(glGetUniformLocation(dof_program, "yres"), config.height);
-
-      // Draw our texture covering entire screen, running the frame shader.
-      glBegin(GL_QUADS);
-        glTexCoord2f(0,1);
-        glVertex2f(0,0);
-        glTexCoord2f(0,0);
-        glVertex2f(0,config.height);
-        glTexCoord2f(1,0);
-        glVertex2f(config.width,config.height);
-        glTexCoord2f(1,1);
-        glVertex2f(config.width,0);
-      glEnd();
+      drawScreen();
 
       glUseProgram(0);
       glDisable(GL_TEXTURE_2D);
-    }
+    }  // multiPass
 
     // Draw keyframe splined path, if we have 2+ keyframes and not rendering.
     if (!config.no_spline &&
         stereoMode == ST_NONE &&  // TODO: show path in 3d
         keyframes.size() > 1 &&
         splines.empty()) {
+
+      // Wtf? need to deactivate each texture unit; glDisable is not enough.
+      // Otherwise, texturing messes with color drawn and keyframe select fails.
+      glEnable(GL_TEXTURE_2D);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glDisable(GL_TEXTURE_2D);
+
       glDepthFunc(GL_LESS);
 
       camera.activateGl();
@@ -2295,7 +2497,7 @@ int main(int argc, char **argv) {
       vector<KeyFrame> splines;
       CatmullRom(keyframes, &splines, config.loop);
 
-      glColor4f(.8,.8,.8,1);
+      glColor4f(0.8f,0.8f,0.8f,1.0f);
       glLineWidth(1);
       glEnable(GL_LINE_SMOOTH);
 
@@ -2334,7 +2536,7 @@ int main(int argc, char **argv) {
 
       glLineWidth(13);
       for (size_t i = 0; i < keyframes.size(); ++i) {
-        glColor4f(0,0,1 - (i/256.0),1);  // Encode keyframe # in color.
+        glColor4f(0.0f,0.0f,1.0f - (i/256.0),1.0f); // Encode keyframe # in color.
         glBegin(GL_LINES);
         KeyFrame tmp = keyframes[i];
         tmp.move(tmp.speed, 0, 0);
@@ -2353,13 +2555,10 @@ int main(int argc, char **argv) {
 
     glDisable(GL_DEPTH_TEST);
 
+    CHECK_ERROR;
+
     // Draw AntTweakBar
     if (!grabbedInput && !rendering) TwDraw();
-
-    {
-      GLenum err = glGetError();
-      if (err != GL_NO_ERROR) printf("glGetError():%04x\n", err);
-    }
 
     SDL_GL_SwapWindow(window.window());
     frameno++;
@@ -2444,9 +2643,11 @@ int main(int argc, char **argv) {
            if (!dragging) {
               // Peek at framebuffer color for keyframe markers.
               unsigned int bgr = getBGRpixel(event.motion.x, event.motion.y);
+              printf("bgr = %06x\n", bgr);
               if ((bgr & 0xffff) == 0) {
                 // No red or green at all : probably a keyframe marker.
                 size_t kf = 255 -(bgr >> 16);
+                printf("kf = %ld\n", kf);
                 if (kf < keyframes.size()) {
                   printf("keyframe %lu\n", (unsigned long)kf);
                   SDL_SetCursor(hand_cursor);
@@ -2504,22 +2705,21 @@ int main(int argc, char **argv) {
         initTwBar();
       } break;
 
-      // Switch L/R eye polarity
+      // Switch L/R eye polarity,
+      // or print screenshot (w/ ctrl).
       case SDLK_p: {
-        polarity *= -1;
-      } break;
-
-      // Save config and screenshot (filename = current time).
-      case SDLK_SYSREQ:
-      //case SDLK_PRINT:
-      {
-        time_t t = time(0);
-        struct tm* ptm = localtime(&t);
-        char filename[256];
-        strftime(filename, 256, "%Y%m%d_%H%M%S.cfg", ptm);
-        camera.saveConfig(filename);
-        strftime(filename, 256, "%Y%m%d_%H%M%S.tga", ptm);
-        saveScreenshot(filename);
+        if (!hasCtrl) {
+          polarity *= -1;
+        } else {
+            // Save config and screenshot (filename = current time).
+          time_t t = time(0);
+          struct tm* ptm = localtime(&t);
+          char filename[256];
+          strftime(filename, 256, "%Y%m%d_%H%M%S.cfg", ptm);
+          camera.saveConfig(filename);
+          strftime(filename, 256, "%Y%m%d_%H%M%S.tga", ptm);
+          saveScreenshot(filename);
+        }
       } break;
 
       // Splined path control.
