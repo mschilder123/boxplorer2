@@ -15,7 +15,6 @@
 */
 
 #define DIST_MULTIPLIER par[9].x  // {min=.01 max=1 step=.01}
-#define DE_EPS 0.0001 //par[9].y
 #define MAX_DIST 10.0
 
 #define INOUT(a,b) inout a b
@@ -50,11 +49,13 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 
 //Fuctions to call.
 #define d d_PKlein//d_PZshape //
+#define d2 d_PKlein2//d_PZshape //
 #define color color_PKlein//color_0//
 
 // Compute the distance from `pos` to the PKlein basic shape.
 float d_PZshape(vec3 p) {
-   float rxy = sign(par[9].y)*(length(p.xy)-abs(par[9].y));
+#define ZHole par[9].y  //{min=-5 max=5 step=.01}
+   float rxy = sign(ZHole)*(length(p.xy)-abs(ZHole));
 
 #define TThickness par[5].x //{min=-5 max=5 step=.01}
 #define Zmult par[8].y //{min=-5 max=5 step=.01}
@@ -62,9 +63,8 @@ float d_PZshape(vec3 p) {
 
    for(int i=0; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
 
-// abs() causes banding at times.
-//     return max(rxy,abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
-   return max(rxy, -(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+   // abs() causes banding at times.
+   return max(rxy, abs(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
 }
 
 // Compute the distance from `pos` to the PKlein.
@@ -95,6 +95,42 @@ float d_PKlein(vec3 p) {
 	//You may need to adjust DIST_MULTIPLIER (par[9].x) especialy with non zero Julia seed
 	return
 	  (DIST_MULTIPLIER*d_PZshape(p-Offset)/abs(DEfactor)-DEoffset);
+}
+
+// Compute the distance from `pos` to the PKlein basic shape.
+float d_PZshape2(vec3 p) {
+   float rxy = sign(ZHole)*(length(p.xy)-abs(ZHole));
+
+   int i = 0;
+   for(; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
+   i = 2*(i&1) - 1;
+
+   // abs() causes banding at times.
+   return max(rxy, abs/*-float(i)* */(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
+}
+
+// Compute the distance from `pos` to the PKlein.
+float d_PKlein2(vec3 p) {
+   //Just scale=1 Julia box
+	float r2=dot(p,p);
+	float DEfactor=1.;
+
+	for(int i=0;i<iters;i++){
+		//Box folding
+		p=2.*clamp(p, -CSize, CSize)-p;
+		//Inversion
+		r2=dot(p,p);
+		float k=max(Size/r2,1.);
+		p*=k;DEfactor*=k;
+		//julia seed
+		p+=C;
+	}
+	//Call basic shape and scale its DE
+	//Ok... not perfect because the inversion transformation is tricky
+	//but works Ok with this shape (maybe because of the "tube" along Z-axis
+	//You may need to adjust DIST_MULTIPLIER (par[9].x) especialy with non zero Julia seed
+	return
+	  (DIST_MULTIPLIER*d_PZshape2(p-Offset)/abs(DEfactor)-DEoffset);
 }
 
 // Compute the color.
@@ -140,25 +176,9 @@ vec3 normal(vec3 pos, float d_pos) {
   //vec4 Eps = vec4(0, normal_eps, 2.0*normal_eps, 3.0*normal_eps);
   vec2 Eps = vec2(0, max(d_pos, normal_eps));
   return normalize(vec3(
-  // 2-tap forward differences, error = O(eps)
-//    -d_pos+d(pos+Eps.yxx),
-//    -d_pos+d(pos+Eps.xyx),
-//    -d_pos+d(pos+Eps.xxy)
-
-  // 3-tap central differences, error = O(eps^2)
-    -d(pos-Eps.yxx)+d(pos+Eps.yxx),
-    -d(pos-Eps.xyx)+d(pos+Eps.xyx),
-    -d(pos-Eps.xxy)+d(pos+Eps.xxy)
-
-  // 4-tap forward differences, error = O(eps^3)
-//    -2.0*d(pos-Eps.yxx)-3.0*d_pos+6.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    -2.0*d(pos-Eps.xyx)-3.0*d_pos+6.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    -2.0*d(pos-Eps.xxy)-3.0*d_pos+6.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
-
-  // 5-tap central differences, error = O(eps^4)
-//    d(pos-Eps.zxx)-8.0*d(pos-Eps.yxx)+8.0*d(pos+Eps.yxx)-d(pos+Eps.zxx),
-//    d(pos-Eps.xzx)-8.0*d(pos-Eps.xyx)+8.0*d(pos+Eps.xyx)-d(pos+Eps.xzx),
-//    d(pos-Eps.xxz)-8.0*d(pos-Eps.xxy)+8.0*d(pos+Eps.xxy)-d(pos+Eps.xxz)
+    -d2(pos-Eps.yxx)+d2(pos+Eps.yxx),
+    -d2(pos-Eps.xyx)+d2(pos+Eps.xyx),
+    -d2(pos-Eps.xxy)+d2(pos+Eps.xxy)
   ));
 }
 
