@@ -2660,7 +2660,6 @@ int main(int argc, char **argv) {
               if ((bgr & 0xffff) == 0) {
                 // No red or green at all : probably a keyframe marker.
                 size_t kf = 255 -(bgr >> 16);
-                printf("kf = %ld\n", kf);
                 if (kf < keyframes.size()) {
                   printf("keyframe %lu\n", (unsigned long)kf);
                   SDL_SetCursor(hand_cursor);
