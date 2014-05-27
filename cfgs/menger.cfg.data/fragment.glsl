@@ -20,6 +20,8 @@
 #define d de_menger // PKlein,combi,menger,mandelbox,ssponge
 #endif
 
+#define DE_FUNC_VEC3 de_menger
+
 // surface coloring func
 #ifndef c
 #define c c_menger  // PKlein,menger
@@ -665,11 +667,7 @@ float pnoise(vec2 pt){ return fract(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.1376
 void main() {
   vec3 eye_out, dp; 
 
-  if (!setup_ray(eye, dir, eye_out, dp)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
-	return;
-  }
+  if (!setup_ray(eye, dir, eye_out, dp)) return;
 
   float m_zoom = zoom * .5 / xres;  // screen error at dist 1.
   float noise = pnoise(gl_FragCoord.xy);
