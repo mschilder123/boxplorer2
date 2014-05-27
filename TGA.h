@@ -55,7 +55,10 @@ public:
   bool writeFile(const char* filename) {
     const unsigned char header[18] = {
       0,0,2,0,0,0,0,0,0,0,0,0,
-      width_%256,width_/256,height_%256,height_/256,24,0
+      (unsigned char)(width_%256),
+      (unsigned char)(width_/256),
+      (unsigned char)(height_%256),
+      (unsigned char)(height_/256),24,0
     };
     FILE* f = NULL;
     bool result = false;

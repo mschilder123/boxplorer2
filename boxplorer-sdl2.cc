@@ -241,7 +241,7 @@ class GFX {
           fullscreen_(false),
           window_(NULL),
           glcontext_(0) {
-    SDL_Init(SDL_INIT_VIDEO);
+    //SDL_Init(SDL_INIT_VIDEO);
     for (ndisplays_ = 0; ndisplays_ < SDL_GetNumVideoDisplays() &&
                          ndisplays_ < kMAXDISPLAYS; ++ndisplays_) {
       SDL_GetCurrentDisplayMode(ndisplays_, &mode_[ndisplays_]);
@@ -251,7 +251,7 @@ class GFX {
 
   ~GFX() {
     reset();
-    SDL_Quit();
+    //SDL_Quit();
   }
 
   void reset() {
@@ -1421,13 +1421,14 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
                       effects.log().c_str());
 
   if (!config.disable_de) {
+#if defined(GL_RGBA32F)  // We need this to be actually capable of GL_FLOAT
     // Try compile same shader to get a minimal DE computation version.
     setupShaders(&de_shader, "#define ST_COMPUTE_DE_ONLY\n");
 
     if (!de_shader.ok()) {
       printf(__FUNCTION__ " : de_shader failed to compile: no GPU de.\n");
       printf(__FUNCTION__ " :\n%s\n", de_shader.log().c_str());
-      while (glGetError() != GL_NO_ERROR); 
+      while (glGetError() != GL_NO_ERROR);
     } else {
       // Got a shader that can compute DE.
       // Set-up a float32 fbo for it to write to.
@@ -1457,7 +1458,17 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glClear(GL_COLOR_BUFFER_BIT);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+#endif  // defined(RGBA32F)
   }
+
+// Play hokey w/ substandard osx ogl support.
+#if defined(GL_RGBA32F)
+#define xGL_RGBA32F GL_RGBA32F
+#define xGL_FLOAT GL_FLOAT
+#else
+#define xGL_RGBA32F GL_RGBA16
+#define xGL_FLOAT GL_UNSIGNED_SHORT
+#endif
 
   if (background.data() != NULL) {
 
@@ -1518,8 +1529,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, config.width, config.height,
-                   0, GL_BGRA, GL_FLOAT, NULL);
+      glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F, config.width, config.height,
+                   0, GL_BGRA, xGL_FLOAT, NULL);
 
       glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -1560,9 +1571,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+        glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F,
                         config.width, config.height,
-                        0, GL_BGRA, GL_FLOAT, NULL);
+                        0, GL_BGRA, xGL_FLOAT, NULL);
 
         glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -1593,7 +1604,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
 
       glGenTextures(1, &scratchTex);
       glGenFramebuffers(1, &scratchFbo);
-  
+
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, scratchTex);
 
@@ -1602,9 +1613,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+      glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F,
                       config.width, config.height,
-                      0, GL_BGRA, GL_FLOAT, NULL);
+                      0, GL_BGRA, xGL_FLOAT, NULL);
 
       glBindFramebuffer(GL_FRAMEBUFFER, scratchFbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -1634,9 +1645,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+      glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F,
                       config.width, config.height,
-                      0, GL_BGRA, GL_FLOAT, NULL);
+                      0, GL_BGRA, xGL_FLOAT, NULL);
 
       glBindFramebuffer(GL_FRAMEBUFFER, fxaaFbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -1911,7 +1922,7 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[argc-1], "--quadbuffer")) {
       stereoMode = ST_QUADBUFFER;
     } else if (!strcmp(argv[argc-1], "--anaglyph")) {
-      stereoMode = ST_ANAGLYPH;  
+      stereoMode = ST_ANAGLYPH;
       defines.append("#define ST_ANAGLYPH\n");
     } else if (!strcmp(argv[argc-1], "--oculus")) {
       stereoMode = ST_OCULUS;
@@ -2080,6 +2091,7 @@ int main(int argc, char **argv) {
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
       die("SDL initialization failed: %s\n", SDL_GetError());
+  atexit(SDL_Quit);
 
   if (kJOYSTICK) {
     // open a joystick by explicit index.
@@ -2274,7 +2286,7 @@ int main(int argc, char **argv) {
           // TODO: use for auto-focus using center-weighted samples?
           glUseProgram(de_shader.program());
           camera.render(ST_COMPUTE_DE_ONLY);
-  
+
           glUseProgram(0);
           glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
@@ -2536,7 +2548,8 @@ int main(int argc, char **argv) {
 
       glLineWidth(13);
       for (size_t i = 0; i < keyframes.size(); ++i) {
-        glColor4f(0.0f,0.0f,1.0f - (i/256.0),1.0f); // Encode keyframe # in color.
+        // Encode keyframe # in blue channel.
+        glColor4f(0.0f,0.0f,1.0f - (i/256.0),1.0f);
         glBegin(GL_LINES);
         KeyFrame tmp = keyframes[i];
         tmp.move(tmp.speed, 0, 0);
@@ -2643,7 +2656,7 @@ int main(int argc, char **argv) {
            if (!dragging) {
               // Peek at framebuffer color for keyframe markers.
               unsigned int bgr = getBGRpixel(event.motion.x, event.motion.y);
-              printf("bgr = %06x\n", bgr);
+              // printf("bgr = %06x\n", bgr);
               if ((bgr & 0xffff) == 0) {
                 // No red or green at all : probably a keyframe marker.
                 size_t kf = 255 -(bgr >> 16);
@@ -3115,6 +3128,8 @@ int main(int argc, char **argv) {
 #if defined(HYDRA)
   sixenseExit();
 #endif
+
+  window.reset();
 
   return 0;
 }

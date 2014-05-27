@@ -3,22 +3,9 @@
 
 #include <string>
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__GNUC__)
 #include <unordered_map>
-#define hash_map std::unordered_map
-using namespace std;
-#elif defined(__GNUC__)
-#include <ext/hash_map>
-using namespace __gnu_cxx;
-namespace __gnu_cxx {
-        template<> struct hash< std::string >
-        {
-                size_t operator()( const std::string& x ) const
-                {
-                        return hash< const char* >()( x.c_str() );
-                }
-        };
-}
+#define hash_map unordered_map
 #else  // WIN32
 #include <hash_map>
 #endif
@@ -84,7 +71,7 @@ private:
   bool parseLine(const std::string& line, iUniformPtr* uni);
 
 #if defined(__GNUC__) || defined(__APPLE__)
-  hash_map<std::string, iUniformPtr, hash<std::string> > uniforms;
+  std::hash_map<std::string, iUniformPtr, std::hash<std::string> > uniforms;
 #else
   std::hash_map<std::string, iUniformPtr> uniforms;
 #endif
