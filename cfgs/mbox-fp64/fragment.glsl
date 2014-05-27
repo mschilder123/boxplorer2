@@ -40,8 +40,15 @@
 varying vec3 eye, dir;
 varying float zoom;
 uniform float xres, yres;
+uniform float dof_scale;  // {min=0.0 max=10.0 step=0.01}
 
+#if 0
+// wtf is wrong w/ AMD?
 uniform dvec3 deye;  // eye position in double precision
+#else
+uniform double deyex, deyey, deyez;
+dvec3 deye = dvec3(deyex, deyey, deyez);
+#endif
 
 // Interactive parameters.
 uniform vec3 par[20];
@@ -108,7 +115,7 @@ void init() {
 double de_mandelbox(dvec3 pos) {
   dvec4 p = dvec4(pos, 1.0), p0 = p;  // p.w is the distance estimate
   for (int i=0; i<iters; i++) {
-	p.xyz = rotationMatrix * p.xyz;
+  	p.xyz = rotationMatrix * p.xyz;
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
 
     double r2 = dot(p.xyz, p.xyz);
@@ -116,7 +123,7 @@ double de_mandelbox(dvec3 pos) {
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + P0;
 
-	if (r2 > 100.0) break;
+	  if (r2 > 100.0) break;
   }
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
 			- absScalePowIters) * 0.95 * DIST_MULTIPLIER;
@@ -135,18 +142,18 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
     double r2 = dot(p.xyz, p.xyz);
     orbitTrap = min(orbitTrap, abs(dvec4(p.xyz, r2)));
 
-	p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
+	  p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + P0;
 
-	if (r2 > 100.0) break;
+	  if (r2 > 100.0) break;
   }
 
   orbitTrap.w = clamp(sqrt(orbitTrap.w)*float(color_iters)/float(i), 0.0, 1.0);
   vec3 orbitColor =
-        X.xyz*X.w*(orbitTrap.x) +
-		Y.xyz*Y.w*orbitTrap.y +
-		Z.xyz*Z.w*orbitTrap.z +
-		R.xyz*R.w*(orbitTrap.w)
+        X.xyz*X.w*float(orbitTrap.x) +
+		Y.xyz*Y.w*float(orbitTrap.y) +
+		Z.xyz*Z.w*float(orbitTrap.z) +
+		R.xyz*R.w*float(orbitTrap.w)
 		;
   return mix(BaseColor, 3.0*orbitColor,  OrbitStrength);
 }
@@ -245,8 +252,8 @@ void main() {
   
   if (!setup_stereo(eye_in, dp)) {
     gl_FragColor = vec4(0);
-	gl_FragDepth = 0;
-	return;
+	  gl_FragDepth = 0;
+	  return;
   }
 
   init();
@@ -293,14 +300,22 @@ void main() {
   }
 
   // Glow is based on the number of steps.
-  col = mix(col, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
+  col = mix(col, glowColor, (float(steps)+float(noise))/float(max_steps) * glow_strength);
   //col = mix(col, glowColor, clamp(float(totalD/dspeed/1000.0), 0.0, 1.0));
 
   double zNear = abs(dspeed);
+
+  // compute CoC, thin lens model
+  double P = abs(focus + 30.0) * zNear;
+  D = totalD;
+  double A = dof_scale;  //~aperture;
+  double F = 8.*abs(dspeed); //~focalLength;
+  double CoC = abs(A*(F*(P-D))/(D*(P-F)));
+
   double zFar = 65535.0 * zNear;
   double a = zFar / (zFar - zNear);
   double b = zFar * zNear / (zNear - zFar);
   float depth = float(a + b / clamp(totalD/length(dir), zNear, zFar));
+  gl_FragColor = vec4(col, float(clamp(CoC, 0.0, 1.0)));
   gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
 }
