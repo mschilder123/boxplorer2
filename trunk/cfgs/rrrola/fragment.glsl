@@ -324,7 +324,7 @@ void main() {
     }
   } else {
     // Record a miss as zFar; might be interpreted by effect shaders.
-    totalD = 65535*abs(speed);
+    totalD = 65535.0*abs(speed);
   }
 
   // Glow is based on the number of steps.
