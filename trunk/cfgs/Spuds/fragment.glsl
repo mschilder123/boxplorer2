@@ -36,7 +36,6 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
 #define minRadius2 par[1].y  //{min=0 max=2.3 step=.01}
 #define foldingLimit1 par[2].x  //{min=0 max=5 step=.01}
 #define foldingLimit2 par[2].y  //{min=0 max=5 step=.01}
-#
 #define Power par[5].x  //{min=0.1 max=12.3 step=.1}
 #define ZMUL par[5].y  //{min=-310 max=310 step=1}
 
