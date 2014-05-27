@@ -131,31 +131,25 @@ const char default_fs[] =
   "}";
 
 const char effects_default_vs[]=
-  "varying vec2 texture_coordinate;"
-  "void main(){"
+  "varying vec2 iTexCoord;"
+  "void main() {"
   " gl_Position=gl_ModelViewProjectionMatrix * gl_Vertex;\n"
-  " texture_coordinate = vec2(gl_MultiTexCoord0);"
+  " iTexCoord = vec2(gl_MultiTexCoord0);"
   "}";
 
 const char effects_default_fs[]=
-  "#extension GL_ARB_shader_texture_lod : enable\n"  // explicit enable for osx.
-  "varying vec2 texture_coordinate;"
-  "uniform sampler2D my_texture;\n"
-  "uniform float dof_offset;  // {min=-5. max=5. step=.01}\n"
-  "uniform float dof_scale;  // {min=-29.5. max=1000. step=.1}\n"
-  "uniform float speed;\n"
-  "uniform float xres, yres;\n"
-  "float pnoise(vec2 pt){return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0);}\n"
+  "varying vec2 iTexCoord;\n"
+  "uniform sampler2D iTexture;\n"
+  "uniform sampler2D iDepth;\n"
+  "uniform sampler2D iBlur0;\n"
+  "uniform sampler2D iBlur1;\n"
+  "uniform bool enable_dof;\n"
   "void main() {"
-  " float z = texture2D(my_texture, texture_coordinate).w;"
-  " float z_near = abs(speed);"
-  " float z_far = 65535.0*z_near;"
-  " float d = -z_far * z_near / (z * (z_far - z_near) - z_far);\n"
-  // 30.0 and .5 make for reasonable views w/ old .cfgs
-  // But have no other meaning. Remove once .cfgs are updated?
-  // TODO: figure proper CoC / aperture / focal plane params
-  " float lod = abs(log(1.0 + d / (abs(speed) * (30.0 + dof_scale))) - .5 + dof_offset);\n"
-  " vec2 dv = vec2(((pnoise(gl_FragCoord.xy)-.5)*lod*lod)/xres, ((pnoise(gl_FragCoord.yx)-.5)*lod*lod)/yres);\n"
-  " gl_FragColor = texture2DLod(my_texture, texture_coordinate + dv, lod);\n"
-  " gl_FragDepth = z;\n"  // copy Z
+  " if (enable_dof) {\n"
+  "   gl_FragColor = min(texture2D(iBlur0, iTexCoord),\n"
+  "                      texture2D(iBlur1, iTexCoord));\n"
+  " } else {\n"
+  "   gl_FragColor = texture2D(iTexture, iTexCoord);\n"
+  " }\n"
+  " gl_FragDepth = texture2D(iDepth, iTexCoord);\n"
   "}";
