@@ -2,7 +2,7 @@
 
 varying vec3 dir;
 
-uniform sampler2D bg_texture;
+uniform sampler2D iChannel0;
 uniform float xres, yres, time;
 uniform vec3 par[1];
 uniform int use_bg_texture;
@@ -11,7 +11,7 @@ uniform int use_bg_texture;
 #define decayG par[0].y  // {min=0 max=1 step=.0001}
 #define decayB par[0].z  // {min=0 max=1 step=.0001}
 
-#define backbuffer bg_texture
+#define backbuffer iChannel0
 vec2 position;
 vec2 pixelSize = vec2(1.0/xres, 1.0/yres);
 
