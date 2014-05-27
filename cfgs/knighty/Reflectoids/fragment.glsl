@@ -103,7 +103,7 @@ float d_PZshape2(vec3 p) {
 
    int i = 0;
    for(; i<int(Ziter); i++) p.z=2.*clamp(p.z, -Zmult, Zmult)-p.z;
-   i = 2*(i&1) - 1;
+   //i = 2*(i&1) - 1;
 
    // abs() causes banding at times.
    return max(rxy, abs/*-float(i)* */(length(p.xy)*p.z-TThickness) / sqrt(dot(p,p)+abs(TThickness)));
