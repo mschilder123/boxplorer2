@@ -151,5 +151,5 @@ const char effects_default_fs[]=
   " } else {\n"
   "   gl_FragColor = texture2D(iTexture, iTexCoord);\n"
   " }\n"
-  " gl_FragDepth = texture2D(iDepth, iTexCoord);\n"
+  " gl_FragDepth = texture2D(iDepth, iTexCoord).x;\n"
   "}";
