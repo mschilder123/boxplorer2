@@ -53,7 +53,7 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   surfaceColor1 = vec3(0.95, 0.64, 0.1),
   surfaceColor2 = vec3(0.89, 0.95, 0.75),
   surfaceColor3 = vec3(0.55, 0.06, 0.03),
-  specularColor = vec3(1.0, 0.8, 0.4),
+  specularColor = vec3(1.0, 0.8, 0.4) * 1.0,
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
@@ -199,6 +199,7 @@ float noise( in vec2 x ) {
 
 #include "setup.inc"
 
+// from http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
 vec3 rgb2hsv(vec3 c) {
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
     vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
@@ -276,23 +277,27 @@ void main() {
     //col = hsv2rgb(hsv);
 #else
     // light things up a bit
-    vec3 light_d = vec3(gl_ModelViewMatrix * vec4(abs(speed) * 4.0, abs(speed), 0, 0));
+    // carry a light to the right and up a bit from eye, propotional
+    // to speed (i.e. size of head / ipd).
+    vec3 light_d = vec3(gl_ModelViewMatrix * vec4(abs(speed) * 14.0, abs(speed) * 5.0, 0, 0));
     vec3 light = eye + light_d;
     // trace back from p to light to determine shadow.
     vec3 tolight = normalize(light - p);
     float lightDist = length(light - p);
-    float shadow = 1.0f;
-    float shadowRayLength = abs(speed);
+    float shadow = 1.0f;  // fully lit
+    float lightRayLength = abs(speed);
     for (int i = 0; i < steps; ++i) {
-      float d = d(p + shadowRayLength * tolight);
-      shadowRayLength += d;
-      if (shadowRayLength > lightDist - 2*m_dist) {
+      float d = d(p + lightRayLength * tolight);
+      lightRayLength += d;
+      if (lightRayLength > lightDist - 2*m_dist) {
+        // reached light
         break;
       }
 
-      shadow = min(shadow, 1.0 * d / shadowRayLength);
+      shadow = min(shadow, 1.0 * d / lightRayLength);
 
       if (d < m_dist) {
+        // hit obstacle; fully shaded
         shadow = 0.0;
         break;
       }
@@ -318,8 +323,8 @@ void main() {
                 clamp(log(D/m_dist) * dist_to_color, 0.0, 1.0));
     }
   } else {
-    // Record a miss as depth 0; might be interpreted by effect shaders.
-    totalD = 0.0;
+    // Record a miss as zFar; might be interpreted by effect shaders.
+    totalD = 65535*abs(speed);
   }
 
   // Glow is based on the number of steps.
