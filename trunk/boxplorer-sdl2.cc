@@ -323,7 +323,7 @@ class GFX {
         break;
       }
       if (rect_[i].h == 1080) alternate1080p = i;
-      printf("screen %i: %dx%d\n", rect_[i].w, rect_[i].h);
+      printf("screen %d: %dx%d\n", i, rect_[i].w, rect_[i].h);
     }
 
     int targetWidth = rect_[d].w;
