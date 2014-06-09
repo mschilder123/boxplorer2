@@ -240,8 +240,10 @@ class GFX {
           last_width_(0), last_height_(0),
           fullscreen_(false),
           window_(NULL),
-          glcontext_(0) {
-    //SDL_Init(SDL_INIT_VIDEO);
+          glcontext_(0) {}
+
+  void init() {
+    //requires SDL_Init(SDL_INIT_VIDEO);
     for (ndisplays_ = 0; ndisplays_ < SDL_GetNumVideoDisplays() &&
                          ndisplays_ < kMAXDISPLAYS; ++ndisplays_) {
       SDL_GetCurrentDisplayMode(ndisplays_, &mode_[ndisplays_]);
@@ -249,10 +251,7 @@ class GFX {
     }
   }
 
-  ~GFX() {
-    reset();
-    //SDL_Quit();
-  }
+  ~GFX() { reset(); }
 
   void reset() {
     if (glcontext_) {
@@ -307,6 +306,7 @@ class GFX {
       // capture current window position.
       SDL_GetWindowPosition(window_, &last_x_, &last_y_);
     }
+
     reset();
 
     // Oculus / Acer hackery:
@@ -323,6 +323,7 @@ class GFX {
         break;
       }
       if (rect_[i].h == 1080) alternate1080p = i;
+      printf("screen %i: %dx%d\n", rect_[i].w, rect_[i].h);
     }
 
     int targetWidth = rect_[d].w;
@@ -1363,6 +1364,7 @@ bool setupDirectories(const char* configFile) {
 //
 // Exits the program if an error occurs.
 bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
+#if 0
   // Set attributes for the OpenGL window.
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1370,6 +1372,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, config.depth_size);
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+#endif
 
   if(stereoMode==ST_QUADBUFFER) {
     SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
@@ -1420,6 +1423,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       die("Error in GLSL effects shader compilation:\n%s\n",
                       effects.log().c_str());
 
+  glEnable(GL_TEXTURE_2D);
+
   if (!config.disable_de) {
 #if defined(GL_RGBA32F)  // We need this to be actually capable of GL_FLOAT
     // Try compile same shader to get a minimal DE computation version.
@@ -1436,7 +1441,6 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
 
       glGenFramebuffers(1, &de_fbo);
 
-      glEnable(GL_TEXTURE_2D);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, de_texture);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1462,10 +1466,16 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   }
 
 // Play hokey w/ substandard osx ogl support.
-#if defined(GL_RGBA32F)
+#if defined(GL_RGBA16F)
+  // try half-float first. Faster and enough range?
+#define xGL_RGBA32F GL_RGBA16F
+#define xGL_FLOAT GL_HALF_FLOAT
+#elif defined(GL_RGBA32F)
+  // try float next.
 #define xGL_RGBA32F GL_RGBA32F
 #define xGL_FLOAT GL_FLOAT
 #else
+  // no HDR fbo for you..
 #define xGL_RGBA32F GL_RGBA16
 #define xGL_FLOAT GL_UNSIGNED_SHORT
 #endif
@@ -1475,7 +1485,6 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     // Load background image into texture.
 
     glGenTextures(1, &background_texture);
-    glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, background_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1504,13 +1513,19 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     // Create framebuffers
     glGenFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
 
+    GLint clamp = config.backbuffer ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+    GLint minfilter = config.backbuffer ? GL_NEAREST : GL_LINEAR;
+
     for (size_t i = 0; i < ARRAYSIZE(mainFbo); ++i) {
       // Initialize depth texture
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mainDepth[i]);
 
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
       glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
                       config.width, config.height,
                       0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
@@ -1521,16 +1536,16 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mainTex[i]);
 
-      GLint clamp = config.backbuffer ? GL_REPEAT:GL_CLAMP_TO_EDGE;
-      GLint minfilter = config.backbuffer ?
-              GL_NEAREST : GL_LINEAR_MIPMAP_LINEAR;
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
-      glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F, config.width, config.height,
+      glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F,
+                   config.width, config.height,
                    0, GL_BGRA, xGL_FLOAT, NULL);
+
+      CHECK_ERROR;
 
       glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -1544,20 +1559,18 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       CHECK_ERROR;
 
       // Attach depthbuffer
-      glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                      GL_TEXTURE_2D, mainDepth[i], 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                             GL_TEXTURE_2D, mainDepth[i], 0);
 
       CHECK_ERROR;
       CHECK_FRAMEBUFFER;
 
       // Clear it all.
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     if (dof.ok()) {
-
       // Create and initialize blur fbos.
 
       glGenTextures(ARRAYSIZE(blurTex), blurTex);
@@ -1568,8 +1581,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
         glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F,
                         config.width, config.height,
@@ -1835,13 +1848,21 @@ void initTwBar() {
   TwDefine("GLOBAL fontsize=3");
   }
 
-  if (fxaa.ok()) TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "");
+  if (fxaa.ok()) {
+    TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "");
+  }
   if (dof.ok()) {
     TwAddVarRW(bar, "DoF", TW_TYPE_BOOL32, &camera.enable_dof, "");
     TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.dof_scale,
                     "min=0.0 max=10.0 step=0.01");
   }
   if (fxaa.ok() || dof.ok()) {
+    TwAddVarRW(bar, "exposure", TW_TYPE_FLOAT, &config.exposure,
+               "min=0.0 max=5.0 step=0.01");
+    TwAddVarRW(bar, "maxBright", TW_TYPE_FLOAT, &config.maxBright,
+               "min=0.0 max=5.0 step=0.01");
+    TwAddVarRW(bar, "gamma", TW_TYPE_FLOAT, &config.gamma,
+               "min=0.0 max=5.0 step=0.01");
     TwAddSeparator(bar, NULL, NULL);
   }
 
@@ -2092,6 +2113,8 @@ int main(int argc, char **argv) {
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
       die("SDL initialization failed: %s\n", SDL_GetError());
   atexit(SDL_Quit);
+
+  window.init();
 
   if (kJOYSTICK) {
     // open a joystick by explicit index.
@@ -2437,7 +2460,7 @@ int main(int argc, char **argv) {
           drawScreen();
 
           glUseProgram(0);  // no program
-          glDisable(GL_TEXTURE_2D);  // no texture
+          //glDisable(GL_TEXTURE_2D);  // no texture
           glBindFramebuffer(GL_FRAMEBUFFER, 0);  // default framebuffer
         }
       }  // dof
@@ -2472,6 +2495,11 @@ int main(int argc, char **argv) {
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 0);
       }
 
+      // send tonemap params etc.
+      glUniform1f(glGetUniformLocation(final_program, "exposure"), config.exposure);
+      glUniform1f(glGetUniformLocation(final_program, "maxBright"), config.maxBright);
+      glUniform1f(glGetUniformLocation(final_program, "gamma"), config.gamma);
+
       // These are not actually used by default,
       // but might be handy for override effects_fragment.glsl?
       glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
@@ -2480,7 +2508,7 @@ int main(int argc, char **argv) {
       drawScreen();
 
       glUseProgram(0);
-      glDisable(GL_TEXTURE_2D);
+      //glDisable(GL_TEXTURE_2D);
     }  // multiPass
 
     // Draw keyframe splined path, if we have 2+ keyframes and not rendering.
@@ -2500,7 +2528,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, 0);
       glActiveTexture(GL_TEXTURE3);
       glBindTexture(GL_TEXTURE_2D, 0);
-      glDisable(GL_TEXTURE_2D);
+      //glDisable(GL_TEXTURE_2D);
 
       glDepthFunc(GL_LESS);
 
