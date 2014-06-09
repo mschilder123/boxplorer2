@@ -41,7 +41,10 @@
   PROCESS(int, backbuffer, "backbuffer", false) \
   PROCESS(int, julia, "julia", true) \
   PROCESS(int, bg_weight, "bg_weight", true) \
-  PROCESS(int, fxaa, "fxaa", false)
+  PROCESS(int, fxaa, "fxaa", false) \
+  PROCESS(float, exposure, "exposure", true) \
+  PROCESS(float, maxBright, "maxBright", true) \
+  PROCESS(float, gamma, "gamma", true)
 
 #define NUMPARS 20
 
