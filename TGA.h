@@ -94,7 +94,7 @@ public:
 #endif
   size_t width() { return width_; }
   size_t height() { return height_; }
-  const unsigned char* data() { return data_; }
+  unsigned char* data() { return data_; }
 
 private:
   size_t width_;
