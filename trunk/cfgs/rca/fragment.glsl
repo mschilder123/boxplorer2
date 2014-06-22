@@ -36,8 +36,8 @@ vec3 color(vec2 z) {
   vec3 v1 = texture2D(backbuffer, position).xyz;
 
   int count = 0;
-  vec2 phase = -1.0 + 2.0 * floor(mod(gl_FragCoord, 2.0));  // 1 or -1
-  phase *= -1.0 + 2.0 * float(frameno & 1);  // 1 or -1
+  vec2 phase = -1.0 + 2.0 * floor(mod(gl_FragCoord.xy, 2.0));  // 1 or -1
+  phase *= -1.0 + 2.0 * floor(mod(float(frameno), 2.0));  // 1 or -1
 
   isAlive(0.0,0.0, count, 1);
   
