@@ -30,7 +30,7 @@ void isAlive(float dx, float dy, inout int count, int factor) {
 
 vec3 color(vec2 z) {
   // Ring o'fire
-  if (use_bg_texture == 0 && random != 0) {
+  if (use_bg_texture == 0 && random > 0.0) {
     if (length(z)<0.1 && length(z)>0.08) {
       return (rand(time*z) < 0.5 ? vec3(1.0,0.0,0.0) : vec3(0.0));
     }
