@@ -1732,12 +1732,12 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
                  y += accu;
                  accu = 0;
                } continue;
-            case 'b': {
+            case 'b': case 'B': {
                  if (!accu) accu = 1;
                  x += accu;
                  accu = 0;
                } continue;
-            case 'o': {
+            case 'o': case 'A': {
                 if (!accu) accu = 1;
                 for (int xx = x; xx < x + accu; ++xx) {
                   glVertex2f(.5 + xx + xo, .5 + y + yo);
@@ -2352,6 +2352,7 @@ int main(int argc, char **argv) {
                     lifeform_file != NULL);
       }
       glUniform1i(glGetUniformLocation(program, "iChannel0"), 0);
+      glUniform1i(glGetUniformLocation(program, "frameno"), frameno);
     }
 
     if (multiPass) {
