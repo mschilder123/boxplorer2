@@ -24,45 +24,53 @@ float rand(vec2 co){
 }
 
 void isAlive(float dx, float dy, inout int count, int factor) {
-  vec4 v1 = texture2D(backbuffer,  position + pixelSize*vec2( dx, dy ));
-  if (v1.x == 1.0) count += factor;
+  float cur = texture2D(backbuffer, position + pixelSize*vec2( dx, dy )).r;
+  // Aliveness is tracked in r channel at 1.0
+  count += int(cur) * factor;
 }
 
 vec3 color(vec2 z) {
-  // Ring o'fire
+  // Ring o'fire; generate random live cells.
   if (use_bg_texture == 0 && random > 0.0) {
-    if (length(z)<0.1 && length(z)>0.08) {
+    if (length(z) < 0.1 && length(z) > 0.08) {
+      // Within thin ring: random life!
       return (rand(time*z) < 0.5 ? vec3(1.0,0.0,0.0) : vec3(0.0));
     }
   }
 
-  vec3 v1 = texture2D(backbuffer, position).xyz;
+  vec3 cur = texture2D(backbuffer, position).rgb;
 
-  int count = 0;
+  // Relative position of self in 2x2 cell.
   vec2 phase = -1.0 + 2.0 * floor(mod(gl_FragCoord.xy, 2.0));  // 1 or -1
+
+  // Margolus toggle of which 2x2 to consider.
   phase *= -1.0 + 2.0 * floor(mod(float(frameno), 2.0));  // 1 or -1
+
+  // Direction toggle.
   phase *= direction;
 
-  isAlive(0.0,0.0, count, 1);
-  
-  // Count neighbours in relative quad
+  int count = int(cur.r);  // self 1 or 0.
+
+  // Count neighbours in relative 2x2.
   isAlive(phase.x, 0.0, count, 2);
   isAlive(phase.x, phase.y, count, 8);
   isAlive(0.0, phase.y, count, 4);
   
-  // Rules
-  if (count == int(-direction * phase.x * phase.y + 3.0)) {
-    return vec3(1.0, 1.0, 1.0);  // rotate clockwise into new life
-  } else if (count > 1) {
-    return v1 * vec3(1.0, par[0].y, par[0].z);  // stable
+  // Rule: single rotate; get life if either count is 2 or 4,
+  //       depending on rotation direction.
+  // TODO: all Margolus rules?
+  if (count == int(3.0 - direction * phase.x * phase.y)) {
+    return vec3(1.0, 1.0, 1.0);  // rotate into new life
+  } else if (count > 1) {  // more than 1 alive: stable
+    return cur * vec3(1.0, par[0].y, par[0].z);
   } else {
-    return v1 * par[0];  // decay
+    return cur * par[0];  // decay
   }
 }
 
 void main() {
   position = gl_FragCoord.xy * pixelSize;  // [0..1>
   vec2 z = -1.0 + 2.0 * position;          // <-1..1>
-  z -= dir.xy;
+  z -= dir.xy;  // respond to mouse move, somewhat.
   gl_FragColor = vec4(color(z), 1.0);
 }
