@@ -2342,7 +2342,8 @@ int main(int argc, char **argv) {
     // TODO: provide both or at least previous if multiPass?
     if (background_texture || config.backbuffer) {
       glActiveTexture(GL_TEXTURE0);
-      if (background_texture) {
+      if (background_texture && !(config.backbuffer && frameno != 0) &&
+                      lifeform_file == NULL) {
         glBindTexture(GL_TEXTURE_2D, background_texture);
         glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
                     background_texture);
