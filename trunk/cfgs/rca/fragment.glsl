@@ -53,9 +53,10 @@ vec3 color(vec2 z) {
 
   // Count neighbours in relative 2x2.
   isAlive(phase.x, 0.0, count, 2);
-  isAlive(phase.x, phase.y, count, 8);
   isAlive(0.0, phase.y, count, 4);
-  
+  isAlive(phase.x, phase.y, count, 8);
+ 
+#if 1
   // Rule: single rotate; get life if either count is 2 or 4,
   //       depending on rotation direction.
   // TODO: all Margolus rules?
@@ -66,6 +67,18 @@ vec3 color(vec2 z) {
   } else {
     return cur * par[0];  // decay
   }
+#else
+  // 0 die or stay dead, 1 live or stay alive.
+  // Bounce gas
+  const int rule[] = {0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1};
+  // SingleRotate (alternate code)
+  //const int rule[] = {0, 0, 2, 1, -2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1};
+  if (rule[count] == 0 || rule[count] * int(direction*phase.x*phase.y) < -1) {
+    return cur * par[0];  // decay
+  } else {
+    return vec3(1.0, 1.0, 1.0);  // pick up new life
+  }
+#endif
 }
 
 void main() {
