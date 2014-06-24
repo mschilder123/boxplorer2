@@ -56,29 +56,45 @@ vec3 color(vec2 z) {
   isAlive(0.0, phase.y, count, 4);
   isAlive(phase.x, phase.y, count, 8);
  
-#if 1
-  // Rule: single rotate; get life if either count is 2 or 4,
-  //       depending on rotation direction.
-  // TODO: all Margolus rules?
-  if (count == int(3.0 - direction * phase.x * phase.y)) {
-    return vec3(1.0, 1.0, 1.0);  // rotate into new life
-  } else if (count > 1) {  // more than 1 alive: stable
-    return cur * vec3(1.0, par[0].y, par[0].z);
-  } else {
-    return cur * par[0];  // decay
-  }
-#else
-  // 0 die or stay dead, 1 live or stay alive.
   // Bounce gas
-  const int rule[] = {0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1};
-  // SingleRotate (alternate code)
-  //const int rule[] = {0, 0, 2, 1, -2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1};
-  if (rule[count] == 0 || rule[count] * int(direction*phase.x*phase.y) < -1) {
-    return cur * par[0];  // decay
+  //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+  //                  -  D  -  -  -  -  L  D  L  D  -  -  -  -  L  -
+//const int rule[] = {0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1};
+//int rule = 0xe968;
+//int rot = 0x0000;
+
+  // Billiard Ball Machine
+  //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+  //                  -  D  -  -  -  -  L  -  L  D  -  -  -  -  -  -
+//const int rule[] = {0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1};
+//int rule = 0xa9e8;
+//int rot = 0x0000;
+
+  // HPP Gas
+  //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+  //                  -  D  -  D  -  D  L  D  L  D  L  -  L  -  L  -
+//const int rule[] = {0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1};
+//int rule = 0xfd40;
+//int rot = 0x0000;
+
+  // SingleRotate
+//const int rule[] = {0, 0, f, 1, b, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1};
+  //                  -  D  f  -  b  -  -  -  -  -  -  -  -  -  -  -
+int rule = 0xaaac;
+int rot = 0x0014;  // direction dependent toggle bits.
+
+  rule ^= (rot & int(direction * phase.x * phase.y));  // note (rot & 1) be 0
+
+  if ((rule & (1 << count)) == 0) {
+    // dead: decay to black
+    return cur * par[0];
+  } else if ((count & 1) == 0) {
+    // born: start as full white
+    return vec3(1.0, 1.0, 1.0);
   } else {
-    return vec3(1.0, 1.0, 1.0);  // pick up new life
+    // stable: decay to full red
+    return cur * vec3(1.0, par[0].y, par[0].z);
   }
-#endif
 }
 
 void main() {
