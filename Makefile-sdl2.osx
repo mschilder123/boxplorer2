@@ -13,6 +13,9 @@ BX_OBJS=boxplorer-sdl2.o interpolate.o camera.o uniforms.o shader.o
 boxplorer-sdl2: $(BX_OBJS) $(TW_OBJS)
 	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer-sdl2 $(LDFLAGS)
 
+sdl2-test: sdl2-test.cc
+	g++ $(FLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
+
 boxplorer-sdl2.o: boxplorer-sdl2.cc default_shaders.h shader_procs.h Makefile.osx \
              TGA.h cfgs/menger.cfg.data/fragment.glsl interpolate.h camera.h \
 	     uniforms.h shader.h params.h
