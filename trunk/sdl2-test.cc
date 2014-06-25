@@ -109,7 +109,7 @@ class GFX {
       window_ = SDL_CreateWindow("test",
           last_x_, last_y_,
           last_width_, last_height_,
-          SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+          SDL_WINDOW_OPENGL|SDL_WINDOW_BORDERLESS);
       width_ = last_width_;
       height_ = last_height_;
     }
@@ -139,7 +139,7 @@ class GFX {
 int main(int argc, char* argv[]) {
   GFX gfx;
 
-  gfx.resize(1280, 720);
+  gfx.resize(720, 480);
 
   int frame = 0;
   bool done = false;
