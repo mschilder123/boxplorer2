@@ -1,5 +1,5 @@
 # Needs SDL2 build in ./SDL2
-all: boxplorer-sdl2 shadershrink edit-cfg glsl
+all: boxplorer-sdl2 shadershrink edit-cfg glsl sdl2-test
 
 CFLAGS=-O2 -ISDL2/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
 
