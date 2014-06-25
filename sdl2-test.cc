@@ -9,11 +9,17 @@
 
 #include <stdio.h>
 
-#include "SDL.h"
-#include "SDL_main.h"
+#include <SDL.h>
+#include <SDL_main.h>
 
+#if defined(_WIN32)
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
+#endif
+
+#if !defined(__FUNCTION__)
+#define __FUNCTION__ "sdl2-test"
+#endif
 
 #define MAXDISPLAYS 6
 
@@ -69,7 +75,7 @@ class GFX {
     window_ = SDL_CreateWindow("test",
        last_x_, last_y_,
        w, h,
-       SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+       SDL_WINDOW_OPENGL|SDL_WINDOW_BORDERLESS);
     renderer_ = SDL_CreateRenderer(window_, d, 0);
     display_ = d;
     last_width_ = width_ = w;
