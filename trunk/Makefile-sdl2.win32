@@ -1,6 +1,6 @@
 # Needs a recent Windows SDL2 drop in ./SDL2/
 #
-all: boxplorer-sdl2.exe shadershrink.exe edit-cfg.exe glsl.exe
+all: boxplorer-sdl2.exe shadershrink.exe edit-cfg.exe glsl.exe sdl2-test.exe
 
 # LibOVR assumed to be at ./LibOVR/
 # Sixense at ./sixense/
@@ -18,6 +18,9 @@ BX_OBJS=boxplorer-sdl2.obj interpolate.obj uniforms.obj camera.obj shader.obj \
 
 boxplorer-sdl2.exe: $(BX_OBJS) $(TW_OBJS)
 	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
+
+sdl2-test.exe: sdl2-test.cc
+	cl $(CFLAGS) sdl2-test.cc $(LDFLAGS)
 
 shadershrink.exe: shadershrink.cc Makefile-sdl2.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
