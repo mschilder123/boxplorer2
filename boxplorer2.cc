@@ -1489,7 +1489,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     glBindTexture(GL_TEXTURE_2D, background_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GLint magFilter = config.backbuffer ? GL_NEAREST : GL_LINEAR;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                     GL_LINEAR_MIPMAP_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8,  // assume tga is srgb
@@ -2142,6 +2143,9 @@ int main(int argc, char **argv) {
 
   // Set up the video mode, OpenGL state, shaders and shader parameters.
   initGraphics(false, config.width, config.height);
+  if (config.fullscreen) {
+    initGraphics(true, 0, 0, 0);
+  }
 
   // Parse as many uniforms from glsl source as we can find.
   uniforms.parseFromGlsl(glsl_source);
