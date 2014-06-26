@@ -11,7 +11,7 @@ Boxplorer2 keeps a backbuffer containing the previous frame. When making that av
 Add loading interesting starting positions and it gets entertaining.
 
 For instance, try
- `./boxplorer cfgs/syntopia/life/ --lifeform=fermatprimecalculator_106.lif`
+ `./boxplorer2 cfgs/syntopia/life/ --lifeform=fermatprimecalculator_106.lif`
 and watch the mayhem unfold when the action wraps around the screen.
 
 Upon resize, the lifeform gets restarted. Larger is better.
