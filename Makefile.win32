@@ -22,16 +22,16 @@ boxplorer2.exe: $(BX_OBJS) $(TW_OBJS)
 sdl2-test.exe: sdl2-test.cc
 	cl $(CFLAGS) sdl2-test.cc $(LDFLAGS)
 
-shadershrink.exe: shadershrink.cc Makefile-sdl2.win32
+shadershrink.exe: shadershrink.cc Makefile.win32
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
 
-glsl.exe: glsl.cc TGA.h glsl.h Makefile-sdl2.win32
+glsl.exe: glsl.cc TGA.h glsl.h Makefile.win32
         cl $(CFLAGS) glsl.cc $(LDFLAGS)
 
-edit-cfg.exe: edit-cfg.cc Makefile-sdl2.win32
+edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
-boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h Makefile-sdl2.win32 \
+boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 \
         glsl.h interpolate.h uniforms.h camera.h shader.h params.h cfgs\menger.cfg.data\fragment.glsl 
 	cl -c $(CFLAGS) boxplorer2.cc
 
