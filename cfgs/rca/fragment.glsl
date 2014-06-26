@@ -61,34 +61,41 @@ vec3 color(vec2 z) {
   //                  -  D  -  -  -  -  L  D  L  D  -  -  -  -  L  -
 //const int rule[] = {0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1};
 //int rule = 0xe968;
-//int rot = 0x0000;
+//int rotf = 0x0000;
+//int rotb = 0x0000;
 
   // Billiard Ball Machine
   //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
   //                  -  D  -  -  -  -  L  -  L  D  -  -  -  -  -  -
 //const int rule[] = {0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1};
 //int rule = 0xa9e8;
-//int rot = 0x0000;
+//int rotf = 0x0000;
+//int rotb = 0x0000;
 
   // HPP Gas
   //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
   //                  -  D  -  D  -  D  L  D  L  D  L  -  L  -  L  -
 //const int rule[] = {0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1};
 //int rule = 0xfd40;
-//int rot = 0x0000;
+//int rotf = 0x0000;
+//int rotb = 0x0000;
 
   // SingleRotate
 //const int rule[] = {0, 0, f, 1, b, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1};
   //                  -  D  f  -  b  -  -  -  -  -  -  -  -  -  -  -
-int rule = 0xaaac;
-int rot = 0x0014;  // direction dependent toggle bits.
+int rule = 0xaaa8;
+int rotf = 0x0004;  // direction dependent toggle bits.
+int rotb = 0x0010;
 
-  rule ^= (rot & int(direction * phase.x * phase.y));  // note (rot & 1) be 0
+  // add rotf if going forward.
+  rule += rotf * int(clamp(direction * phase.x * phase.y, 0.0, 1.0));
+  // add rotb if going backward.
+  rule += rotb * int(clamp(-direction * phase.x * phase.y, 0.0, 1.0));
 
-  if ((rule & (1 << count)) == 0) {
+  if (fract(float(rule) / pow(2.0, float(count + 1))) < .5) {
     // dead: decay to black
     return cur * par[0];
-  } else if ((count & 1) == 0) {
+  } else if (fract(float(count) / 2.0) < .5) {
     // born: start as full white
     return vec3(1.0, 1.0, 1.0);
   } else {
