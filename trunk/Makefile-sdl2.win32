@@ -1,11 +1,11 @@
-# Needs a recent Windows SDL2 drop in ./SDL2/
-#
-all: boxplorer-sdl2.exe shadershrink.exe edit-cfg.exe glsl.exe sdl2-test.exe
-
+# Needs a SDL2 drop in ./SDL2/
 # LibOVR assumed to be at ./LibOVR/
 # Sixense at ./sixense/
+#
+all: boxplorer2.exe shadershrink.exe edit-cfg.exe glsl.exe sdl2-test.exe
 
-CFLAGS=/nologo /I. /ILibOVR/Include /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DHYDRAX
+CFLAGS=/nologo /ILibOVR/Include /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DHYDRAX
+
 LDFLAGS=/link /LIBPATH:SDL2/lib/x86 /LIBPATH:LibOVR/Lib/Win32 /LIBPATH:sixense /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
@@ -13,10 +13,10 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
 	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj TwEventSDL20.obj \
 	LoadOGLCore.obj TwOpenGLCore.obj
 
-BX_OBJS=boxplorer-sdl2.obj interpolate.obj uniforms.obj camera.obj shader.obj \
+BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj \
 				oculus_sdk.obj
 
-boxplorer-sdl2.exe: $(BX_OBJS) $(TW_OBJS)
+boxplorer2.exe: $(BX_OBJS) $(TW_OBJS)
 	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
 
 sdl2-test.exe: sdl2-test.cc
@@ -31,9 +31,9 @@ glsl.exe: glsl.cc TGA.h glsl.h Makefile-sdl2.win32
 edit-cfg.exe: edit-cfg.cc Makefile-sdl2.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
-boxplorer-sdl2.obj: boxplorer-sdl2.cc default_shaders.h shader_procs.h TGA.h Makefile-sdl2.win32 \
+boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h Makefile-sdl2.win32 \
         glsl.h interpolate.h uniforms.h camera.h shader.h params.h cfgs\menger.cfg.data\fragment.glsl 
-	cl -c $(CFLAGS) boxplorer-sdl2.cc
+	cl -c $(CFLAGS) boxplorer2.cc
 
 oculus_sdk.obj: oculus_sdk.cc oculus_sdk.h
 	cl -c $(CFLAGS) oculus_sdk.cc
