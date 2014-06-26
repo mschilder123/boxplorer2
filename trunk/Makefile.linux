@@ -17,17 +17,17 @@ sdl2-test: sdl2-test.cc
 	g++ $(CFLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
 
 boxplorer2.o: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
-	camera.h interpolate.h uniforms.h Makefile-sdl2.linux params.h \
+	camera.h interpolate.h uniforms.h Makefile.linux params.h \
 	cfgs/menger.cfg.data/fragment.glsl
 	g++ -c $(CFLAGS) boxplorer2.cc
 
-shadershrink: shadershrink.cc shadershrink.h Makefile-sdl2.linux
+shadershrink: shadershrink.cc shadershrink.h Makefile.linux
 	g++ $(CFLAGS) shadershrink.cc -o shadershrink
 
-edit-cfg: edit-cfg.cc Makefile-sdl2.linux
+edit-cfg: edit-cfg.cc Makefile.linux
 	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
 
-glsl: glsl.cc TGA.h glsl.h Makefile-sdl2.linux cfgs/menger.cfg.data/fragment.glsl
+glsl: glsl.cc TGA.h glsl.h Makefile.linux cfgs/menger.cfg.data/fragment.glsl
 	g++ $(CFLAGS) glsl.cc -o glsl
 
 interpolate.o: interpolate.cc interpolate.h
