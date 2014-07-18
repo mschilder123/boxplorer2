@@ -1923,6 +1923,7 @@ int main(int argc, char **argv) {
   bool useTime = false;
   bool configSpeed = false;
   bool fixedFov = false;
+  bool fullscreen = false;
   char* lifeform_file = NULL;
   int enableDoF = 0;
   int disableDE = 0;
@@ -1953,6 +1954,8 @@ int main(int argc, char **argv) {
       rendering = true;
     } else if (!strcmp(argv[argc-1], "--time")) {
       useTime = true;
+    } else if (!strcmp(argv[argc-1], "--fullscreen")) {
+      fullscreen = true;
     } else if (!strcmp(argv[argc-1], "--speed")) {
       configSpeed = true;
     } else if (!strcmp(argv[argc-1], "--disable-dof")) {
@@ -2020,6 +2023,8 @@ int main(int argc, char **argv) {
     // Load definition into our global string.
     readFile(lifeform_file, &lifeform);
   }
+
+  if (fullscreen) config.fullscreen = fullscreen;
 
 #if defined(_WIN32)
   if (stereoMode == ST_OCULUS) {
