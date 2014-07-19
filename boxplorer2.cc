@@ -1364,7 +1364,6 @@ bool setupDirectories(const char* configFile) {
 //
 // Exits the program if an error occurs.
 bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
-#if 0
   // Set attributes for the OpenGL window.
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1372,7 +1371,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, config.depth_size);
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-#endif
+
+  printf(__FUNCTION__ " : SetSwap %d\n", SDL_GL_SetSwapInterval(0));
 
   if(stereoMode==ST_QUADBUFFER) {
     SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
@@ -1388,6 +1388,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       return false;
     }
   }
+
+  printf(__FUNCTION__ " : GetSwap %d\n", SDL_GL_GetSwapInterval());
 
   if(stereoMode==ST_QUADBUFFER) {
     int ga = 0;
