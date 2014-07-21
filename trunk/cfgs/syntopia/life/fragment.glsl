@@ -21,14 +21,14 @@ float rand(vec2 co){
 
 void isAlive(float  dx, float  dy, inout int count) {
   vec4 v1 = texture2D( backbuffer,  position + pixelSize*vec2( dx, dy ) );
-  if (v1.x==1.0) count++;
+  count += int(v1.a);
 }
 
-vec3 color(vec2 z) {
+vec4 color(vec2 z) {
   // Ring o'fire
   if (use_bg_texture == 0) {
     if (length(z)<0.1 && length(z)>0.08) {
-      return (rand(time*z) < 0.5 ? vec3(1.0,0.0,0.0) : vec3(0.0));
+      return (rand(time*z) < 0.5 ? vec4(1.0,0.0,0.0,1.0) : vec4(0.0));
     }
   }
 
@@ -50,19 +50,37 @@ vec3 color(vec2 z) {
   
   // Rules
   if (alive==1) {
-    if (neighbours<2) return vec3(v1.x*0.99,v1.y*0.99,v1.z);
-    else if (neighbours<4) return vec3(1.0);
+    if (neighbours>1 && neighbours<4) {
+      // Stay alive; turn red.
+      return vec4(clamp(v1.r + .0001, 0.0, 1.0),
+                  v1.g * par[0].g,
+                  v1.b * par[0].b,
+                  1.0);
+    }
   } else {
-    if (neighbours==3) return vec3(1.0);
+    if (neighbours==3) {
+      // born
+      const float t = .5;
+      if (v1.a >= t) {
+        // Oscillate 1: green
+        return vec4(0.0,1.0,0.0,1.0);
+      } else if (v1.a >= t * t) {
+        // Oscilate 2: blue
+        return vec4(0.0,0.0,1.0,1.0);
+      } else {
+        // Other: yellow
+        return vec4(1.0,1.0,0.0,1.0);
+      }
+    }
   }
 
-  return v1.xyz * par[0];
-  //return vec3(v1.x*0.95,v1.y*0.98,v1.z*0.999) ;
+  // Dead, decay
+  return v1 * vec4(par[0], .5);
 }
 
 void main() {
   position = gl_FragCoord.xy * pixelSize;  // [0..1>
   vec2 z = -1.0 + 2.0 * position;          // <-1..1>
   z -= dir.xy;
-  gl_FragColor = vec4(color(z), 1.0);
+  gl_FragColor = color(z);
 }
