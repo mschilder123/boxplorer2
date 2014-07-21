@@ -27,7 +27,7 @@ float rand(vec2 co){
 void isAlive(float dx, float dy, inout int count, int factor) {
   vec4 cur = texture2D(backbuffer, position + pixelSize*vec2( dx, dy ));
   // Aliveness is tracked in r or a (except not a at first frame, to load img).
-  float alive = max(cur.r, sign(frameno)*cur.a);
+  float alive = max(cur.r, sign(float(frameno))*cur.a);
   count += int(alive) * factor;
 }
 
@@ -51,7 +51,7 @@ vec4 color(vec2 z) {
   // Direction toggle.
   phase *= direction;
 
-  float alive = max(cur.r, sign(frameno)*cur.a);
+  float alive = max(cur.r, sign(float(frameno))*cur.a);
   int count = int(alive);
 
   // Count neighbours in relative 2x2.
