@@ -1,4 +1,5 @@
-// syntopia's Fragmentarium Life
+// syntopia's Fragmentarium Life.
+// coloring and tweaks by marius.
 
 varying vec3 dir;
 
@@ -11,7 +12,6 @@ uniform int use_bg_texture;
 #define decayG par[0].y  // {min=0 max=1 step=.0001}
 #define decayB par[0].z  // {min=0 max=1 step=.0001}
 
-#define backbuffer iChannel0
 vec2 position;
 vec2 pixelSize = vec2(1.0/xres, 1.0/yres);
 
@@ -19,9 +19,10 @@ float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
-void isAlive(float  dx, float  dy, inout int count) {
-  vec4 v1 = texture2D( backbuffer,  position + pixelSize*vec2( dx, dy ) );
-  count += int(v1.a);
+void isAlive(float dx, float dy, inout int count) {
+  vec4 cur = texture2D(iChannel0,  position + pixelSize*vec2( dx, dy ) );
+  // Alive if cur.a == 1.0
+  count += int(cur.a);
 }
 
 vec4 color(vec2 z) {
@@ -32,7 +33,7 @@ vec4 color(vec2 z) {
     }
   }
 
-  vec4 v1 = texture2D( backbuffer, position);
+  vec4 cur = texture2D(iChannel0, position);
   int neighbours = 0;
   int alive = 0;
 
@@ -48,24 +49,24 @@ vec4 color(vec2 z) {
   isAlive(-1.0,0.0, neighbours);
   isAlive(-1.0,-1.0, neighbours);
   
-  // Rules
+  // Rules and coloring
   if (alive==1) {
     if (neighbours>1 && neighbours<4) {
       // Stay alive; turn red.
-      return vec4(clamp(v1.r + .0001, 0.0, 1.0),
-                  v1.g * par[0].g,
-                  v1.b * par[0].b,
+      return vec4(clamp(cur.r + .0001, 0.0, 1.0),
+                  cur.g * par[0].g,
+                  cur.b * par[0].b,
                   1.0);
     }
   } else {
     if (neighbours==3) {
       // born
       const float t = .5;
-      if (v1.a >= t) {
+      if (cur.a >= t) {
         // Oscillate 1: green
         return vec4(0.0,1.0,0.0,1.0);
-      } else if (v1.a >= t * t) {
-        // Oscilate 2: blue
+      } else if (cur.a >= t * t) {
+        // Oscillate 2: blue
         return vec4(0.0,0.0,1.0,1.0);
       } else {
         // Other: yellow
@@ -75,7 +76,7 @@ vec4 color(vec2 z) {
   }
 
   // Dead, decay
-  return v1 * vec4(par[0], .5);
+  return cur * vec4(par[0], .5);
 }
 
 void main() {
