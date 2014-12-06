@@ -1932,6 +1932,7 @@ int main(int argc, char **argv) {
   int disableSpline = 0;
   bool xbox360 = true;  // try find xbox360 controller
   int kJOYSTICK = 0;  // joystick by index
+  char* outputFilename = NULL;
 
   // Peel known options off the back..
   while (argc>1) {
@@ -1978,6 +1979,8 @@ int main(int argc, char **argv) {
       loop = true;
     } else if (!strcmp(argv[argc-1], "--no360")) {
       xbox360 = false;
+    } else if (!strncmp(argv[argc-1], "--output=", 9)) {
+      outputFilename = argv[argc-1] + 9;
     } else if (!strncmp(argv[argc-1], "--kf=", 5)) {
       kKEYFRAME = argv[argc-1] + 5;
     } else if (!strncmp(argv[argc-1], "--joystick=", 11)) {
@@ -2335,6 +2338,7 @@ int main(int argc, char **argv) {
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
@@ -3151,6 +3155,11 @@ int main(int argc, char **argv) {
 
     // We might have changed view. Preserve changes, minus HMD orientation.
     camera.unmixSensorOrientation(view_q);
+
+    if (outputFilename != NULL) {
+      saveScreenshot(outputFilename);
+      break;
+    }
   }
 
   TwTerminate();
