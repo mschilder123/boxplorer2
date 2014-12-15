@@ -30,7 +30,7 @@ extern const char *g_ErrCantUnloadOGL;
 
 //  ---------------------------------------------------------------------------
 
-#ifdef _DEBUG
+#ifdef ANT_DEBUG
     static void CheckGLCoreError(const char *file, int line, const char *func)
     {
         int err=0;

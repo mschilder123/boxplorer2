@@ -131,7 +131,7 @@ PFNGLGetVertexAttribiv _glGetVertexAttribiv = NULL;
 
 //  ---------------------------------------------------------------------------
 
-#ifdef _DEBUG
+#ifdef ANT_DEBUG
     static void CheckGLError(const char *file, int line, const char *func)
     {
         int err=0;
@@ -280,8 +280,8 @@ void CTwGraphOpenGL::BeginDraw(int _WndWidth, int _WndHeight)
         _glGetIntegerv(GL_MAX_TEXTURE_COORDS, &maxTexUnits); // was GL_MAX_TEXTURE_UNITS_ARB
         if( maxTexUnits<1 ) 
             maxTexUnits = 1;
-        else if( maxTexUnits > MAX_TEXTURES )
-            maxTexUnits = MAX_TEXTURES;
+        else if( maxTexUnits > 8/*MAX_TEXTURES*/ )
+            maxTexUnits = 8/*MAX_TEXTURES*/;
         GLint i;
         for( i=0; i<maxTexUnits; ++i )
         {
@@ -507,8 +507,8 @@ void CTwGraphOpenGL::EndDraw()
         _glGetIntegerv(GL_MAX_TEXTURE_COORDS, &maxTexUnits); // was GL_MAX_TEXTURE_UNITS_ARB
         if( maxTexUnits<1 ) 
             maxTexUnits = 1;
-        else if( maxTexUnits > MAX_TEXTURES )
-            maxTexUnits = MAX_TEXTURES;
+        else if( maxTexUnits > 8/*MAX_TEXTURES*/ )
+            maxTexUnits = 8/*MAX_TEXTURES*/;
         GLint i;
         for( i=0; i<maxTexUnits; ++i )
         {
