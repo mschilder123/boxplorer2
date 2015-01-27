@@ -1544,9 +1544,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
-      glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F,
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
                    config.width, config.height,
-                   0, GL_BGRA, xGL_FLOAT, NULL);
+                   0, GL_BGRA, GL_FLOAT, NULL);
 
       CHECK_ERROR;
 
