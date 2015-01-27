@@ -1,10 +1,10 @@
-# Needs SDL2 build in ./SDL2
+# sudo apt-get install libsdl2-dev
 #
 all: boxplorer2 shadershrink edit-cfg glsl sdl2-test
 
-CFLAGS=-O2 -ISDL2/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
+CFLAGS=-O2 -I/usr/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
 
-LDFLAGS=-lm -lGL -lX11 -LSDL2/lib -lSDL2 -lSDL2main
+LDFLAGS=-lm -lGL -lX11 -lSDL2 -lSDL2main
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o TwEventSDL20.o
 
