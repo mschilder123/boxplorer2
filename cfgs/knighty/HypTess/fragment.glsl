@@ -1,6 +1,9 @@
 // http://www.fractalforums.com/general-discussion-b77/solids-many-many-solids/msg43794/#msg43794
 // from .frag by Knighty
 
+#include "setup.inc"
+#line 7
+ 
 #define INOUT(a,b) inout a b
 #define MAX_DIST 10.0
 #define ULP 0.000000059604644775390625
@@ -9,10 +12,6 @@
 #endif
 
 uniform vec3 par[20];
-uniform float speed;
-varying float zoom;
-uniform float xres;
-uniform float time;
 uniform int nrays;        // {min=1 max=10} # of ray bounces.
 
 uniform float
@@ -33,8 +32,6 @@ uniform int iters,    // Number of fractal iterations.
 
 // Background blur
 #define BG_BLUR par[1].z  // {min=0 max=8 step=.1}
-
-varying vec3 eye, dir;
 
 //#group Hyperbolic-tesselation
 
@@ -358,18 +355,12 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
   return col;
 }
 
-#include "setup.inc"
-
 // ytalinflusa's noise [0..1>
 float pnoise(vec2 pt){ return mod(pt.x*(pt.x+0.15731)*0.7892+pt.y*(pt.y+0.13763)*0.8547,1.0); }
 
 void main() {
   vec3 eye_in, dp;
-  if (!setup_ray(eye, dir ,eye_in, dp)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
-    return;
-  }
+  if (!setup_ray(eye, dir ,eye_in, dp)) return;
 
   init();
 

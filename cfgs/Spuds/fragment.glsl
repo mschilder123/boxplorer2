@@ -4,13 +4,11 @@
 #define DIST_MULTIPLIER par[9].x  // {min=.01 max=1 step=.01}
 #define MAX_DIST 10.0
 
-// Camera position and direction.
-varying vec3 eye, dir;
+#include "setup.inc"
+#line 9
 
 // Interactive parameters.
 uniform vec3 par[10];
-uniform float speed;
-uniform float xres, yres;
 
 uniform float min_dist;           // Distance at which raymarching stops.
 uniform float ao_eps;             // Base distance at which ambient occlusion is estimated.
@@ -158,9 +156,6 @@ float trace(inout vec3 p, in vec3 dp, inout float D, inout float totalD, in floa
   return float(steps);
 }
 
-#include "setup.inc"
-#line 163
-
 float de_for_host(vec3 p) { return DE(p); }
 
 void main() {
@@ -221,5 +216,6 @@ void main() {
     refpart*=REFACTOR;
   }
 
-  write_pixel(dir, firstD, pow(finalcol, vec3(2.2)));
+  write_pixel(dir, firstD, pow(finalcol, vec3(2.0)));
+  //write_pixel(dir, firstD, finalcol);
 }

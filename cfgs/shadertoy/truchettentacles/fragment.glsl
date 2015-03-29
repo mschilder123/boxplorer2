@@ -1,15 +1,11 @@
 // From https://www.shadertoy.com/view/ldfGWn
 
-// boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
+#include "setup.inc"
+#line 5
 
 // Map to shadertoy expected vars
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
-
-#include "setup.inc"
-#line 12
 
 float rand(vec3 r) { return fract(sin(dot(r.xy,vec2(1.38984*sin(r.z),1.13233*cos(r.z))))*653758.5453); }
 

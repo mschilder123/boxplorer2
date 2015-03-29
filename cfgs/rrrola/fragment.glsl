@@ -18,6 +18,10 @@
 #define c c_mandelbox  // PKlein,menger
 #endif
 
+#include "setup.inc"
+#line 23
+
+// Colors. Can be negative or >1 for interestiong effects.
 #endif  // _FAKE_GLSL_
 
 uniform bool julia;
@@ -26,14 +30,8 @@ uniform bool julia;
 #define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
 
-#define DIST_MULTIPLIER par[8].z  // {min=.01 max=1.0 step=.01}
+#define DIST_MULTIPLIER par[8].z  // {min=.01 max=2.0 step=.01}
 #define MAX_DIST 10.0
-
-uniform float xres, yres, speed;
-
-// Camera position and direction.
-varying vec3 eye, dir;
-varying float zoom;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -48,12 +46,11 @@ uniform int iters;  // Number of fractal iterations. {min=0 max=500 step=1}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=0 max=500 step=1}
 uniform int max_steps;  // Maximum raymarching steps. {min=0 max=1000 step=1}
 
-// Colors. Can be negative or >1 for interestiong effects.
 vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   surfaceColor1 = vec3(0.95, 0.64, 0.1),
   surfaceColor2 = vec3(0.89, 0.95, 0.75),
   surfaceColor3 = vec3(0.55, 0.06, 0.03),
-  specularColor = vec3(1.0, 0.8, 0.4) * 1.0,
+  specularColor = vec3(1.0, 0.8, 0.4) * 4.0,
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
@@ -68,9 +65,11 @@ void init() {
 
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, -MB_SCALE) / minRad2;
+  if (scale.w < 0) scale.w = abs(scale.w);
   
   float s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
+  //for (int i=0; i<int(float(iters) * detail); i++) s*= ds;
   for (int i=0; i<iters; i++) s*= ds;
   absScalePowIters = s;
   
@@ -85,12 +84,14 @@ void init() {
     );
 }
 
+#define JL par[0].z // {min=0 max=1 step=1}
 float de_mandelbox(vec3 pos) {
   vec4 p = vec4(pos,1.0);  // p.w is the distance estimate
   vec4 P0;
-  if (julia) P0 = vec4(JuliaVector, 1.0); else P0 = p;
+  if (julia) P0 = vec4(JuliaVector, JL); else P0 = p;
+  int it = iters; //int(float(iters)*detail);
 if (rotationAngle == 0.)
-  for (int i=0; i<iters; i++) {
+  for (int i=0; i<it; i++) {
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
@@ -98,7 +99,7 @@ if (rotationAngle == 0.)
     //if (r2 > 1000.0) break;
   }
 else
-  for (int i=0; i<iters; i++) {
+  for (int i=0; i<it; i++) {
     p = vec4(rotationMatrix * p.xyz, p.w);
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
@@ -106,8 +107,12 @@ else
     p = p*scale + P0;
     //if (r2 > 1000.0) break;
   }
+#if 1
   return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-            - absScalePowIters) * 0.95 * DIST_MULTIPLIER;
+            - absScalePowIters) * DIST_MULTIPLIER;
+#else
+  return length(p.xyz) / abs(p.w);
+#endif
 }
 DECLARE_DE(de_mandelbox)
 
@@ -136,7 +141,7 @@ else
   }
   // c.x: log final distance (fractional iteration count)
   // c.y: spherical orbit trap at (0,0,0)
-  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 1.0);
+  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 2.0);
   return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
 }
 DECLARE_COLORING(c_mandelbox)
@@ -147,11 +152,18 @@ float normal_eps = 0.000001;
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos) {
   vec2 Eps = vec2(0, max(normal_eps, d_pos));
+#if 0
   return normalize(vec3(
     -d(pos-Eps.yxx)+d(pos+Eps.yxx),
     -d(pos-Eps.xyx)+d(pos+Eps.xyx),
     -d(pos-Eps.xxy)+d(pos+Eps.xxy)
   ));
+#else
+  // Eiffie's denormal
+  vec3 dn = vec3(d(pos-Eps.yxx),d(pos-Eps.xyx),d(pos-Eps.xxy));
+  vec3 dp = vec3(d(pos+Eps.yxx),d(pos+Eps.xyx),d(pos+Eps.xxy));
+  return (dp-dn)/(length(dp-vec3(d_pos))+length(vec3(d_pos)-dn));
+#endif
 }
 
 // Blinn-Phong shading model with rim lighting (diffuse light bleeding to the other side).
@@ -197,8 +209,6 @@ float noise( in vec2 x ) {
     return fract(res);
 }
 
-#include "setup.inc"
-
 // from http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
 vec3 rgb2hsv(vec3 c) {
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -219,33 +229,56 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
   vec3 eye_in, dp; 
 
-  if (!setup_ray(eye, dir, eye_in, dp)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
-    return;
-  }
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
+#if 0
+{
+  vec2 p = -1. + 2.*gl_FragCoord.xy / vec2(xres, yres);
+  float lp = length(p);
+  detail = 1.0 - .5 * smoothstep(.1, .8, lp);
+}
+#endif
 
   init();
 
-  float m_zoom = zoom * 0.5 / xres;
-  float noise = noise(gl_FragCoord.xy / vec2(xres, yres));
+  float m_zoom = zoom * 0.5 / (xres * pow(detail, 3.0));
+  float noise = noise(gl_FragCoord.xy * time);
 
   vec3 p = eye_in;
   float D = d(p);
   float side = sign(D);
-  float totalD = side * D;   // Randomize first step.
+  float totalD = side * noise * D;   // Randomize first step.
 
   // Intersect the view ray with the Mandelbox using raymarching.
   float m_dist = m_zoom * totalD;
+
+//#define OVERSTEP
+#ifdef OVERSTEP
+  float os = 0.;
+#define sf par[0].z  // {min=0 max=2 step=.01}
+#endif  // oVERSTEP
   int steps;
   for (steps=0; steps<max_steps; steps++) {
     D = (side * d(p + totalD * dp));
     if (D < m_dist) break;
+#ifdef OVERSTEP
+    if (D < os) {
+      // might have overstepped
+      totalD -= os;
+      steps--;
+      continue;
+    } else {
+      os = sf * D;
+      totalD += D + os;
+    }
+#else  // OVERSTEP
     totalD += D;
+#endif  // OVERSTEP
+
     if (totalD > MAX_DIST) break;
     m_dist =  m_zoom * totalD;
   }
 
+#if 1
   // If we got a hit, find desired distance to surface.
   // Likely our hit was lot closer than m_dist; make it approx. m_dist.
   if (D < m_dist) {
@@ -255,6 +288,7 @@ void main() {
       D = d(p + totalD * dp);
     }
   }
+#endif
 
   p += totalD * dp;
 
@@ -263,7 +297,7 @@ void main() {
 
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
-    vec3 n = normal(p, D/*m_dist*/);
+    vec3 n = normal(p, D);
     col = c(p);
 #if 1
     col = blinn_phong(n, -dp,
@@ -332,5 +366,5 @@ void main() {
             glowColor,
             (float(steps)+noise)/float(max_steps) * glow_strength);
 
-  write_pixel(dir, totalD, col);
+  write_pixel(dir, totalD, sqrt(detail) * col);
 }

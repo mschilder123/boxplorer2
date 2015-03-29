@@ -25,6 +25,9 @@ KeyFrame::KeyFrame() {
   n_iunis = 0;
   n_funis = 0;
   isKey_ = false;
+  // Defaults
+  enable_dof = 1;
+  enable_fxaa = 1;
 }
 
 double KeyFrame::distanceTo(const KeyFrame& other) const {
@@ -72,7 +75,7 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
     for (int j=0; j<3; j++) v[i+j*4] = dot(c, r[j]);
   }
   orthogonalize();
-  bg_weight = 0;
+  iBackbufferCount = 0;
 }
 
 void* KeyFrame::map_address(const string& type, const string& name, int n) {

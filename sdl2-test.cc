@@ -144,6 +144,21 @@ int main(int argc, char* argv[]) {
   int frame = 0;
   bool done = false;
 
+  SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+  SDL_Joystick* joystick = SDL_JoystickOpen(2);
+
+    printf(__FUNCTION__ " : JoystickName '%s'\n",
+             SDL_JoystickName(joystick));
+    printf(__FUNCTION__ " : JoystickNumAxes   : %i\n",
+           SDL_JoystickNumAxes(joystick));
+    printf(__FUNCTION__ " : JoystickNumButtons: %i\n",
+           SDL_JoystickNumButtons(joystick));
+    printf(__FUNCTION__ " : JoystickNumHats   : %i\n",
+           SDL_JoystickNumHats(joystick));
+   SDL_JoystickEventState(SDL_ENABLE);
+
+  Sint16 axes[6] = {0};
+
   while(!done) {
     ++frame;
 
@@ -175,8 +190,35 @@ int main(int argc, char* argv[]) {
             gfx.resize(event.window.data1, event.window.data2);
           }
         } break;
+        case SDL_JOYBUTTONDOWN:
+        case SDL_JOYBUTTONUP:
+        {
+          printf("%s:%d\n",
+                 event.jbutton.type == SDL_JOYBUTTONDOWN?"dn":"up",
+                 event.jbutton.button
+          );
+        } break;
+        case SDL_JOYAXISMOTION:
+        {
+          Sint16 v = event.jaxis.value;
+          if (v < -5000 || v > 5000) {
+            axes[event.jaxis.axis] = v;
+            for (int i = 0; i < 6; ++i) {
+              printf("%d:%8d ",
+                     i, axes[i]);
+            }
+            printf("\n");
+          }
+        } break;
       }
     }
+
+    const Uint8* state =SDL_GetKeyboardState(NULL);
+    if (state[SDL_SCANCODE_W]) {
+            printf("W");
+    }
+
+    fflush(stdout);
   }
 
   return 0;

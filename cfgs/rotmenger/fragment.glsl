@@ -32,7 +32,7 @@ uniform float
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
 
-uniform float speed;
+uniform float xres, yres, speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
@@ -180,18 +180,14 @@ float ambient_occlusion(vec3 p, vec3 n) {
   return clamp(ao, 0.0, 1.0);
 }
 
+#include "setup.inc"
+#line 185
 
 void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp;
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
-  vec3 p = eye_in, dp = normalize(dir);
-
-  float odd = fract(gl_FragCoord.y * .5);
-  float displace = (4. * odd - 1.) * speed;
-  p += displace * vec3(gl_ModelViewMatrix[0]);
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
 
@@ -240,11 +236,5 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

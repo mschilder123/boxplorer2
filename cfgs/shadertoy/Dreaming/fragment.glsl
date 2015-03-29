@@ -1,15 +1,10 @@
 // By Kali, from https://www.shadertoy.com/view/ldXGDl
 
-uniform float xres, yres, speed, time;
-uniform sampler2D bg_texture; 
-varying vec3 eye, dir;
-
 #include "setup.inc"
-#line 8
+#line 5
 
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
-#define iChannel0 bg_texture
 
 void main(void)
 {

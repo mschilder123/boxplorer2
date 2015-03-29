@@ -41,7 +41,7 @@ uniform float
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
 
-uniform float time, speed;
+uniform float xres, yres, time, speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
@@ -188,9 +188,13 @@ float ambient_occlusion(vec3 p, vec3 n) {
   return clamp(ao, 0.0, 1.0);
 }
 
+#include "setup.inc"
+#line 193
 
 void main() {
-  vec3 p = eye, dp = normalize(dir);
+  vec3 p = eye, dp;
+
+  if (!setup_ray(eye, dir, p, dp)) return;
 
   float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
 
@@ -239,11 +243,5 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zNear = abs(speed);
-  float zFar = 65535.0*zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

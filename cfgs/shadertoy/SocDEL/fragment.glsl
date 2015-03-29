@@ -2,8 +2,8 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // From https://www.shadertoy.com/view/lsjGzW
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
+#include "setup.inc"
+#line 7
 uniform vec3 par[20];
 uniform int iters;
 uniform int max_steps;
@@ -12,8 +12,6 @@ vec2 size = vec2(xres, yres);
 
 float DE(vec3);
 float de_for_host(vec3 p) { return DE(p); }
-#include "setup.inc"
-#line 17
 
 #define aperture par[1].x //{min=.001 max=0.5 step=.001}
 #define focalDistance par[1].y  //{min=0 max=5 step=.01}

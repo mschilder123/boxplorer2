@@ -2,18 +2,12 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // From https://www.shadertoy.com/view/lsf3zr
 
-// boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
-uniform sampler2D bg_texture;
+#include "setup.inc"
+#line 7
 
-#define iChannel0 bg_texture
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = dir;
-
-#include "setup.inc"
-#line 16
 
 float fbm( vec3 p, vec3 n )
 {
@@ -352,7 +346,7 @@ void main( void )
   vec3 col = sqrt( colz.xyz );
   
   // vigneting
-  col *= 0.25+0.75*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.15 );
+//  col *= 0.25+0.75*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.15 );
 
   write_pixel(dir, colz.w, col);
 }

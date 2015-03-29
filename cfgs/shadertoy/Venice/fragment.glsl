@@ -6,18 +6,13 @@
 // (I have never been in Venice btw)
 //
 
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
-uniform sampler2D bg_texture;
-
-#define iChannel0 bg_texture
-#define iChannel1 bg_texture
-#define iChannel2 bg_texture
-#define iChannel3 bg_texture
-vec2 iResolution = vec2(xres, yres);
-
 #include "setup.inc"
-#line 20
+#line 11
+
+#define iChannel1 iChannel0
+#define iChannel2 iChannel0
+#define iChannel3 iChannel0
+vec2 iResolution = vec2(xres, yres);
 
 // #define SHOW_ORNAMENTS
 #define SHOW_GALLERY

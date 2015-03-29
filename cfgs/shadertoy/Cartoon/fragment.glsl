@@ -8,18 +8,14 @@
 
 // There are no lights and no AO, only color by normals and dark edges.
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
-uniform sampler2D my_texture;
-uniform int iters, max_steps;
-
 #include "setup.inc"
-#line 17
+#line 13
+
+uniform int iters, max_steps;
 
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = vec3(0.);
 float iGlobalTime = time;
-#define iChannel0 my_texture
 
 //#define SHOWONLYEDGES
 #define WAVES
@@ -74,7 +70,7 @@ float de(vec3 pos) {
   return d;
 }
 
-float de_for_host(vec3 p) { return de(p); }
+//float de_for_host(vec3 p) { return de(p); }
 
 // Camera path
 vec3 path(float ti) {
@@ -99,7 +95,7 @@ vec3 normal(vec3 p) {
 
 // Raymarching and 2D graphics
 
-vec3 raymarch(in vec3 from, in vec3 dir) 
+vec4 raymarch(in vec3 from, in vec3 dir) 
 {
   edge=0.;
   vec3 p, norm;
@@ -137,7 +133,7 @@ vec3 raymarch(in vec3 from, in vec3 dir)
   
   col=mix(vec3(1.,.9,.3),col,exp(-.004*totdist*totdist));// distant fading to sun color
   if (totdist>25.) col=backg; // hit background
-  return col;
+  return vec4(col, totdist);
 }
 
 // get camera position
@@ -171,7 +167,8 @@ void main(void)
   if (!setup_ray(eye, dir, from, ddir)) {  // boxplorify view
     return;
   }
-  vec3 color=raymarch(from,ddir);
+  vec4 colordist=raymarch(from,ddir);
+  vec3 color=colordist.rgb;
   color=pow(color,vec3(GAMMA))*BRIGHTNESS;
   color=mix(vec3(length(color)),color,SATURATION);
 
@@ -184,5 +181,5 @@ void main(void)
  #endif
 #endif
   //gl_FragColor = vec4(color,1.);
-  write_pixel(dir, 1., color);  // boxplorify write
+  write_pixel(dir, colordist.a, color);  // boxplorify write
 }

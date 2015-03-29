@@ -2,16 +2,14 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // just trying to find a use for the new DoF renderer
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
+#include "setup.inc"
+#line 7
+
 uniform vec3 par[20];
 uniform int iters;
 uniform int max_steps;
 
 vec2 size = vec2(xres, yres);
-
-#include "setup.inc"
-#line 14
 
 //const float focalDistance=1.5,aperature=0.01,fudgeFactor=0.9;
 #define aperature par[1].x //{min=.001 max=0.5 step=.001}

@@ -43,6 +43,10 @@ uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
 uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
 
+uniform float xres, yres;
+
+#include "setup.inc"
+
 // Colors. Can be negative or >1 for interesting effects.
 vec3 specularColor = vec3(.9, 0.8, 0.4);
 vec3 aoColor = vec3(0, 0, 0);
@@ -184,24 +188,9 @@ float ambient_occlusion(vec3 p, vec3 n, int niters) {
   return clamp(ao, 0.0, 1.0);
 }
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 15x speed.
-void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
-#if !defined(ST_NONE)
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  dp = normalize(dir * (focus + 15.0) * abs(speed) - eye_d);
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-}
-
 void main() {
-  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  vec3 eye_in, dp; 
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
   vec3 p = eye_in;
   float totalD = 0.0, D = 0.0;
@@ -249,11 +238,5 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zNear = abs(speed);
-  float zFar = 65535.0*speed;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

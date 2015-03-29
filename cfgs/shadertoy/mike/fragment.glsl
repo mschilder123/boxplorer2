@@ -2,19 +2,11 @@
 // done by visual inspiration from the first picture you get in google images when you 
 // type "mike wazowski".
 
-// Camera position and direction.
-varying vec3 eye;
-varying vec3 dir;
-
-uniform float xres, yres, time, speed;
-uniform sampler2D bg_texture;
+#include "setup.inc"
+#line 7
 
 vec2 iResolution = vec2(xres, yres);
 float iGlobalTime = time;
-#define iChannel0 bg_texture
-
-#include "setup.inc"
-#line 18
 
 //uniform vec2      iResolution;     // viewport resolution (in pixels)
 //uniform float     iGlobalTime;     // shader playback time (in seconds)

@@ -3,15 +3,11 @@
 // This has been kicked out of Shadertoy due to lack of stability.
 // Handle with care!
 
-varying vec3 eye;
-varying vec3 dir;
-varying float zoom;
+#include "setup.inc"
+#line 8
 
-uniform float xres, yres, time, speed;
 uniform int iters;    // {min=1 max=1000} Number of fractal iterations.
 uniform int color_iters;    // {min=1 max=1000} Number of fractal iterations.
-
-#include "setup.inc"
 
 //precision mediump float;
 

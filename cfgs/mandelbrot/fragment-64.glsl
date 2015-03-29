@@ -1,9 +1,16 @@
+#extension GL_ARB_gpu_shader_fp64 : enable
 // 2D Mandelbrot
 // shader parts from https://github.com/Syntopia/Fragmentarium
 
 // Camera position and direction.
 varying vec3 eye, dir;
-uniform dvec3 deye;
+#if 0
+// wtf is wrong w/ AMD?
+uniform dvec3 deye;  // eye position in double precision
+#else
+uniform double deyex, deyey, deyez;
+dvec3 deye = dvec3(deyex, deyey, deyez);
+#endif
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -145,7 +152,7 @@ void main() {
   float zNear = 0.0001;
   float a = zFar / (zFar - zNear);
   float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
+  float depth = (a + b / float(clamp(totalD/length(dir), zNear, zFar)));
   gl_FragDepth = depth;
   gl_FragColor = vec4(col, depth);
 }

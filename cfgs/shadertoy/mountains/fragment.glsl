@@ -7,15 +7,12 @@
 // Video of my OpenGL version that uses streaming texture normals for speed...
 // http://www.youtube.com/watch?v=qzkBnCBpQAM
 
-// boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
+#include "setup.inc"
+#line 13
 
 // Map to shadertoy expected vars
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
-
-#include "setup.inc"
 
 vec3 sunLight  = normalize( vec3(  0.4, 0.4,  0.48 ) );
 vec3 sunColour = vec3(1.0, .9, .83);

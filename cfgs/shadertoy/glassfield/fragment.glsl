@@ -1,19 +1,15 @@
 //"Glass Field" by Kali
 // From https://www.shadertoy.com/view/4ssGWr
 
-// boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
+#include "setup.inc"
+#line 6
 
 // Map to shadertoy expected vars
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 
-#include "setup.inc"
-
-#define lightcol1 vec3(1.,.95,.85)
-#define lightcol2 vec3(.85,.95,1.)
-
+#define lightcol1 vec3(1.,.295,.285)
+#define lightcol2 vec3(.285,.295,1.)
 
 //Rotation matrix by Syntopia
 mat3 rotmat(vec3 v, float angle)
@@ -30,7 +26,7 @@ mat3 rotmat(vec3 v, float angle)
 //Smooth min by IQ
 float smin( float a, float b )
 {
-    float k = 0.5;
+  float k = 0.5;
 	float h = clamp( 0.5 + 0.5*(b-a)/k, 0.0, 1.0 );
 	return mix( b, a, h ) - k*h*(1.0-h);
 }
@@ -45,7 +41,7 @@ float de(vec3 pos) {
 	cyl=min(cyl,length(p.xz))-.4;
 	cyl=min(cyl,length(p.yz))-.4;
 	//cyl=min(cyl,length(p.yz-(cyl*.5)))-.4;
-    return smin(cyl,sph);
+  return smin(cyl,sph);
 }
 
 // finite difference normal
@@ -84,9 +80,7 @@ void main(void) {
 	vec3 light1=normalize(vec3(cos(time),sin(time*3.)*.5,sin(time)));
 	vec3 light2=normalize(vec3(cos(time),sin(time*3.)*.5,-sin(time)));
 
-  if (!setup_ray( eye, dir, from, raydir )) {  // boxplorify view
-    return;
-  }
+  if (!setup_ray( eye, dir, from, raydir )) return;  // boxplorify view
 
 	for (int r=0; r<80; r++) {
 		vec3 p=from+totdist*raydir;
@@ -128,7 +122,7 @@ void main(void) {
 	col+=1.5*lightcol2*pow(max(0.,max(0.,dot(raydir,light2))),10.)*glassfade; 
 	//col+=vec3(sin(time*10.)+1.,0.,0.)*.8*pow(max(0.,max(0.,dot(raydir,vec3(0.,0.,1.)))),5.)*glassfade; 
 
-	col*=min(1.,time); //fade in
+	//col*=min(1.,time); //fade in
 
   write_pixel(dir, totdist, col);  // boxplorify write
 }

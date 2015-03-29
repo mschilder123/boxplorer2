@@ -1,10 +1,10 @@
 // Menger-sphere shader by marius. Parts by knighty, Rrrola.
 // See http://www.fractalforums.com/3d-fractal-generation/revenge-of-the-half-eaten-menger-sponge/
 
-#define MAX_DIST 4.0
+#include "setup.inc"
+#line 6
 
-// Camera position and direction.
-varying vec3 eye, dir;
+#define MAX_DIST 4.0
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -15,11 +15,10 @@ uniform float ao_strength;  // Strength of ambient occlusion. {min=0 max=.01 ste
 uniform float glow_strength;  // How much glow is applied after max_steps. {min=0 max=10 step=.05}
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.05}
 
-uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
-
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
 uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
+
 
 // Colors. Can be negative or >1 for interesting effects.
 #define backgroundColor par[7]
@@ -180,24 +179,9 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side) {
   return clamp(ao, 0.0, 1.0);
 }
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 15x speed.
-void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
-#if !defined(ST_NONE)
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  dp = normalize(dir * (focus + 15.0) * abs(speed) - eye_d);
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-}
-
 void main() {
-  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  vec3 eye_in, dp;
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
   vec3 p = eye_in;
 
@@ -239,11 +223,5 @@ void main() {
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
   // Write zBuffer and pixel
-  float zNear = abs(speed);
-  float zFar = zNear * 65535.0;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

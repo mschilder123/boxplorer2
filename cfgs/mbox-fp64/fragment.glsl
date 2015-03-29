@@ -40,7 +40,7 @@
 varying vec3 eye, dir;
 varying float zoom;
 uniform float xres, yres;
-uniform float dof_scale;  // {min=0.0 max=10.0 step=0.01}
+uniform float aperture;  // {min=0.0 max=10.0 step=0.01}
 
 #if 0
 // wtf is wrong w/ AMD?
@@ -308,7 +308,7 @@ void main() {
   // compute CoC, thin lens model
   double P = abs(focus + 30.0) * zNear;
   D = totalD;
-  double A = dof_scale;  //~aperture;
+  double A = aperture;  //~aperture;
   double F = 8.*abs(dspeed); //~focalLength;
   double CoC = abs(A*(F*(P-D))/(D*(P-F)));
 

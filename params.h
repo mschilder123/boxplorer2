@@ -28,9 +28,10 @@
   PROCESS(double, time, "time", true) \
   PROCESS(float, fps, "fps", false) \
   PROCESS(int, depth_size, "depth_size", false) \
-  PROCESS(float, dof_scale, "dof_scale", true) \
+  PROCESS(float, aperture, "aperture", true) \
   PROCESS(float, dof_offset, "dof_offset", true) \
   PROCESS(int, enable_dof, "enable_dof", false) \
+  PROCESS(int, enable_fxaa, "enable_fxaa", false) \
   PROCESS(int, disable_de, "disable_de", false) \
   PROCESS(int, no_spline, "no_spline", false) \
   PROCESS(float, focus, "focus", true) \
@@ -40,9 +41,10 @@
   PROCESS(int, use_bg_texture, "use_bg_texture", false) \
   PROCESS(int, backbuffer, "backbuffer", false) \
   PROCESS(int, julia, "julia", true) \
-  PROCESS(int, bg_weight, "bg_weight", true) \
+  PROCESS(int, iBackbufferCount, "iBackbufferCount", false) \
   PROCESS(int, frameno, "frameno", false) \
   PROCESS(int, fxaa, "fxaa", false) \
+  PROCESS(float, ipd, "ipd", false) \
   PROCESS(float, exposure, "exposure", true) \
   PROCESS(float, maxBright, "maxBright", true) \
   PROCESS(float, gamma, "gamma", true)

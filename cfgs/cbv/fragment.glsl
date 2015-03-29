@@ -62,5 +62,5 @@ void main() {
   vec2 pixelSize = vec2(1.0/xres, 1.0/yres);
   vec2 position = gl_FragCoord.xy * pixelSize;  // [0..1>
   vec4 c = color(position + pixelSize * .5);
-  gl_FragColor = vec4(pow(c.rgb, 1.0 / 2.2), c.w);
+  gl_FragColor = vec4(pow(c.rgb, vec3(1.0 / 2.2)), c.w);
 }

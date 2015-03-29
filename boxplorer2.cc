@@ -36,7 +36,7 @@
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
 
-#include "oculus_sdk.h"
+#include "oculus_sdk4.h"
 
 #if defined(HYDRA)
 #include <sixense.h>
@@ -95,7 +95,7 @@ using namespace std;
 #define CHECK_STATUS(f, v) { \
     GLenum __s; \
     if ((__s = (f)) != (v)) { \
-      die(__FUNCTION__ "[%d] : %s() : %04x\n", __LINE__, #f, __s); \
+      printf(__FUNCTION__ "[%d] : %s() : %04x\n", __LINE__, #f, __s); \
     }}
 
 #define CHECK_ERROR \
@@ -394,8 +394,21 @@ enum StereoMode { ST_NONE=0,
                   ST_QUADBUFFER,
                   ST_OCULUS,
                   ST_ANAGLYPH,
+                  ST_SPHERICAL,
+                  ST_DOME,
                   ST_COMPUTE_DE_ONLY
 } stereoMode = ST_NONE;
+
+// For seamless cube rendering.
+typedef int ViewQuadrant;
+#define VQ_FRONT 0
+#define VQ_BACK 1
+#define VQ_UP 2
+#define VQ_DOWN 3
+#define VQ_RIGHT 4
+#define VQ_LEFT 5
+#define VQ_DONE 6
+#define VQ_LETTER "fbudrl"
 
 #define NFBO 2
 // ogl framebuffer object(s).
@@ -407,15 +420,16 @@ GLuint mainTex[NFBO];
 GLuint mainDepth[NFBO];
 
 // Fbo and texture for fxaa output.
-GLuint fxaaFbo;
-GLuint fxaaTex;
+GLuint fxaaFbo = -1;
+GLuint fxaaTex = -1;
 
 // Fbo and texture for tmp rendering pass.
-GLuint scratchFbo;
-GLuint scratchTex;
+GLuint scratchFbo = -1;
+GLuint scratchTex = -1;
 
 // framebuffer(s) for post-process blur.
 // We have 2: one holding square and one a diamond.
+// TODO: per eye for xfire?
 #define NBLUR 2
 
 GLuint blurFbo[NBLUR];
@@ -505,17 +519,11 @@ char* _readFile(char const* name) {
 bool readFile(const string& name, string* content) {
   string filename(WorkingDir + name);
   char* s = _readFile(filename.c_str());
-  if (!s) return false;
-  content->assign(s);
-  free(s);
-  printf(__FUNCTION__ " : read '%s'\n", filename.c_str());
-  return true;
-}
-
-bool readIncludeFile(const string& name, string* content) {
-  string filename(BaseDir + "include/" + name);
-  char* s = _readFile(filename.c_str());
-  if (!s) return false;
+  if (!s) {
+    filename = BaseDir + "include/" + name;
+    s = _readFile(filename.c_str());
+    if (!s) return false;
+  }
   content->assign(s);
   free(s);
   printf(__FUNCTION__ " : read '%s'\n", filename.c_str());
@@ -586,15 +594,50 @@ class Camera : public KeyFrame {
   public:
    Camera& operator=(const KeyFrame& other) {
     *((KeyFrame*)this) = other;
-    bg_weight = 0;  // reset progressive rendering count.
+    iBackbufferCount = 0;  // reset progressive rendering count.
     return *this;
    }
 
    // Set the OpenGL modelview matrix to the camera matrix, for shader.
-   void activate() {
+   void activate(ViewQuadrant vq = VQ_FRONT) {
       orthogonalize();
       glMatrixMode(GL_MODELVIEW);
-      glLoadMatrixd(v);
+      // Tweak view for desired quadrant.
+      double m[16];
+      memcpy(m, v, sizeof(m));
+      switch (vq) {
+        case VQ_FRONT:
+          //m[0] = v[0]; m[1] = v[1]; m[2] = v[2];  // right
+          //m[4] = v[4]; m[5] = v[5]; m[6] = v[6];  // up
+          //m[8] = v[8]; m[9] = v[9]; m[10] = v[10];  // ahead
+          break;
+        case VQ_BACK:
+          // ahead = -ahead; right = -right
+          m[0] = -v[0]; m[1] = -v[1]; m[2] = -v[2];
+          m[8] = -v[8]; m[9] = -v[9]; m[10] = -v[10];
+          break;
+        case VQ_UP:
+          // ahead = up; up = -ahead;
+          m[4] = -v[8]; m[5] = -v[9]; m[6] = -v[10];
+          m[8] = v[4]; m[9] = v[5]; m[10] = v[6];
+          break;
+        case VQ_DOWN:
+          // ahead = -up; up = ahead
+          m[4] = v[8]; m[5] = v[9]; m[6] = v[10];
+          m[8] = -v[4]; m[9] = -v[5]; m[10] = -v[6];
+          break;
+        case VQ_RIGHT:
+          // ahead = right; right = -ahead 
+          m[0] = -v[8]; m[1] = -v[9]; m[2] = -v[10];
+          m[8] = v[0]; m[9] = v[1]; m[10] = v[2];
+          break;
+        case VQ_LEFT:
+          // ahead = -right; right = ahead 
+          m[0] = v[8]; m[1] = v[9]; m[2] = v[10];
+          m[8] = -v[0]; m[9] = -v[1]; m[10] = -v[2];
+          break;
+      }
+      glLoadMatrixd(m);
    }
 
    // Set the OpenGL modelview and projection for gl*() functions.
@@ -718,7 +761,11 @@ class Camera : public KeyFrame {
      if (glow_strength <= 0) glow_strength = 0.25;
      if (dist_to_color <= 0) dist_to_color = 0.2;
 
-     bg_weight = 0;  // No samples in backbuffer yet.
+     if (exposure == 0) exposure = 1.0;
+     if (maxBright == 0) maxBright = 1.0;
+     if (gamma == 0) gamma = 1.0;
+
+     iBackbufferCount = 0;  // No samples in backbuffer yet.
 
      orthogonalize();
      mat2quat(this->v, this->q);
@@ -782,8 +829,9 @@ class Camera : public KeyFrame {
      glSetUniformf(time);
 
      glUniform1f(glGetUniformLocation(program, "speed"), spd);
-     glUniform1f(glGetUniformLocation(program, "xres"), window.width());
-     glUniform1f(glGetUniformLocation(program, "yres"), window.height());
+     glUniform1f(glGetUniformLocation(program, "ipd"), config.ipd);
+     glUniform1f(glGetUniformLocation(program, "xres"), config.width);
+     glUniform1f(glGetUniformLocation(program, "yres"), config.height);
 
      // Also pass in some double precision values, if supported.
      if (glUniform1d) {
@@ -808,8 +856,8 @@ class Camera : public KeyFrame {
      uniforms.send(program);
    }
 
-   void render(enum StereoMode stereo) {
-     activate();  // Load view matrix for shader.
+   void render(enum StereoMode stereo, ViewQuadrant vq = VQ_FRONT) {
+     activate(vq);  // Load view matrix for shader.
      switch(stereo) {
        case ST_OVERUNDER: {  // left / right
          setUniforms(1.0, 0.0, 2.0, 1.0, +speed);
@@ -838,8 +886,9 @@ class Camera : public KeyFrame {
          glRectf(0,-1,1,1);  // draw right half of screen
          } break;
        case ST_NONE:
+       case ST_SPHERICAL:
+       case ST_DOME:
          setUniforms(1.0, 0.0, 1.0, 0.0, speed);
-         // Draw screen in N (==2 for now) steps for x-fire / sli
          glRects(-1,-1,0,1);  // draw left half
          glRects(0,-1,1,1);  // draw right half
          break;
@@ -939,6 +988,7 @@ void suggestDeltaTime(KeyFrame& camera, const vector<KeyFrame>& keyframes) {
 }
 
 #define NSUBFRAMES 100  // # splined subframes between keyframes.
+// TODO: make relative to delta_time, thus more like max fps.
 
 void CatmullRom(const vector<KeyFrame>& keyframes,
                 vector<KeyFrame>* output,
@@ -1267,7 +1317,7 @@ bool setupShaders(Shader* fractal, const char* extra_define = NULL) {
     string name(fragment, name_start, name_end - name_start);
     size_t line_end = fragment.find("\n", inc_pos);
     string inc;
-    readIncludeFile(name, &inc);
+    readFile(name, &inc);
     fragment.replace(inc_pos, line_end - inc_pos, inc);
   }
 
@@ -1294,15 +1344,13 @@ bool setupShaders2(void) {
 
   bool ok = (effects.compile(defines, vertex, fragment) != 0);
 
-  string dof_vertex;
-  string dof_fragment;
-
-  readFile(DOF_VERTEX_SHADER_FILE, &dof_vertex);
-  readFile(DOF_FRAGMENT_SHADER_FILE, &dof_fragment);
-
-  if (!dof_vertex.empty() && !dof_fragment.empty()) {
-    ok &= (dof.compile(defines, dof_vertex, dof_fragment) != 0);
+#if 0
+  if (stereoMode == ST_OCULUS) {
+    // Do not load fxaa / dof for oculus rendering.
+    // We only do aberration pre-compensation in post for oculus.
+    return ok;
   }
+#endif
 
   string fxaa_vertex;
   string fxaa_fragment;
@@ -1312,6 +1360,16 @@ bool setupShaders2(void) {
 
   if (!fxaa_vertex.empty() && !fxaa_fragment.empty()) {
     ok &= (fxaa.compile(defines, fxaa_vertex, fxaa_fragment) != 0);
+  }
+
+  string dof_vertex;
+  string dof_fragment;
+
+  readFile(DOF_VERTEX_SHADER_FILE, &dof_vertex);
+  readFile(DOF_FRAGMENT_SHADER_FILE, &dof_fragment);
+
+  if (!dof_vertex.empty() && !dof_fragment.empty()) {
+    ok &= (dof.compile(defines, dof_vertex, dof_fragment) != 0);
   }
 
   return ok;
@@ -1378,16 +1436,33 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
     SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
   }
 
+  int ww = w, hh = h;
+  if (w == h && (h == 2048 || h == 4096)) {
+    ww = 1024;  // HACK!
+    hh = 1024;
+  }
+  if (w == 2 * h && (w == 4096 || w == 2048)) {
+    ww = 2048;  // HACK!
+    hh = 1024;
+  }
+
   if (fullscreenToggle) {
     if (!window.toggleFullscreen()) {
       return false;
     }
   } else {
-    if (!window.resize(w, h)) {
+    if (!window.resize(ww, hh)) {
       // Spurious SDL resize? Ignore.
       return false;
     }
   }
+
+  GLint maxRenderBufferSize;
+  glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &maxRenderBufferSize);
+  printf(__FUNCTION__ " : max render buffer size %d\n", maxRenderBufferSize);
+  GLint dims[2];
+  glGetIntegerv(GL_MAX_VIEWPORT_DIMS, &dims[0]);
+  printf(__FUNCTION__ " : max viewport dims %dx%d\n", dims[0], dims[1]);
 
   printf(__FUNCTION__ " : GetSwap %d\n", SDL_GL_GetSwapInterval());
 
@@ -1398,8 +1473,12 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   }
 
   // Take the window size the system provided. Might be higher than requested.
-  config.width = window.width();
-  config.height = window.height();
+  if (ww == w && hh == h) {
+    config.width = window.width();
+    config.height = window.height();
+  }
+
+  printf(__FUNCTION__ " : %dx%d\n", config.width, config.height);
 
   SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &config.depth_size);
   printf(__FUNCTION__ " : depth size %u\n", config.depth_size);
@@ -1544,6 +1623,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
+      // This needs to be 32F for the pathtracer and radiance shaders that
+      // use accumulation.
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
                    config.width, config.height,
                    0, GL_BGRA, GL_FLOAT, NULL);
@@ -1682,7 +1763,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   // Fill backbuffer w/ starting lifeform, if we have one.
 
   if (config.backbuffer && !lifeform.empty()) {
-    glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[(frameno-1)&1]);
+    glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[(frameno&1)^1]);
     // Ortho projection, entire screen in regular pixel coordinates.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -1832,53 +1913,67 @@ void initTwUniform(const string& name, void* addr) {
   }
 }
 
-void initTwBar() {
+void initTwBar(enum StereoMode stereoMode) {
   if (bar == NULL) TwInit(TW_OPENGL, NULL);
 
-  TwWindowSize(config.width, config.height);
+  TwWindowSize(window.width(), window.height());
 
   if (bar != NULL) return;
 
   bar = TwNewBar("boxplorer");
 
   if (stereoMode == ST_OCULUS) {
-  // Position HUD center for left eye.
-  char pos[100];
-  int x = config.width;
-  int y = config.height;
-  sprintf(pos, "boxplorer position='%d %d'", x/6, y/4);
+    // Position HUD center for left eye.
+    // TODO: make float
+    char pos[100];
+    int x = window.width();
+    int y = window.height();
+    sprintf(pos, "boxplorer position='%d %d'", x/6, y/4);
     TwDefine(pos);
-  TwDefine("GLOBAL fontsize=3");
+    TwDefine("GLOBAL fontsize=3");
   }
 
   if (fxaa.ok()) {
-    TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "");
+    TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "group=post");
   }
   if (dof.ok()) {
-    TwAddVarRW(bar, "DoF", TW_TYPE_BOOL32, &camera.enable_dof, "");
-    TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.dof_scale,
-                    "min=0.0 max=10.0 step=0.01");
+    TwAddVarRW(bar, "DoF", TW_TYPE_BOOL32, &camera.enable_dof, "group=post");
+    TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.aperture,
+                    "min=0.0 max=10.0 step=0.01 group=post");
   }
-  if (fxaa.ok() || dof.ok()) {
+  if (effects.ok()|| fxaa.ok() || dof.ok()) {
+          // Global, thus on config, not camera.
     TwAddVarRW(bar, "exposure", TW_TYPE_FLOAT, &config.exposure,
-               "min=0.0 max=5.0 step=0.01");
+               "min=0.0 max=5.0 step=0.01 group=post");
     TwAddVarRW(bar, "maxBright", TW_TYPE_FLOAT, &config.maxBright,
-               "min=0.0 max=5.0 step=0.01");
+               "min=0.0 max=5.0 step=0.01 group=post");
     TwAddVarRW(bar, "gamma", TW_TYPE_FLOAT, &config.gamma,
-               "min=0.0 max=5.0 step=0.01");
-    TwAddSeparator(bar, NULL, NULL);
+               "min=0.0 max=5.0 step=0.01 group=post");
   }
 
-#if 0
-  // Add TW UI for common parameters.
-#define PROCESS(a,b,c,d) initTwUniform(c, &camera.b);
-  PROCESS_COMMON_PARAMS
-#undef PROCESS
-#else
+  TwAddVarRW(bar, "focus", TW_TYPE_FLOAT, &camera.focus,
+                  "min=-20.0 max=30.0 step=0.1 group=3d");
+
+  if (stereoMode == ST_OCULUS) {
+    TwAddVarRW(bar, "ipd", TW_TYPE_FLOAT, &config.ipd,
+                    "min=-10.0 max=10.0 step=0.1 group=oculus");
+  }
+
   uniforms.bindToUI(bar);
-#endif
 
   initTwParDefines();
+
+  // Tweak menus depending on state.
+  TwDefine("boxplorer/post opened=false");
+  TwDefine("boxplorer/3d opened=false");
+  TwDefine("boxplorer/oculus opened=false");
+
+  if (!config.enable_dof) {
+          TwDefine("boxplorer/post visible=false");
+  }
+  if (stereoMode != ST_OCULUS) {
+          TwDefine("boxplorer/oculus visible=false");
+  }
 }
 
 void LoadKeyFrames(bool fixedFov) {
@@ -1900,20 +1995,24 @@ void LoadKeyFrames(bool fixedFov) {
       (unsigned long)keyframes.size());
 }
 
-void drawScreen() {
-      // Draw our texture covering entire screen, running the frame shader.
+void drawScreen(int leftRight = 3) {
+    // Draw our texture covering entire screen, running the frame shader.
+    if (leftRight & 1) {
       glBegin(GL_QUADS);  // left
         glTexCoord2f(0,1); glVertex2f(0,0);
         glTexCoord2f(0,0); glVertex2f(0,config.height);
         glTexCoord2f(.5,0); glVertex2f(config.width/2,config.height);
         glTexCoord2f(.5,1); glVertex2f(config.width/2,0);
       glEnd();
+    }
+    if (leftRight & 2) {
       glBegin(GL_QUADS);  // right
         glTexCoord2f(0.5,1); glVertex2f(config.width/2,0);
         glTexCoord2f(0.5,0); glVertex2f(config.width/2,config.height);
         glTexCoord2f(1,0); glVertex2f(config.width,config.height);
         glTexCoord2f(1,1); glVertex2f(config.width,0);
       glEnd();
+    }
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1921,6 +2020,7 @@ void drawScreen() {
 
 int main(int argc, char **argv) {
   bool rendering = false;
+  bool rendercubes = false;
   bool loop = false;
   bool useTime = false;
   bool configSpeed = false;
@@ -1950,11 +2050,19 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[argc-1], "--anaglyph")) {
       stereoMode = ST_ANAGLYPH;
       defines.append("#define ST_ANAGLYPH\n");
+    } else if (!strcmp(argv[argc-1], "--spherical")) {
+      stereoMode = ST_SPHERICAL;
+      defines.append("#define ST_SPHERICAL\n");
+    } else if (!strcmp(argv[argc-1], "--dome")) {
+      stereoMode = ST_DOME;
+      defines.append("#define ST_DOME\n");
     } else if (!strcmp(argv[argc-1], "--oculus")) {
       stereoMode = ST_OCULUS;
       defines.append("#define ST_OCULUS\n");
     } else if (!strcmp(argv[argc-1], "--render")) {
       rendering = true;
+    } else if (!strcmp(argv[argc-1], "--cubes")) {
+      rendercubes = true;
     } else if (!strcmp(argv[argc-1], "--time")) {
       useTime = true;
     } else if (!strcmp(argv[argc-1], "--fullscreen")) {
@@ -2021,12 +2129,17 @@ int main(int argc, char **argv) {
       // succuss
     } else
 #endif
-    { die("Usage: boxplorer <configuration-file.cfg>\n"); }
+    { die("Usage: boxplorer2 <configuration-file.cfg>\n"); }
   }
 
   if (lifeform_file) {
+    // Try extract base name, since readFile loads from current data directory.
+    // By allowed paths in the name cmdline completion can be used for the arg.
+    const char* base = strrchr(lifeform_file, '/');
+    if (!base) base = strrchr(lifeform_file, '\\');
+    if (!base) base = lifeform_file;
     // Load definition into our global string.
-    readFile(lifeform_file, &lifeform);
+    readFile(base, &lifeform);
   }
 
   if (fullscreen) config.fullscreen = fullscreen;
@@ -2097,10 +2210,22 @@ int main(int argc, char **argv) {
   if (disableSpline) config.no_spline = (disableSpline == -1);  // override
   if (stereoMode == ST_OCULUS) {
     // Fix resolution for optimal performance.
-    config.width = 1280; config.height = 800;
-    //config.width = 1920; config.height = 1080;
-    config.fov_x = 110; config.fov_y = 90.0;
+    //config.width = 1280; config.height = 800;  // DK1
+    //config.fov_x = 110; config.fov_y = 94.0;  // DK1
+    config.width = 1920; config.height = 1080;
+    config.fov_x = 100; config.fov_y = 100.0;
     fixedFov = true;
+    // Enable multipass but not dof and fxaa.
+    config.backbuffer = 1;
+    config.enable_fxaa = 0;
+    config.enable_dof = 0;
+  }
+  if (stereoMode == ST_SPHERICAL) {
+    config.width = 2048;
+    config.height = config.width / 2;
+  }
+  if (stereoMode == ST_DOME) {
+    config.height = config.width;  // square
   }
   if (stereoMode == ST_INTERLACED || stereoMode == ST_OVERUNDER) {
     // Fix at 1080P
@@ -2111,12 +2236,28 @@ int main(int argc, char **argv) {
   if (config.fps < 5) config.fps = 30;
   if (config.depth_size < 16) config.depth_size = 16;
 
+  if (rendercubes) {
+    // Render 6 cube faces:
+    // make sure we have square view at 90 degrees.
+    fixedFov = true;
+    config.width = 2048;
+    config.height = 2048;
+    config.fov_x = 90.0;
+    config.fov_y = 90.0;
+    config.enable_fxaa = 1;
+    config.enable_dof = 1;
+    stereoMode = ST_NONE;
+  }
+
   int saveWidth = config.width;
   int saveHeight = config.height;
 
   if (stereoMode == ST_XEYED) config.width *= 2;
 
   config.sanitizeParameters();
+
+  printf(__FUNCTION__ ": sanitized: size %dx%d\n", config.width, config.height);
+  printf(__FUNCTION__ ": sanitized: view %fx%f\n", config.fov_x, config.fov_y);
 
   LoadBackground();
 
@@ -2171,8 +2312,14 @@ int main(int argc, char **argv) {
 
   // Load initial camera; sets all known, linked uniforms.
   camera.loadConfig(BaseFile);
+  if (fixedFov) {
+          camera.width = config.width;
+          camera.height = config.height;
+          camera.fov_x = config.fov_x;
+          camera.fov_y = config.fov_y;
+  }
 
-  initTwBar();
+  initTwBar(stereoMode);
   initFPS(FPS_FRAMES_TO_AVERAGE);
 
   //printf(__FUNCTION__ " : GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
@@ -2279,16 +2426,21 @@ int main(int argc, char **argv) {
 
     next_camera = &camera;
 
+    bool mixedInOculus = false;
+
     if (!rendering) {
 #if defined(_WIN32)
       // When not rendering a sequence,
       // now mix in orientation (and translation.. where's my DK2 Oculus?)
       if (stereoMode == ST_OCULUS) {
-        GetOculusQuat(view_q);
+        if (GetOculusQuat(view_q)) {
+          if (grabbedInput) {
+            camera.mixSensorOrientation(view_q);
+            mixedInOculus = true;
+          }
+        }
       }
 #endif
-
-      camera.mixSensorOrientation(view_q);
 
       if (!config.disable_de) {
         // Try get a DE for current position.
@@ -2338,7 +2490,7 @@ int main(int argc, char **argv) {
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS);  // we're writing Z every pixel
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     GLuint program = fractal.program();
     glUseProgram(program);  // the fractal shader
@@ -2348,36 +2500,56 @@ int main(int argc, char **argv) {
     // requires rendering to fbo.
     bool multiPass =
             (config.enable_dof &&
-               ((dof.ok() && camera.enable_dof && camera.dof_scale != 0) ||
+               ((dof.ok() && camera.enable_dof && camera.aperture != 0) ||
                 (fxaa.ok() && camera.fxaa))) ||
             config.backbuffer;
 
     // Set up input texture to fractal shader.
-    // This is either previous frame or some file from disk.
-    // TODO: provide both or at least previous if multiPass?
-    if (background_texture || config.backbuffer) {
+    if (background_texture) {
       glActiveTexture(GL_TEXTURE0);
-      if (background_texture && !(config.backbuffer && frameno != 0) &&
-                      lifeform_file == NULL) {
-        glBindTexture(GL_TEXTURE_2D, background_texture);
-        glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
-                    background_texture);
-      } else if (config.backbuffer) {
-        glBindTexture(GL_TEXTURE_2D, mainTex[(frameno-1)&1]);
-        glUniform1i(glGetUniformLocation(program, "use_bg_texture"),
-                    lifeform_file != NULL);
-      }
+      glBindTexture(GL_TEXTURE_2D, background_texture);
       glUniform1i(glGetUniformLocation(program, "iChannel0"), 0);
-      glUniform1i(glGetUniformLocation(program, "frameno"), frameno);
     }
 
+    // Set up backbuffer as input.
+    if (config.backbuffer) {
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, mainTex[(frameno&1)^1]);
+      glUniform1i(glGetUniformLocation(program, "iBackbuffer"), 1);
+      glUniform1i(glGetUniformLocation(program, "iBackbufferCount"),
+                      camera.iBackbufferCount);
+    }
+
+    glUniform1i(glGetUniformLocation(program, "frameno"), frameno);
+ 
     if (multiPass) {
-      // Render to texture for post-processing.
       glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[frameno&1]);
     }
 
     camera.speed *= speed_factor;
-    camera.render(stereoMode);  // Draw fractal; this is where the tflops go.
+
+    if (rendercubes) {
+      glViewport(0, 0, config.width, config.height);
+      for (int vq = VQ_FRONT; vq < VQ_DONE; ++vq) {
+        // Hack: render to fxaaFbo
+        glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[frameno&1]);
+
+        camera.render(stereoMode, vq);  // This is where the tflops go.
+
+        char filename[256];
+        sprintf(filename, "cube-%05d%c.tga", frameno, VQ_LETTER[vq]);
+        saveScreenshot(filename);
+      }
+
+      glViewport(0, 0, window.width(), window.height());
+    } else {
+      if (stereoMode == ST_DOME) {
+        camera.render(stereoMode, VQ_UP);
+      } else {
+        camera.render(stereoMode);  // This is where the tflops go.
+      }
+    }
+
     camera.speed /= speed_factor;
 
     glUseProgram(0);
@@ -2397,19 +2569,20 @@ int main(int argc, char **argv) {
       GLuint currentFrame = mainTex[frameno&1];
 
       if (!config.backbuffer) {
-        // Mipmap the frame.
-        // TODO: not needed by default. Costly?
         glEnable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, currentFrame);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        // Mipmap the frame.
+        // TODO: not needed by default. Costly?
+        //glGenerateMipmap(GL_TEXTURE_2D);
       }
 
-      if (fxaa.ok() && camera.fxaa) {
+      if (fxaa.ok() && config.enable_fxaa && camera.fxaa) {
         // We have a fxaa shader.
-        // Compute and point currentFrame at output.
+        // Compute and point currentFrame(s) at output.
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, currentFrame);
+
         glBindFramebuffer(GL_FRAMEBUFFER, fxaaFbo);
         GLuint program = fxaa.program();
         glUseProgram(program);
@@ -2417,13 +2590,15 @@ int main(int argc, char **argv) {
         glUniform1f(glGetUniformLocation(program, "xres"), config.width);
         glUniform1f(glGetUniformLocation(program, "yres"), config.height);
         drawScreen();
+
         glUseProgram(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         currentFrame = fxaaTex;  // Our output is input for next stage.
       }  // fxaa
 
-      if (dof.ok() && camera.enable_dof && camera.dof_scale != 0) {
+      if (dof.ok() && config.enable_dof && camera.enable_dof &&
+                      camera.aperture != 0) {
         // We have a DoF shader.
         // Compute iBlur0 and iBlur1
         for (int i = 0; i < NBLUR * 2; ++i) {
@@ -2498,7 +2673,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, mainDepth[frameno&1]);
       glUniform1i(glGetUniformLocation(final_program, "iDepth"), 1);
 
-      if (dof.ok() && camera.enable_dof && camera.dof_scale != 0) {
+      if (dof.ok() && camera.enable_dof && camera.aperture != 0) {
         // Pass blur textures as 2 and 3, if we computed them.
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, blurTex[0]);
@@ -2513,14 +2688,18 @@ int main(int argc, char **argv) {
       }
 
       // send tonemap params etc.
-      glUniform1f(glGetUniformLocation(final_program, "exposure"), config.exposure);
-      glUniform1f(glGetUniformLocation(final_program, "maxBright"), config.maxBright);
-      glUniform1f(glGetUniformLocation(final_program, "gamma"), config.gamma);
+      glUniform1f(glGetUniformLocation(final_program, "exposure"),
+                      config.exposure);
+      glUniform1f(glGetUniformLocation(final_program, "maxBright"),
+                      config.maxBright);
+      glUniform1f(glGetUniformLocation(final_program, "gamma"),
+                      config.gamma);
 
-      // These are not actually used by default,
-      // but might be handy for override effects_fragment.glsl?
-      glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
-      glUniform1f(glGetUniformLocation(final_program, "yres"), config.height);
+     if (stereoMode == ST_OCULUS) {
+        glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
+        glUniform1f(glGetUniformLocation(final_program, "yres"), config.height);
+        glUniform1f(glGetUniformLocation(final_program, "ipd"), config.ipd);
+      }
 
       drawScreen();
 
@@ -2616,17 +2795,27 @@ int main(int argc, char **argv) {
     CHECK_ERROR;
 
     // Draw AntTweakBar
-    if (!grabbedInput && !rendering) TwDraw();
+    if (!grabbedInput && !rendering) {
+            //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            //glDisable(GL_TEXTURE_2D);
+            //glDisable(GL_LINE_SMOOTH);
+            TwDraw();
+    }
+
+    CHECK_ERROR;
 
     SDL_GL_SwapWindow(window.window());
     frameno++;
-    camera.bg_weight++;
+    camera.iBackbufferCount++;
 
-    if (rendering && !splines.empty()) {
+    if (rendering && !rendercubes && !splines.empty()) {
       // If we're playing a sequence back, save every frame to disk.
       char filename[256];
       sprintf(filename, "frame-%05d.tga", frameno);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, GL_FRONT);
       saveScreenshot(filename);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     updateFPS();
@@ -2659,7 +2848,7 @@ int main(int argc, char **argv) {
             if (initGraphics(false,
                              event.window.data1, event.window.data2,
                              frameno)) {
-              initTwBar();
+              initTwBar(stereoMode);
 
               config.fov_x = 0;  // go for square pixels..
               config.sanitizeParameters();
@@ -2759,7 +2948,7 @@ int main(int argc, char **argv) {
       // Switch fullscreen mode (drops the whole OpenGL context in Windows).
       case SDLK_RETURN: case SDLK_KP_ENTER: {
         initGraphics(true, 0, 0, frameno);
-        initTwBar();
+        initTwBar(stereoMode);
       } break;
 
       // Switch L/R eye polarity,
@@ -2775,7 +2964,9 @@ int main(int argc, char **argv) {
           strftime(filename, 256, "%Y%m%d_%H%M%S.cfg", ptm);
           camera.saveConfig(filename);
           strftime(filename, 256, "%Y%m%d_%H%M%S.tga", ptm);
+          glBindFramebuffer(GL_FRAMEBUFFER, GL_FRONT);
           saveScreenshot(filename);
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
       } break;
 
@@ -3002,7 +3193,12 @@ int main(int argc, char **argv) {
 
     // Continue after calling SDL_GetRelativeMouseState() so view direction
     // does not jump after closing AntTweakBar.
-    if (!grabbedInput) continue;
+    if (!grabbedInput) {
+      if (mixedInOculus) {
+        camera.unmixSensorOrientation(view_q);
+      }
+      continue;
+    }
 
     if(joystick) {
       SDL_JoystickUpdate();
@@ -3154,10 +3350,16 @@ int main(int argc, char **argv) {
     if (!(ctlXChanged || ctlYChanged)) consecutiveChanges = 0;
 
     // We might have changed view. Preserve changes, minus HMD orientation.
-    camera.unmixSensorOrientation(view_q);
+    if (mixedInOculus) {
+      camera.unmixSensorOrientation(view_q);
+    }
 
     if (outputFilename != NULL) {
+      glBindFramebuffer(GL_FRAMEBUFFER, GL_FRONT);
       saveScreenshot(outputFilename);
+      break;
+    }
+    if (!rendering && rendercubes) {
       break;
     }
   }
