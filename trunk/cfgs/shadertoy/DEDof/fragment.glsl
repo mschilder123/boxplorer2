@@ -16,16 +16,14 @@
 
 //V2 added some of knighty's improvements (it really speeds up the march to add the CoC to DE!)
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
+#include "setup.inc"
+#line 21
+
 uniform vec3 par[20];
 uniform int iters;
 uniform int max_steps;
 
 vec2 size = vec2(xres, yres);
-
-#include "setup.inc"
-#line 29
 
 //const float aperature=0.025,focalDistance=1.5,shadowCone=0.5;//play with these to test the DOF
 #define aperature par[1].x //{min=.001 max=0.5 step=.001}
@@ -51,6 +49,7 @@ float DE(in vec3 z0){
 		d=min(d,HTorus(z.zyx,1.0,0.1)/z.w);
 		z.z+=1.0;
 		z*=vec4(2.0,-2.0,2.0,2.0);
+        //Rotate(z.xz, time*.5*float(i+1));
 	}
 	z.z-=0.8;
 	dB=(length(z.xyz)-1.0)/z.w;

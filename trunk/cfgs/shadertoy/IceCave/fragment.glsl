@@ -6,14 +6,9 @@
 #define RELIEF_Z 0.3
 #define RELIEF_DEPTH 0.01
 
-varying vec3 eye, dir;
-uniform float xres, yres, time, speed;
-uniform sampler2D bg_texture;
-
 #include "setup.inc"
-#line 15
+#line 11
 
-#define iChannel0 bg_texture
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 

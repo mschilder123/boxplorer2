@@ -6,20 +6,17 @@
 //v 1.2 Some optimisations.
 
 // boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
-uniform sampler2D bg_texture;
+#include "setup.inc"
+#line 11
 
 // Map to shadertoy expected vars
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 // boxplorer only has 1 channel at the moment..
-#define iChannel0 bg_texture
-#define iChannel1 bg_texture
-#define iChannel2 bg_texture
-#define iChannel3 bg_texture
+#define iChannel1 iChannel0
+#define iChannel2 iChannel0
+#define iChannel3 iChannel0
 
-#include "setup.inc"
 
 #define VARY_SIZE
 

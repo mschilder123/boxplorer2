@@ -1,9 +1,7 @@
 //by @paulofalcao, https://www.shadertoy.com/view/Xdj3Dt
 
-uniform float time, speed, xres, yres;
-varying vec3 eye, dir;
 #include "setup.inc"
-#line 7
+#line 5
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 

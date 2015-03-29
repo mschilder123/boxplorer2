@@ -14,11 +14,8 @@
 // (better coloring, AO and  shadows), some lighting effects, and a path for the camera  
 // following a liquid metal ball. 
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
-
 #include "setup.inc"
-#line 21
+#line 19
 
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = vec3(0., 0., 0.);
@@ -192,7 +189,7 @@ vec3 light(in vec3 p, in vec3 dir, in vec3 n, in float hid) {//PASSING IN THE NO
   return col;
 }
 
-vec3 raymarch(in vec3 from, in vec3 dir) 
+vec4 raymarch(in vec3 from, in vec3 dir) 
 {
   float ey=mod(t*.5,1.);
   float glow,eglow,ref,sphdist,totdist=glow=eglow=ref=sphdist=0.;
@@ -250,7 +247,7 @@ vec3 raymarch(in vec3 from, in vec3 dir)
     vec3 sphlight=light(origfrom+sphdist*origdir,origdir,sphNorm,2.);
     col=mix(col*.3+sphlight*.7,backg,1.0-exp(-1.*pow(sphdist,1.5)));
   }
-  return col; 
+  return vec4(col, totdist); 
 }
 
 vec3 move(inout mat2 rotview1,inout mat2 rotview2) {
@@ -290,7 +287,8 @@ void main(void)
     return;
   }
 #endif
-  vec3 color=raymarch(from,ddir); 
+  vec4 hit = raymarch(from,ddir); 
+  vec3 color = hit.rgb;
   color=clamp(color,vec3(.0),vec3(1.));
   color=pow(color,vec3(GAMMA))*BRIGHTNESS;
   color=mix(vec3(length(color)),color,SATURATION);
@@ -303,5 +301,5 @@ void main(void)
   color.b*=(.5+abs(.5-mod(uv2.y+.014,.021)/.021)*.5)*1.5;
   color*=.8+rain*.5;
 #endif
-  write_pixel(dir, 1.0, color);  // boxplorify write
+  write_pixel(dir, hit.a, color);  // boxplorify write
 }

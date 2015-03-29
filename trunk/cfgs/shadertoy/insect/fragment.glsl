@@ -2,21 +2,14 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // From https://www.shadertoy.com/view/Mss3zM
 
-// Boxplorer inputs
-varying vec3 eye, dir;
-varying float zoom;
-
-uniform float xres, yres, time, speed;
-uniform sampler2D bg_texture;
+#include "setup.inc"
+#line 7
 
 // Boxplorer only provices 1 input texture; use it.
-#define iChannel0 bg_texture
-#define iChannel1 bg_texture
-#define iChannel2 bg_texture
+#define iChannel1 iChannel0
+#define iChannel2 iChannel0
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
-
-#include "setup.inc"
 
 float hash( float n )
 {

@@ -1,0 +1,88 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Pano2VR project file  -->
+<pano2vrconfig>
+  <panorama>
+    <input>
+      <patch/>
+      <type>equirectangular</type>
+      <filename>C:/Users/mario/prj/boxplorer2/cfgs/shadertoy/Kali3d2/cube-f_equi.jpg</filename>
+      <filenamefront>cube-f.tga.png</filenamefront>
+      <filenameright>cube-r.tga.png</filenameright>
+      <filenameback>cube-b.tga.png</filenameback>
+      <filenameleft>cube-l.tga.png</filenameleft>
+      <filenametop>cube-u.tga.png</filenametop>
+      <filenamebottom>cube-d.tga.png</filenamebottom>
+      <hfov>360</hfov>
+    </input>
+    <viewingparameter>
+      <pan/>
+      <tilt/>
+      <fov/>
+    </viewingparameter>
+    <userdata/>
+    <hotspots/>
+    <output>
+      <thumb>
+        <html>
+          <enabled>0</enabled>
+          <filename>output/cube-f_tga.html</filename>
+          <template>normal.ggt</template>
+          <values>
+            <value id="bgcolor">#ffffff</value>
+            <value id="showuserdata">true</value>
+            <value id="tablebgcolor">#dddddd</value>
+            <value id="tablebordercolor">#777777</value>
+            <value id="tabletextcolor">#000000</value>
+            <value id="textcolor">#000000</value>
+          </values>
+        </html>
+        <facequality/>
+        <filename>output/cube-f_tga_out.jpg</filename>
+        <backgroundColor>#000000,0</backgroundColor>
+        <nooversampling>0</nooversampling>
+        <type>equirectangular</type>
+        <quality>90</quality>
+        <progressivejpeg>0</progressivejpeg>
+        <width>8192</width>
+        <height>4096</height>
+        <defaultview>1</defaultview>
+        <pan>0</pan>
+        <tilt>0</tilt>
+        <roll>0</roll>
+        <fov>70</fov>
+        <cubefacenaming>_5</cubefacenaming>
+      </thumb>
+      <thumb>
+        <html>
+          <enabled>0</enabled>
+          <filename>output/cube-f_tga_1.html</filename>
+          <template>normal.ggt</template>
+          <values>
+            <value id="bgcolor">#ffffff</value>
+            <value id="showuserdata">true</value>
+            <value id="tablebgcolor">#dddddd</value>
+            <value id="tablebordercolor">#777777</value>
+            <value id="tabletextcolor">#000000</value>
+            <value id="textcolor">#000000</value>
+          </values>
+        </html>
+        <facequality/>
+        <filename>output/cube-f_tga_out.jpg</filename>
+        <backgroundColor>#000000,0</backgroundColor>
+        <nooversampling>0</nooversampling>
+        <type>equirectangular</type>
+        <quality>90</quality>
+        <progressivejpeg>0</progressivejpeg>
+        <width>8192</width>
+        <height>4096</height>
+        <defaultview>1</defaultview>
+        <pan>0</pan>
+        <tilt>0</tilt>
+        <roll>0</roll>
+        <fov>70</fov>
+        <cubefacenaming>_5</cubefacenaming>
+      </thumb>
+    </output>
+    <sounds/>
+  </panorama>
+</pano2vrconfig>

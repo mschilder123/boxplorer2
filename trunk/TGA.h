@@ -77,8 +77,8 @@ public:
     delete[] data_;
     data_ = new unsigned char[width_ * height_ * 3];
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadBuffer(GL_FRONT);
-    glReadPixels(viewportOffset[0], viewportOffset[1],
+    //glReadBuffer(GL_FRONT);
+    glReadPixels(0,0,//viewportOffset[0], viewportOffset[1],
                  width_, height_,
                  GL_BGR, GL_UNSIGNED_BYTE,
                  data_);

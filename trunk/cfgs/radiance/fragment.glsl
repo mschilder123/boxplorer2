@@ -1,18 +1,15 @@
 //from http://glsl.heroku.com/e#9837.0 by @301z
 //Hacked up by marius to work /w boxplorer2
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;  
-
-uniform sampler2D bg_texture;
-uniform int bg_weight;
+#include "setup.inc"
+#line 6
 
 uniform vec3 par[20];
 
-#include "setup.inc"
-
-#line 14
 vec2 iResolution = vec2(xres, yres);
+
+#define FocusDist par[1].x
+#define Aperture par[1].y
 
 // by @301z
 
@@ -82,12 +79,15 @@ float random(vec3 scale, float seed) {
 vec3 radiance(Ray ray, float seed) {
   vec3 color = vec3(0.0);
   vec3 reflectance = vec3(1.0);
+  float tDist = 0.;
   for (int depth = 0; depth < 8; depth++) {
     Hit hit = intersect(ray);
     if (!(hit.distance < kInf))
       break;
+    tDist += abs(hit.distance);
     seed += float(depth);
     color += reflectance * hit.sphere.colorEmission.w;
+    //color += reflectance * (hit.sphere.colorEmission.w * 75. / tDist);
     reflectance *= hit.sphere.colorEmission.xyz;
     vec3 hitPosition = ray.origin + ray.direction * hit.distance;
     vec3 hitNormal = (hitPosition - hit.sphere.positionRadius.xyz) / hit.sphere.positionRadius.w;
@@ -119,21 +119,40 @@ vec3 radiance(Ray ray, float seed) {
 }
 
 void main() {
+  vec3 d = dir, e = eye;
+
+#if 1
+  // Add some circle of confusion action.
+  // First compute hit dist for center ray.
+  // Use that as focus plane.
+  // Pick random eye jitter offset orthogonal to straight ahead.
+  // Move eye, keep focus on original point.
+  Ray straightAhead = Ray(eye, vec3(gl_ModelViewMatrix * vec4(0.0, 0.0, 1.0, 0.0)));
+  Hit center = intersect(straightAhead);
+
+
+  //d*= FocusDist;  // Manual focus
+  d *= center.distance;  // Center focus.
+
+  vec2 r = vec2(.5-random(dir, time), .5-random(eye+dir, time)); // square aperture
+  r = normalize(r) * .5 * pow(random(eye, time), 2.0);  // round aperture
+
+  r *= Aperture;
+
+  e += vec3(gl_ModelViewMatrix * vec4(r, 0.0, 0.0));  // wiggle eye
+  d = eye + d - e;  // recompute dir from wiggled e to focal point eye + d
+#endif
+
   vec3 pos, ray;
 
-  if (!setup_ray(eye, dir, pos, ray)) {
-    gl_FragColor = vec4(0.);
-    gl_FragDepth = 0.;
-    return;
-  }
+  if (!setup_ray(e, d, pos, ray)) return;
 
   const float kGamma = 2.2;
 
   // Fetch current accumulation.
-  vec4 current = texture2D(bg_texture, gl_FragCoord.xy / iResolution);
+  vec4 current = texture2D(iBackbuffer, gl_FragCoord.xy / iResolution);
   vec3 curCol = pow(current.rgb, vec3(kGamma));
-
-  float currentWeight = float(bg_weight);
+  float currentWeight = float(iBackbufferCount);
 
   vec3 col = mix(
       radiance(Ray(pos, ray), time),

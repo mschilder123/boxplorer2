@@ -2,21 +2,16 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 //-----------------------------------------------------------------------------------
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
-uniform sampler2D bg_texture;
-
 #include "setup.inc"
-#line 11
+#line 7
 
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = vec3(0., 0., 0.);
 float iGlobalTime = time;
 // boxplorer only has 1 channel at the moment..
-#define iChannel0 bg_texture
-#define iChannel1 bg_texture
-#define iChannel2 bg_texture
-#define iChannel3 bg_texture
+#define iChannel1 iChannel0
+#define iChannel2 iChannel0
+#define iChannel3 iChannel0
 
 float hash1( float n ) { return fract(sin(n)*43758.5453123); }
 
@@ -360,8 +355,8 @@ void main( void ) {
 		col = mate.xyz* brdf;
 
 		// fog
-		tmat.x = max(0.0,tmat.x-1.3); col *= 0.65;
-		float hh = 1.0-exp(-0.2*tmat.x); 
+		float fog = max(0.0,tmat.x-1.3); col *= 0.65;
+		float hh = 1.0-exp(-0.2*fog); 
 		col = col*(1.0-hh)*(1.0-hh) + 1.25*vec3(0.0,0.12,0.2)*hh;
 	}
 	
@@ -391,5 +386,5 @@ void main( void ) {
 	col *= smoothstep( 0.0, 1.0, iGlobalTime );
 	
 //	gl_FragColor = vec4( col, 1.0 );
-  write_pixel(dir, 1.0, col);
+  write_pixel(dir, tmat.x, col);
 }

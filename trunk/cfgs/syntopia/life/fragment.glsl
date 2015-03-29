@@ -3,10 +3,9 @@
 
 varying vec3 dir;
 
-uniform sampler2D iChannel0;
+uniform sampler2D iBackbuffer;
 uniform float xres, yres, time;
 uniform vec3 par[1];
-uniform int use_bg_texture;
 
 #define decayR par[0].x  // {min=0 max=1 step=.0001}
 #define decayG par[0].y  // {min=0 max=1 step=.0001}
@@ -20,20 +19,22 @@ float rand(vec2 co){
 }
 
 void isAlive(float dx, float dy, inout int count) {
-  vec4 cur = texture2D(iChannel0,  position + pixelSize*vec2( dx, dy ) );
+  vec4 cur = texture2D(iBackbuffer,  position + pixelSize*vec2( dx, dy ) );
   // Alive if cur.a == 1.0
   count += int(cur.a);
 }
 
 vec4 color(vec2 z) {
+#if 0
   // Ring o'fire
   if (use_bg_texture == 0) {
     if (length(z)<0.1 && length(z)>0.08) {
       return (rand(time*z) < 0.5 ? vec4(1.0,0.0,0.0,1.0) : vec4(0.0));
     }
   }
+#endif
 
-  vec4 cur = texture2D(iChannel0, position);
+  vec4 cur = texture2D(iBackbuffer, position);
   int neighbours = 0;
   int alive = 0;
 

@@ -3,15 +3,13 @@
 // From https://www.shadertoy.com/view/lssGRM
 
 // boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
+#include "setup.inc"
+#line 8
 
 // Map to shadertoy expected vars
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = dir;
-
-#include "setup.inc"
 
 float hash( float n )
 {
@@ -213,7 +211,7 @@ void main(void)
     col *= vec3( 1.0, 1.04, 1.0);
     
     // vigneting
-    col *= pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
+//    col *= pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
     
     write_pixel(dir, tmat.x, col);  // boxplorify write
 }

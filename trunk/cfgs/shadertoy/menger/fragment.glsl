@@ -1,13 +1,11 @@
 // from: https://www.shadertoy.com/view/Mdf3z7
 // by syntopia
 
-uniform float xres, yres, time, speed;
-varying vec3 eye, dir;
+#include "setup.inc"
+#line 6
 
 vec2 iResolution = vec2(xres, yres);
 float iGlobalTime = time;
-
-#include "setup.inc"
 
 #define MaxSteps 30
 #define MinimumDistance 0.0009

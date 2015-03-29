@@ -19,14 +19,11 @@
 
 #define INOUT(a,b) inout a b
 
-// Camera position and direction.
-varying vec3 eye, dir;
+#include "setup.inc"
+#line 24
 
 // Interactive parameters.
 uniform vec3 par[10];
-uniform float speed;
-
-uniform float xres, yres;
 
 uniform float min_dist;           // Distance at which raymarching stops.
 uniform float ao_eps;             // Base distance at which ambient occlusion is estimated.
@@ -226,8 +223,6 @@ float marche(inout vec3 p, in vec3 dp, inout float D, inout float totalD, in flo
 	return float(steps);
 }
 
-#include "setup.inc"
-
 float hash( float n ) {
     return fract(sin(n)*5345.8621276);
 }
@@ -249,11 +244,7 @@ float noise( in vec2 x ) {
 void main() {
   vec3 eye_in, dp; 
 
-  if (!setup_ray(eye, dir, eye_in, dp)) {
-    gl_FragColor = vec4(0.0);
-    gl_FragDepth = 0.0;
-    return;
-  }
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
   float noise = noise(gl_FragCoord.xy / vec2(xres, yres));
 

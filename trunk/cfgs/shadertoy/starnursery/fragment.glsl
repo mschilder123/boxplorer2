@@ -4,15 +4,12 @@
 // Edited by Dave Hoskins into "Star Nursery"
 // V.1.1 Some speed up in the ray-marching loop.
 
-// boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
+#include "setup.inc"
+#line 9
 
 // Map to shadertoy expected vars
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
-
-#include "setup.inc"
 
 mat3 m = mat3( 0.00,  0.90,  0.60,
               -0.90,  0.36, -0.48,

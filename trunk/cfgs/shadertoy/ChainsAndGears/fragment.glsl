@@ -1,10 +1,7 @@
 // chains and gears - @P_Malin
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
-
 #include "setup.inc"
-#line 7
+#line 5
 
 vec2 iResolution = vec2(xres, yres);
 float iGlobalTime = time;

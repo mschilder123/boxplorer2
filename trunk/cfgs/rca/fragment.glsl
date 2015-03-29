@@ -3,9 +3,9 @@
 varying vec3 dir;
 
 uniform sampler2D iChannel0;
+uniform sampler2D iBackbuffer;
 uniform float xres, yres, time;
 uniform vec3 par[2];
-uniform int use_bg_texture;
 uniform int frameno;
 
 #define decayR par[0].x  // {min=0 max=1 step=.0001}
@@ -16,7 +16,6 @@ uniform int frameno;
 
 #define direction par[1].y  // {min=-1 max=1 step=2}
 
-#define backbuffer iChannel0
 vec2 position;
 vec2 pixelSize = vec2(1.0/xres, 1.0/yres);
 
@@ -25,7 +24,7 @@ float rand(vec2 co){
 }
 
 void isAlive(float dx, float dy, inout int count, int factor) {
-  vec4 cur = texture2D(backbuffer, position + pixelSize*vec2( dx, dy ));
+  vec4 cur = texture2D(iBackbuffer, position + pixelSize*vec2( dx, dy ));
   // Aliveness is tracked in r or a (except not a at first frame, to load img).
   float alive = max(cur.r, sign(float(frameno))*cur.a);
   count += int(alive) * factor;
@@ -33,14 +32,14 @@ void isAlive(float dx, float dy, inout int count, int factor) {
 
 vec4 color(vec2 z) {
   // Ring o'fire; generate random live cells.
-  if (/*use_bg_texture == 0 && */random > 0.0) {
+  if (random > 0.0) {
     if (length(z) < 0.02 /*&& length(z) > 0.08*/) {
       // Within tiny circle: random life!
       return (rand(time*z) < 0.5 ? vec4(1.0,0.0,0.0,1.0) : vec4(0.0));
     }
   }
 
-  vec4 cur = texture2D(backbuffer, position);
+  vec4 cur = texture2D(iBackbuffer, position);
 
   // Relative position of self in 2x2 cell.
   vec2 phase = -1.0 + 2.0 * floor(mod(gl_FragCoord.xy, 2.0));  // 1 or -1
@@ -119,17 +118,17 @@ int rotb = 0x0010;
     const float t = .5 * .5;
     if (alive >= t) {
       // period 2: green
-      return vec4(cur.r * .1, 1.0, cur.b * .45, 1.0);
+      return vec4(cur.r * .0, 1.0, cur.b * .0, 1.0);
     } else if (alive >= t * t) {
       // period 4: yellow
-      return vec4(1.0, 1.0, cur.b * 1.0, 1.0);
+      return vec4(1.0, 1.0, cur.b * 0.0, 1.0);
     } else {
       // others: blue
-      return vec4(cur.r * .3, cur.g * .4, 1.0, 1.0);
+      return vec4(cur.r * .0, cur.g * .0, 1.0, 1.0);
     }
   } else {
     // stable: climb to full red
-    return vec4(clamp(cur.r + 0.001, 0.0, 1.0),
+    return vec4(clamp(cur.r + 0.0001, 0.0, 1.0),
                 cur.g * par[0].g, cur.b * par[0].b, 1.0);
   }
 }

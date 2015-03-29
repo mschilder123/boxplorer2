@@ -8,12 +8,9 @@
 //
 // From: https://www.shadertoy.com/view/4ds3zn
 
-// Camera position, direction and eps from vertex shader.
-varying vec3 eye;
-varying vec3 dir;
-varying float zoom;
+#include "setup.inc"
+#line 12
 
-uniform float xres, yres, time, speed;
 uniform int iters;    // {min=1 max=1000} Number of fractal iterations.
 uniform int color_iters;    // {min=1 max=1000} Number of fractal iterations.
 
@@ -22,9 +19,6 @@ float     iGlobalTime = time;     // shader playback time (in seconds)
 
 uniform vec3 par[1];
 #define ss par[0].x  // {min=.1 max=2.0 step=.001}
-
-#include "setup.inc"
-#line 27
 
 float de( vec3 p ) {
   float scale = 1.0;  
@@ -112,11 +106,11 @@ void main(void) {
 
     // color
     col = rgb*brdf*exp(-0.2*t);
-    }
+  }
 
-    col = sqrt(col);
+  col = sqrt(col);
   
-    col = mix( col, smoothstep( 0.0, 1.0, col ), 0.25 );
+  col = mix( col, smoothstep( 0.0, 1.0, col ), 0.25 );
   
-    write_pixel(dir, t, col);  // boxplorify write
+  write_pixel(dir, t, col);  // boxplorify write
 }

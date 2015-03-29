@@ -1,19 +1,14 @@
 // Created by inigo quilez - iq/2013
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
-uniform sampler2D bg_texture;
+#include "setup.inc"
+#line 6
 
 vec2 iResolution = vec2(xres, yres);
 float iGlobalTime = time;
-#define iChannel0 bg_texture
-
-#include "setup.inc"
-#line 14
 
 // From http://blog.hvidtfeldts.net/
-#define PI 3.14159265358979323
+//#define PI 3.14159265358979323
 vec3 equirectangularMap(sampler2D sampler, vec3 dir) {
   vec3 d = normalize(dir);
   // Convert (normalized) dir to spherical coordinates. 
@@ -22,7 +17,7 @@ vec3 equirectangularMap(sampler2D sampler, vec3 dir) {
   vec2 uv = clamp(longlat / vec2(2.0*PI, PI), -1., 1.);
   //uv = uv * .5 + vec2(.5);
   return //pow(texture2D(sampler,uv).rrr, vec3(1./2.2, 1./2.2, 1./2.2));
-         vec3(texture2D(sampler,uv).x);
+         vec3(texture2D(sampler,uv).r);
 }
 
 vec3 hash3( float n )

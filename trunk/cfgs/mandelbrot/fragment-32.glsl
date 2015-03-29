@@ -8,6 +8,7 @@ varying vec3 eye, dir;
 uniform vec3 par[10];
 
 uniform int iters;  // Number of fractal iterations. {min=10 max=1000}
+uniform float speed;
 
 #define surfaceColor par[2]
 #define surfaceColor2 par[3]
@@ -22,7 +23,7 @@ vec2 complexMul(vec2 a, vec2 b) {
   return vec2(a.x*b.x - a.y*b.y,a.x*b.y + a.y * b.x);
 }
 
-#if 1
+#if 0
 // Mandelbrot for c.x,c.y
 vec3 getColor2D(vec2 c) {
   vec2 z = vec2(0.0,0.0);
@@ -47,7 +48,8 @@ vec3 getColor2D(vec2 c) {
     return vec3(0.0);
   }
 }
-#else
+#endif
+#if 0
 // kali's grid deform coloring
 // http://www.fractalforums.com/mandelbrot-and-julia-set/how-mandelbrot-deforms-a-grid/
 vec3 getColor2D(vec2 c) {
@@ -63,6 +65,52 @@ vec3 getColor2D(vec2 c) {
       return surfaceColor;
   else
       return surfaceColor2;
+}
+#endif
+#if 1
+// https://www.shadertoy.com/view/ldf3DN
+vec3 getColor2D(vec2 cc) {
+  vec2 z  = vec2(0.0);
+  vec2 dz = vec2(0.0);
+  float trap1 = 0.0;
+  float trap2 = 1e20;
+  float co2 = 0.0;
+  vec2 t2c = vec2(-0.5,2.0);
+  for( int i=0; i<iters; i++ ) {
+    if( dot(z,z)>1024.0 ) break;
+
+    // Z' -> 2·Z·Z' + 1
+    dz = 2.0*vec2(z.x*dz.x-z.y*dz.y, z.x*dz.y + z.y*dz.x ) + vec2(1.0,0.0);
+      
+    // Z -> Z² + c      
+    z = cc + vec2( z.x*z.x - z.y*z.y, 2.0*z.x*z.y );
+      
+    // trap 1
+    float d1 = abs(dot(z-vec2(0.0,1.0),vec2(0.707)));
+    float ff = step( d1, 1.0 );
+    co2 += ff;
+    trap1 += ff*d1;
+
+    //trap2
+    trap2 = min( trap2, dot(z-t2c,z-t2c) );
+  }
+
+    // distance, d(c) = |Z|·log|Z|/|Z'|
+  float d = sqrt( dot(z,z)/dot(dz,dz) )*log(dot(z,z));
+
+#define fzoo par[1].x  //{min=0 max=.1 step=.001}
+//  float zoo = 1.0 / 250.0;
+
+  float zoo = speed * fzoo;
+  
+  float c1 = pow( clamp( 2.00*d/zoo,    0.0, 1.0 ), 0.5 );
+  float c2 = pow( clamp( 1.5*trap1/co2, 0.0, 1.0 ), 2.0 );
+  float c3 = pow( clamp( 0.4*trap2, 0.0, 1.0 ), 0.25 );
+
+  vec3 col1 = 0.5 + 0.5*sin( 3.0 + 4.0*c2 + vec3(0.0,0.5,1.0) );
+  vec3 col2 = 0.5 + 0.5*sin( 4.1 + 2.0*c3 + vec3(1.0,0.5,0.0) );
+  vec3 col = 2.0*sqrt(c1*col1*col2);
+  return col;
 }
 #endif
 

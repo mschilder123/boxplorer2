@@ -36,12 +36,14 @@
 #define PI 3.14159265
 #endif
 
-// Camera position and direction.
-varying vec3 eye;
-varying vec3 dir;
-varying float zoom;
+#include "setup.inc"
+#line 41
 
-uniform float xres, yres, time, speed;
+// Camera position and direction.
+//varying vec3 eye;
+//varying vec3 dir;
+
+//uniform float xres, yres, time, speed;
 
 // Interactive parameters.
 uniform vec3 par[20];
@@ -504,10 +506,7 @@ float ambient_occlusion(vec3 p, vec3 n, float totalD, float m_dist, float side) 
 #ifndef _FAKE_GLSL_
 // Intersect direction ray w/ large encapsulating sphere.
 // Sphere map texture onto it.
-uniform sampler2D bg_texture;
-uniform int use_bg_texture;
 vec3 background_color(in vec3 vp) {
-  if (use_bg_texture == 0) return backgroundColor;
   const vec3 vn = vec3(0.0, 1.0, 0.0);
   const vec3 ve = vec3(1.0, 0.0, 0.0);
   float phi = acos(-dot(vn, vp));
@@ -520,7 +519,7 @@ vec3 background_color(in vec3 vp) {
     u = 1. - theta;
   }
   //return texture2DLod(bg_texture, vec2(u+time/10.0,v+time/10.0), BG_BLUR).xyz;
-  return texture2DLod(bg_texture, vec2(u+time/40.0,v), BG_BLUR).xyz;
+  return texture2DLod(iChannel0, vec2(u+time/40.0,v), BG_BLUR).xyz * 2.0;
   //return texture2D(bg_texture, vec2(u+time/10.0,v)).xyz;
 }
 #else
@@ -597,7 +596,6 @@ vec3 rayColor(vec3 p, vec3 dp, vec3 n, float totalD, float m_dist, float side, f
   return col;
 }
 
-#include "setup.inc"
 
 #if 0
 // 3d noise
@@ -692,7 +690,7 @@ void main() {
     rayCol = mix(rayCol, glowColor, (float(steps)+noise)/float(max_steps) * glow_strength);
   } else {
     rayCol = background_color(dp);
-    totalD = 0.0;
+    //totalD = 0.;
   }
 
   vec3 finalCol = rayCol;

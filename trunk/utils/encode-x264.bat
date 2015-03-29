@@ -1,1 +1,1 @@
-mencoder -nosound -ovc x264 -o boxplorer-30fps.avi -mf type=tga:fps=30 mf://frame-*.tga 
+\Users\mario\Downloads\mencoder -nosound -ovc lavc -lavcopts vcodec=msmpeg4v2:vbitrate=10000000:mbd=2:keyint=132:vqblur=1.0:cmp=2:subcmp=2:dia=2:mv0:last_pred=3 -o boxplorer-30fps.avi -mf type=tga:fps=30 mf://frame-*.tga 

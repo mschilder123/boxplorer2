@@ -57,6 +57,11 @@ Options for stereoscopic rendering:
 --sidebyside : half width, right eye on right. Compatible with 3d tvs.
 --quadbuffer : OpenGL quad buffer. Tested on an AMD Radeon 7970 and an Optoma HD600X-LV
 
+Other output formats:
+--cubic      : output 6 cube faces, when rendering or saving a screenshot.
+--dome       : render 180 degree looking up view.
+--spherical  : render 360x180 degree view.
+
 To make a flight path form a loop, edit the .cfg file to have it
 contain a line 'loop 1'. Or add --loop on the commandline.
 

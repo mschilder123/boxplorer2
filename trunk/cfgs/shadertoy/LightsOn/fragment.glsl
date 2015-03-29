@@ -1,20 +1,11 @@
 // from shadertoy/ld2Gz3
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;
-uniform sampler2D bg_texture;
-
 #include "setup.inc"
-#line 9
+#line 5
 
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = vec3(0., 0., 0.);
 float iGlobalTime = time;
-// boxplorer only has 1 channel at the moment..
-#define iChannel0 bg_texture
-#define iChannel1 bg_texture
-#define iChannel2 bg_texture
-#define iChannel3 bg_texture
 
 struct Ray {
 	vec3 origin;
@@ -51,7 +42,7 @@ struct Output {
 	Material material;
 };
 
-const float PI = 3.1415926536;
+//const float PI = 3.1415926536;
 
 #define planeCount 1
 Plane plane[planeCount];
@@ -295,5 +286,6 @@ void main() {
 	
 	vec3 color = raytrace(ray);
 	
-	gl_FragColor = vec4(color, 1.0);
+	//gl_FragColor = vec4(color, 1.0);
+  write_pixel(dir, 0., color);
 }

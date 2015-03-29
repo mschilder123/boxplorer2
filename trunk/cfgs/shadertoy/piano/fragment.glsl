@@ -2,27 +2,20 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // From https://www.shadertoy.com/view/ldl3zN
 
-// boxplorer i/o
-varying vec3 eye, dir;
-uniform float xres, yres, speed, time;
-uniform sampler2D bg_texture;
+#include "setup.inc"
+#line 7
 
-// Map to shadertoy expected vars
-#define iChannel3 bg_texture
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
 vec3 iMouse = dir;
-
-#include "setup.inc"
-#line 17
 
 float fbm( vec3 p, vec3 n )
 {
     p *= 0.15;
 
-    float x = texture2D( iChannel3, p.yz ).x;
-    float y = texture2D( iChannel3, p.zx ).x;
-    float z = texture2D( iChannel3, p.xy ).x;
+    float x = texture2D( iChannel0, p.yz ).x;
+    float y = texture2D( iChannel0, p.zx ).x;
+    float z = texture2D( iChannel0, p.xy ).x;
 
     return x*abs(n.x) + y*abs(n.y) + z*abs(n.z);
 }
@@ -199,15 +192,15 @@ vec4 floorColor( vec3 pos, out vec3 bnor )
     bnor = 100.0*normalize(bnor);
 */
     vec3 col = vec3(0.6,0.35,0.25);
-    float f = 0.5+0.5*texture2D( iChannel3, 0.1*pos.xz*vec2(6.0,0.5)+0.5*id ).x;
+    float f = 0.5+0.5*texture2D( iChannel0, 0.1*pos.xz*vec2(6.0,0.5)+0.5*id ).x;
     col = mix( col, vec3(0.4,0.15,0.05), f );
     
     col.x *= 0.8;
 
-    col *= 0.85 + 0.15*texture2D( iChannel3, 2.0*pos.xz ).x;
+    col *= 0.85 + 0.15*texture2D( iChannel0, 2.0*pos.xz ).x;
 
     // frekles
-    f = smoothstep( 0.4, 0.9, texture2D( iChannel3, pos.xz*0.2 - id*10.0).x );
+    f = smoothstep( 0.4, 0.9, texture2D( iChannel0, pos.xz*0.2 - id*10.0).x );
     col = mix( col, vec3(0.07), f*0.25 );
 
     col *= 1.0 + 0.2*sin(32.0*(id.x-id.y));
@@ -262,10 +255,10 @@ vec4 paperColor( in vec3 pos, in vec3 nor )
 
     
     float of = floor(0.5*250.0*pos.y/6.2831);
-    float g = 1.0-smoothstep( 0.2,0.3,texture2D( iChannel3, pos.xy*vec2(0.5,0.01) + 0.15*of).x);
+    float g = 1.0-smoothstep( 0.2,0.3,texture2D( iChannel0, pos.xy*vec2(0.5,0.01) + 0.15*of).x);
     col *= mix( 1.0, 1.0-g, f );
     
-    col *= 0.5 + 0.7*texture2D( iChannel3, 0.02*pos.xy ).x;
+    col *= 0.5 + 0.7*texture2D( iChannel0, 0.02*pos.xy ).x;
     
     
     return vec4(col,0.0);

@@ -14,12 +14,12 @@
 	Have fun!
 */
 
+#include "setup.inc"
+#line 19
+
 #define DIST_MULTIPLIER par[9].x // {min=.0001 max=1 step=.0001}
 
 #define MAX_DIST 10.0
-
-// Camera position and direction.
-varying vec3 eye, dir;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -30,8 +30,6 @@ uniform float
   ao_strength,        // Strength of ambient occlusion.
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
-
-uniform float speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
@@ -177,24 +175,9 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side) {
 #define ONE_MINUS_ULP 0.999999940395355224609375 //0.99999988079071044921875 // 
 #define ULP 0.000000059604644775390625 //0.00000011920928955078125 // 
 
-uniform float focus;  // {min=-10 max=30 step=.1} Focal plane devation from 15x speed.
-void setup_stereo(inout vec3 eye_in, inout vec3 dp) {
-#if !defined(ST_NONE)
-#if defined(ST_INTERLACED)
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 4.0 * (fract(gl_FragCoord.y * 0.5) - .5) * abs(speed), 0, 0, 0));
-#else
-  vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif
-  eye_in = eye + eye_d;
-  dp = normalize(dir * (focus + 15.0) * abs(speed) - eye_d);
-#else  // ST_NONE
-  eye_in = eye;
-  dp = normalize(dir);
-#endif
-}
-
 void main() {
-  vec3 eye_in, dp; setup_stereo(eye_in, dp);
+  vec3 eye_in, dp;
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
   vec3 p = eye_in;
 
@@ -241,12 +224,5 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zNear = abs(speed);
-  float zFar = 65535.0*zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

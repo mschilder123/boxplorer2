@@ -1,16 +1,10 @@
 //After http://madebyevan.com/webgl-path-tracing/webgl-path-tracing.js
 //Hacked up by marius to work /w boxplorer2
 
-uniform float xres, yres, speed, time;
-varying vec3 eye, dir;  
-
-uniform sampler2D bg_texture;
-uniform int bg_weight;
+#include "setup.inc"
+#line 6
 
 uniform vec3 par[20];
-
-#include "setup.inc"
-#line 14
 
 vec2 iResolution = vec2(xres, yres);
 
@@ -216,13 +210,13 @@ void main() {
   const float kGamma = 1.0;
 
   // Fetch current accumulation
-  vec4 current = texture2D(bg_texture, gl_FragCoord.xy / iResolution);
+  vec4 current = texture2D(iBackbuffer, gl_FragCoord.xy / iResolution);
   vec3 curCol = pow(current.xyz, vec3(kGamma));
 
   // Jitter light a bit for soft shadows.
   vec3 newLight = light + uniformlyRandomVector(time + 53.0) * 0.3;
 
-  float currentWeight = float(bg_weight);
+  float currentWeight = float(iBackbufferCount);
 
   vec3 col = mix(
       calculateColor(pos, ray, newLight),

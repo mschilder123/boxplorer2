@@ -27,9 +27,6 @@
 #define DE_EPS 0.0001 //par[9].y
 #define MAX_DIST 10.0
 
-// Camera position and direction.
-varying vec3 eye, dir;
-
 // Interactive parameters.
 uniform vec3 par[10];
 
@@ -39,8 +36,6 @@ uniform float
   ao_strength,        // Strength of ambient occlusion.
   glow_strength,      // How much glow is applied after max_steps.
   dist_to_color;      // How is background mixed with the surface color after max_steps.
-
-uniform float speed;
 
 uniform int iters,    // Number of fractal iterations.
   color_iters,        // Number of fractal iterations for coloring.
@@ -54,6 +49,9 @@ vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
   specularColor = vec3(1.0, 0.8, 0.4),
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
+
+#include "setup.inc"
+#line 55
 
 //Fuctions to call.
 #define d d_PKlein//de_KIFSMenger //
@@ -203,12 +201,10 @@ float ambient_occlusion(vec3 p, vec3 n, float DistAtp, float side) {
 #define ONE_MINUS_ULP 0.999999940395355224609375 //0.99999988079071044921875 // 
 #define ULP 0.000000059604644775390625 //0.00000011920928955078125 // 
 void main() {
-  // Interlaced stereoscopic eye fiddling
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp;
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
 
-  vec3 p = eye_in, dp = normalize(dir);
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 1000.0, extraD = 0.0, lastD;
   D = d(p + totalD * dp);
@@ -251,11 +247,5 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zFar = 5.0;
-  float zNear = 0.0001;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

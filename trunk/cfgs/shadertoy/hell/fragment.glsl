@@ -1,12 +1,7 @@
 // from: https://www.shadertoy.com/view/Mds3Rn
 
-uniform float xres, yres, time, speed;
-varying vec3 eye, dir;
-
 #include "setup.inc"
-#line 8
-
-const float PI=3.14159265358979323846;
+#line 5
 
 float iGlobalTime = time;
 vec2 iResolution = vec2(xres, yres);
@@ -76,5 +71,5 @@ void main(void)
 	float c=(n.x+n.y+n.z)*0.35;
 	vec3 color=vec3(c,c,c)+t*0.0625;
 	color = vec3(c-t*0.0375+p.y*0.05,c-t*0.025-p.y*0.0625,c+t*0.025-p.y*0.025)+color*color;
-  write_pixel(dir, 1.0, color);  // boxplorify write
+  write_pixel(dir, t, color);  // boxplorify write
 	}

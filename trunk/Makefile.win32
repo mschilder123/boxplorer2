@@ -1,12 +1,14 @@
 # Needs a SDL2 drop in ./SDL2/
-# LibOVR assumed to be at ./LibOVR/
+# Needs ATL, not part of vc++ express; download as part of
+# http://www.microsoft.com/en-us/download/details.aspx?id=11800
+# LibOVR assumed to be at ./OculusSDKx/LibOVR/
 # Sixense at ./sixense/
 #
 all: boxplorer2.exe shadershrink.exe edit-cfg.exe glsl.exe sdl2-test.exe
 
-CFLAGS=/nologo /ILibOVR/Include /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DHYDRAX
+CFLAGS=/nologo /IOculusSDK4/LibOVR/Include /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /I/WinDDK/7600.16385.1/inc/atl71 /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DHYDRAX /DANT_DEBUG
 
-LDFLAGS=/link /LIBPATH:SDL2/lib/x86 /LIBPATH:LibOVR/Lib/Win32 /LIBPATH:sixense /SUBSYSTEM:console /nologo
+LDFLAGS=/link /LIBPATH:SDL2/lib/x86 /LIBPATH:OculusSDK4/LibOVR/Lib/Win32/VS2010 /LIBPATH:sixense /LIBPATH:/WinDDK/7600.16385.1/lib/ATL/i386 /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj \
@@ -14,7 +16,7 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
 	LoadOGLCore.obj TwOpenGLCore.obj
 
 BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj \
-				oculus_sdk.obj
+				oculus_sdk4.obj
 
 boxplorer2.exe: $(BX_OBJS) $(TW_OBJS)
 	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
@@ -32,11 +34,11 @@ edit-cfg.exe: edit-cfg.cc Makefile.win32
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
 boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h Makefile.win32 \
-        glsl.h interpolate.h uniforms.h camera.h shader.h params.h cfgs\menger.cfg.data\fragment.glsl 
+        glsl.h interpolate.h uniforms.h camera.h shader.h params.h cfgs\menger.cfg.data\fragment.glsl include\setup.inc
 	cl -c $(CFLAGS) boxplorer2.cc
 
-oculus_sdk.obj: oculus_sdk.cc oculus_sdk.h
-	cl -c $(CFLAGS) oculus_sdk.cc
+oculus4_sdk.obj: oculus4_sdk.cc oculus4_sdk.h
+	cl -c $(CFLAGS) oculus4_sdk.cc
 
 interpolate.obj: interpolate.cc interpolate.h
 	cl -c $(CFLAGS) interpolate.cc
