@@ -498,7 +498,7 @@ SDL_Joystick* joystick = NULL;
 // Allocate a char[] and read a text file into it. Return 0 on error.
 char* _readFile(char const* name) {
   FILE* f;
-  int len;
+  size_t len;
   char* s = 0;
 
   // open file an get its length
@@ -1623,11 +1623,17 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
-      // This needs to be GL_FLOAT for the pathtracer and radiance shaders that
+      // 32F gives best fidelity for the pathtracer and radiance shaders that
       // use accumulation.
+#if defined(GL_RGBA32F)
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+                   config.width, config.height,
+                   0, GL_BGRA, GL_FLOAT, NULL);
+#else
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                    config.width, config.height,
                    0, GL_BGRA, GL_FLOAT, NULL);
+#endif
 
       CHECK_ERROR;
 
@@ -3084,7 +3090,7 @@ int main(int argc, char **argv) {
           // Start playing: spline and start at keyframe.
           if (!keyframes.empty()) {
             CatmullRom(keyframes, &splines, config.loop);
-            int nkeys = keyframe;
+            size_t nkeys = keyframe;
             for (splines_index = 0; splines_index < splines.size();
                  ++splines_index) {
               if (splines[splines_index].isKey())
