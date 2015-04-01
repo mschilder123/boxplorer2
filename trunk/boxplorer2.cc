@@ -829,9 +829,9 @@ class Camera : public KeyFrame {
      glSetUniformf(time);
 
      glUniform1f(glGetUniformLocation(program, "speed"), spd);
-     glUniform1f(glGetUniformLocation(program, "ipd"), config.ipd);
-     glUniform1f(glGetUniformLocation(program, "xres"), config.width);
-     glUniform1f(glGetUniformLocation(program, "yres"), config.height);
+     glUniform1f(glGetUniformLocation(program, "ipd"), ipd);
+     glUniform1f(glGetUniformLocation(program, "xres"), width);
+     glUniform1f(glGetUniformLocation(program, "yres"), height);
 
      // Also pass in some double precision values, if supported.
      if (glUniform1d) {
@@ -1623,9 +1623,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minfilter);
 
-      // This needs to be 32F for the pathtracer and radiance shaders that
+      // This needs to be GL_FLOAT for the pathtracer and radiance shaders that
       // use accumulation.
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                    config.width, config.height,
                    0, GL_BGRA, GL_FLOAT, NULL);
 
@@ -2424,6 +2424,12 @@ int main(int argc, char **argv) {
       camera.time = now();
     }
 
+    // We want current camera to always be in sync with some fields from
+    // global config.
+    camera.width = config.width;
+    camera.height = config.height;
+    camera.ipd = config.ipd;
+
     next_camera = &camera;
 
     bool mixedInOculus = false;
@@ -2699,7 +2705,7 @@ int main(int argc, char **argv) {
         glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
         glUniform1f(glGetUniformLocation(final_program, "yres"), config.height);
         glUniform1f(glGetUniformLocation(final_program, "ipd"), config.ipd);
-      }
+     }
 
       drawScreen();
 
