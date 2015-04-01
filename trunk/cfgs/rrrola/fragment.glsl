@@ -19,7 +19,7 @@
 #endif
 
 #include "setup.inc"
-#line 23
+#line 24
 
 // Colors. Can be negative or >1 for interestiong effects.
 #endif  // _FAKE_GLSL_
@@ -65,8 +65,7 @@ void init() {
 
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, -MB_SCALE) / minRad2;
-  if (scale.w < 0) scale.w = abs(scale.w);
+  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(-MB_SCALE)) / minRad2;
   
   float s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
   //for (int i=0; i<int(float(iters) * detail); i++) s*= ds;
