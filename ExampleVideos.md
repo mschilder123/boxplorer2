@@ -1,5 +1,7 @@
 # Sample videos rendered with boxplorer2 #
 
+Note Youtube decided to abandon everybody that has overunder 3D; it only supports sidebyside now.
+
   * http://www.youtube.com/watch?v=GN6TIGY4PHI
 > Change width and height to desired dimensions in cfgs/menger-sphere/default.cfg and run
 > `./boxplorer2 cfgs/menger-sphere/ --render --fixedfov --overunder`
@@ -19,5 +21,5 @@
 > `./boxplorer2 cfgs/menger.cfg.data/ --render --fixedfov --overunder --time` to regenerate.
 
   * http://www.youtube.com/watch?v=20xv8U-B-G8
-> `./boxplorer2 cfgs/menger.cfg.data/ionized-0.cfg --kf=ionized --time --loop --render` to regenerate.
+> `./boxplorer2 cfgs/menger.cfg.data/ionized-0.cfg --kf=ionized --time --overunder --fixedfov --loop --render` to regenerate.
 > I first made a loop flight like normal. Then renamed position to par19 (aka light 1 coordinate) using `edit-cfg -r`. Then added final camera flight path, chasing the light. Pretty tedious..
