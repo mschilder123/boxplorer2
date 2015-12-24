@@ -2,6 +2,7 @@
 // sdk4 mods by marius
 
 #include "oculus_sdk4.h"
+#if defined(HAVE_SDK4)
 #include "OVR.h"
 
 #pragma comment(lib, "libovr.lib")
@@ -17,8 +18,10 @@
 #pragma comment(lib, "gdi32.lib")
 
 static ovrHmd hmd = NULL;
+#endif  // HAVE_SDK4
 
 int InitOculusSDK() {
+#if defined(HAVE_SDK4)
   ovr_Initialize();
   hmd = ovrHmd_Create(0);
 
@@ -38,6 +41,9 @@ int InitOculusSDK() {
       | ovrTrackingCap_Position, 0);
   
   return 1;
+#else  // HAVE_SDK4
+  return 0;
+#endif  // HAVE_SDK4
 }
 
 void GetOculusView(float view[3]) {
@@ -55,6 +61,7 @@ void GetOculusView(float view[3]) {
 
 bool GetOculusQuat(float quat[4]) {
   bool result = false;
+#if defined(HAVE_SDK4)
   ovrTrackingState ts = ovrHmd_GetTrackingState(hmd, 0.0/*ovr_GetTimeInSeconds()*/);
   if (ts.StatusFlags & (ovrStatus_OrientationTracked)) {
     ovrPoseStatef poseState = ts.HeadPose;
@@ -77,22 +84,25 @@ bool GetOculusQuat(float quat[4]) {
     printf("pos(%f, %f, %f)\n", p.x, p.y, p.z);
   }
 #endif
+#endif  // HAVE_SDK4
   return result;
 }
 
-void ReleaseOculusSDK()
-{
+void ReleaseOculusSDK() {
+#if defined(HAVE_SDK4)
   if (hmd) {
     ovrHmd_Destroy(hmd);
     hmd = NULL;
   }
   ovr_Shutdown();
+#endif  // HAVE_SDK4
 }
 
 void SetOculusPrediction(float time) {
 }
 
 int GetOculusDeviceInfo(hmd_settings_t *hmd_settings) {
+#if defined(HAVE_SDK4)
   hmd_settings->h_resolution = hmd->Resolution.w;
   hmd_settings->v_resolution = hmd->Resolution.h;
 #if 0
@@ -107,8 +117,13 @@ int GetOculusDeviceInfo(hmd_settings_t *hmd_settings) {
 
 #endif
   return 1;
+#else  // HAVE_SDK4
+  return 0;
+#endif  // HAVE_SDK4
 }
 
 void ResetOculusOrientation() {
+#if defined(HAVE_SDK4)
   ovrHmd_RecenterPose(hmd);
+#endif  // HAVE_SDK4
 }

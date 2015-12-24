@@ -1,12 +1,13 @@
 # Needs a SDL2 drop in ./SDL2/
 # Needs ATL, not part of vc++ express; download as part of
 # http://www.microsoft.com/en-us/download/details.aspx?id=11800
-# LibOVR assumed to be at ./OculusSDKx/LibOVR/
-# Sixense at ./sixense/
 #
+# LibOVR assumed to be at ./OculusSDK4/LibOVR/ (define HAVE_SDK4 vs NO_HAVE_SDK4)
+# Sixense at ./sixense/ (define HYDRA vs NO_HYDRA)
+
 all: boxplorer2.exe shadershrink.exe edit-cfg.exe glsl.exe sdl2-test.exe
 
-CFLAGS=/nologo /IOculusSDK4/LibOVR/Include /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /I/WinDDK/7600.16385.1/inc/atl71 /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DHYDRAX /DANT_DEBUG
+CFLAGS=/nologo /IOculusSDK4/LibOVR/Include /ISDL2/include /Iinclude /IAntTweakBar/include /IAntTweakBar/src /Isixense /I/WinDDK/7600.16385.1/inc/atl71 /MD /D_CONSOLE /DWIN32 /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DANT_DEBUG /DNO_HYDRA /DNO_HAVE_SDK4
 
 LDFLAGS=/link /LIBPATH:SDL2/lib/x86 /LIBPATH:OculusSDK4/LibOVR/Lib/Win32/VS2010 /LIBPATH:sixense /LIBPATH:/WinDDK/7600.16385.1/lib/ATL/i386 /SUBSYSTEM:console /nologo
 
