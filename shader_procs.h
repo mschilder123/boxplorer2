@@ -8,6 +8,9 @@ bool enableShaderProcs(void);
 #include <SDL_opengl.h>
 #include <SDL.h>
 
+typedef ptrdiff_t GLsizeiptr;
+typedef ptrdiff_t GLintptr;
+
 #if (defined __APPLE__)
   #include <OpenGL/glu.h>
   #include <OpenGL/glext.h>
