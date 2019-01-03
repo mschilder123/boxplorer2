@@ -9,8 +9,8 @@
 
 #include <stdio.h>
 
-#include <SDL.h>
-#include <SDL_main.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_main.h>
 
 #if defined(_WIN32)
 #pragma comment(lib, "SDL2.lib")

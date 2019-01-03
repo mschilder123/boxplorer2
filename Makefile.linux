@@ -2,6 +2,9 @@
 #
 all: boxplorer2 shadershrink edit-cfg glsl sdl2-test
 
+clean:
+	rm *.o boxplorer2 shadershrink edit-cfg glsl sdl2-test
+
 CFLAGS=-O2 -I/usr/local/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
 
 LDFLAGS=-lm -lGL -lX11 -lSDL2 -lSDL2main

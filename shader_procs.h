@@ -5,8 +5,8 @@
 bool enableShaderProcs(void);
 
 #define NO_SDL_GLEXT
-#include <SDL_opengl.h>
-#include <SDL.h>
+#include <SDL2/SDL_opengl.h>
+#include <SDL2/SDL.h>
 
 typedef ptrdiff_t GLsizeiptr;
 typedef ptrdiff_t GLintptr;

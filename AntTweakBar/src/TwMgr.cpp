@@ -177,9 +177,11 @@ void ANT_CALL CColorExt::InitColor32CB(void *_ExtValue, void *_ClientData)
         ext->m_HLS = false;
         ext->m_HasAlpha = false;
         ext->m_CanHaveAlpha = true;
+#ifdef ANT_DODX
         if( g_TwMgr && g_TwMgr->m_GraphAPI==TW_DIRECT3D9 ) // D3D10 now use OGL rgba order!
             ext->m_OGL = false;
         else
+#endif
             ext->m_OGL = true;
         ext->m_PrevConvertedColor = Color32FromARGBi(ext->A, ext->R, ext->G, ext->B);
         ext->m_StructProxy = (CTwMgr::CStructProxy *)_ClientData;

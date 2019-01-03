@@ -19,9 +19,9 @@ void ColorRGBToHLSf(float _R, float _G, float _B, float *_Hue, float *_Light, fl
 
     float rnorm, gnorm, bnorm, minval, maxval, msum, mdiff, r, g, b;
     r = g = b = 0;
-    if(_R>0) r = _R; if(r>1) r = 1;
-    if(_G>0) g = _G; if(g>1) g = 1;
-    if(_B>0) b = _B; if(b>1) b = 1;
+    if(_R>0){ r = _R; } if(r>1){ r = 1; }
+    if(_G>0){ g = _G; } if(g>1){ g = 1; }
+    if(_B>0){ b = _B; } if(b>1){ b = 1; }
 
     minval = r;
     if(g<minval) minval = g;
@@ -106,9 +106,9 @@ void ColorHLSToRGBf(float _Hue, float _Light, float _Saturation, float *_R, floa
 
     float rh, rl, rs, rm1, rm2;
     rh = rl = rs = 0;
-    if(_Hue>0)        rh = _Hue;        if(rh>360) rh = 360;
-    if(_Light>0)      rl = _Light;      if(rl>1)   rl = 1;
-    if(_Saturation>0) rs = _Saturation; if(rs>1)   rs = 1;
+    if(_Hue>0)       { rh = _Hue;       } if(rh>360) { rh = 360; }
+    if(_Light>0)     { rl = _Light;     } if(rl>1)   { rl = 1; }
+    if(_Saturation>0){ rs = _Saturation;} if(rs>1)   { rs = 1; }
 
     if(rl<=0.5f)
         rm2 = rl*(1.0f + rs);

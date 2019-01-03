@@ -58,10 +58,10 @@
 using namespace std;
 
 #define NO_SDL_GLEXT
-#include <SDL_opengl.h>
-#include <SDL.h>
-#include <SDL_thread.h>
-#include <SDL_main.h>
+#include <SDL2/SDL_opengl.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_thread.h>
+#include <SDL2/SDL_main.h>
 
 #include <AntTweakBar.h>
 
@@ -3230,6 +3230,8 @@ int main(int argc, char **argv) {
     (void)mouse_buttons;
     (void)mouse_button_left;
     (void)mouse_button_right;
+    (void)joystick_lt;
+    (void)joystick_rt;
 
     if (keystate[SDL_SCANCODE_W]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDL_SCANCODE_S]) camera.move(0, 0, -camera.speed);  //back

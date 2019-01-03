@@ -194,9 +194,11 @@ TW_API int      TW_CALL TwSetParam(TwBar *bar, const char *varName, const char *
 typedef enum ETwGraphAPI
 {
     TW_OPENGL           = 1,
+#ifdef ANT_DODX
     TW_DIRECT3D9        = 2,
     TW_DIRECT3D10       = 3,
     TW_DIRECT3D11       = 4,
+#endif
     TW_OPENGL_CORE      = 5
 } TwGraphAPI;
 
