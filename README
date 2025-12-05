@@ -1,7 +1,7 @@
 Added simple makefiles for linux, win32 and osx. Mild testing on all got done.
 Copy Makefile.? to Makefile and run make/nmake.
 
-You'll need SDL2 ( http://www.libsdl.org/download-2.0.php )
+You'll need SDL2 ( https://github.com/libsdl-org/SDL/releases/tag/release-2.32.8 )
 
 Compared to starting point boxplorer-1.02:
 - added z-buffering splining, rough keyframe editing and visualization.
@@ -70,3 +70,4 @@ either change the box appearance or switch fractal entirely (bulb,
 menger,blend-menger).
 
 -marius
+
