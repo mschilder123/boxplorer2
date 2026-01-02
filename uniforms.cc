@@ -306,7 +306,7 @@ bool Uniforms::parseFromGlsl(const string& glsl) {
 }
 
 void Uniforms::link(KeyFrame* kf) {
-  for (hash_map<string, iUniformPtr>::iterator it =
+  for (unordered_map<string, iUniformPtr>::iterator it =
     uniforms.begin(); it != uniforms.end(); ++it) {
       if (it->second->link(kf)) {
         cout << "link UNI: " << it->second->toString() << endl;
@@ -315,7 +315,7 @@ void Uniforms::link(KeyFrame* kf) {
 }
 
 void Uniforms::bindToUI(void* bar) {
-  for (hash_map<string, iUniformPtr>::iterator it =
+  for (unordered_map<string, iUniformPtr>::iterator it =
     uniforms.begin(); it != uniforms.end(); ++it) {
       if (it->second->ok())
         it->second->bindToUI(bar);
@@ -323,7 +323,7 @@ void Uniforms::bindToUI(void* bar) {
 }
 
 void Uniforms::send(int program) {
-  for (hash_map<string, iUniformPtr>::iterator it =
+  for (unordered_map<string, iUniformPtr>::iterator it =
     uniforms.begin(); it != uniforms.end(); ++it) {
       if (it->second->ok())
         it->second->send(program);
