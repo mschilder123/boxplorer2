@@ -34,6 +34,7 @@
 #if defined(_MSC_VER) && _MSC_VER<=1200
 #   pragma warning(push, 3)
 #endif
+#include <functional>
 #include <string>
 #include <sstream>
 #include <vector>
