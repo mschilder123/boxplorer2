@@ -1,10 +1,10 @@
 // Mandalabeth 1522 shader by marius.
 // Original shader by Rrrola for mandelbox, part of boxplorer.
 
-#define MAX_DIST 4.0
+#include "setup.inc"
+#line 5
 
-// Camera position and direction.
-varying vec3 eye, dir;
+#define MAX_DIST 4.0
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -14,10 +14,6 @@ uniform float ao_eps;  // Base distance at which ambient occlusion is estimated.
 uniform float ao_strength;  // Strength of ambient occlusion. {min=0 max=.01 step=.0001}
 uniform float glow_strength;  // How much glow is applied after max_steps. {min=0 max=10 step=.05}
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.05}
-
-uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
-uniform float xres;
-varying float zoom;
 
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
@@ -36,7 +32,7 @@ uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
 
 vec3 aoColor = vec3(0, 0, 0);
 
-//Fuctions to call.
+//Functions to call.
 #define d d_MandalaBeth1522  //d_MandalaBeth1032
 #define color color_MandalaBeth
 
@@ -196,11 +192,11 @@ float ambient_occlusion(vec3 p, vec3 n, float side) {
 
 
 void main() {
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp;
 
-  vec3 p = eye_in, dp = normalize(dir);
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
+
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 3.4e38, extraD = 0.0, lastD;
   float cutD;
@@ -265,12 +261,5 @@ if (z - par[0].x < -m_dist) {
   } else totalD = MAX_DIST;
  }
 
-  // Write Z-buffer
-  float zNear = abs(speed);
-  float zFar = 65535.0*zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }

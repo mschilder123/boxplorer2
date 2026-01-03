@@ -2,6 +2,9 @@
 // Original formula by Tglad
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
 
+#include "setup.inc"
+#line 6
+
 #define P0 p0                    // standard Mandelbox
 //#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
 
@@ -37,8 +40,6 @@ uniform float dist_to_color;  // How is background mixed with the surface color 
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
 uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
-
-#include "setup.inc"
 
 // Colors. Can be negative or >1 for interesting effects.
 vec3 specularColor = vec3(.9, 0.8, 0.4);
