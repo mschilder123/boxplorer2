@@ -1,11 +1,11 @@
 # sudo apt-get install libsdl2-dev
-#
+
 all: boxplorer2 shadershrink edit-cfg glsl sdl2-test
 
 clean:
 	rm *.o boxplorer2 shadershrink edit-cfg glsl sdl2-test
 
-CFLAGS=-O2 -I/usr/local/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
+CFLAGS=-O2 -I/usr/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
 
 LDFLAGS=-lm -lGL -lX11 -lSDL2 -lSDL2main
 
@@ -42,7 +42,7 @@ shader.o: shader.cc shader.h
 camera.o: camera.cc camera.h params.h
 	g++ -c $(CFLAGS) camera.cc
 
-uniforms.o: uniforms.cc uniforms.h
+uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
 	g++ -c $(CFLAGS) uniforms.cc
 
 TwBar.o: AntTweakBar/src/TwBar.cpp

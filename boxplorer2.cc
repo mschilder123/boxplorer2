@@ -42,7 +42,7 @@
 #include <sixense.h>
 #pragma comment(lib, "sixense.lib")
 #pragma comment(lib, "sixense_utils.lib")
-#endif
+#endif  // HYDRA
 
 #endif  // _WIN32
 
@@ -58,10 +58,10 @@
 using namespace std;
 
 #define NO_SDL_GLEXT
-#include <SDL2/SDL_opengl.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_thread.h>
-#include <SDL2/SDL_main.h>
+#include <SDL_opengl.h>
+#include <SDL.h>
+#include <SDL_thread.h>
+#include <SDL_main.h>
 
 #include <AntTweakBar.h>
 
@@ -110,6 +110,12 @@ using namespace std;
 #endif
 #ifdef min
 #undef min
+#endif
+
+#if defined(_WIN32)
+void glActiveTexture( GLenum texture ) {
+	xglActiveTexture(texture);
+}
 #endif
 
 #include "glsl.h"
@@ -344,7 +350,7 @@ class GFX {
       window_ = SDL_CreateWindow("boxplorer2",
           rect_[d].x, rect_[d].y,
           targetWidth, targetHeight,
-          SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN);
+          SDL_WINDOW_OPENGL|SDL_WINDOW_FULLSCREEN_DESKTOP);
       width_ = targetWidth;
       height_ = targetHeight;
     } else {
@@ -1160,7 +1166,7 @@ char* printController(char* s, Controller c) {
   assert(c <= CTL_LAST);
   switch (c) {
     default: {
-      char x[8],y[8]; sprintf(x, "par%dx", c); sprintf(y, "par%dy", c);
+      char x[20],y[20]; sprintf(x, "par%dx", c); sprintf(y, "par%dy", c);
       sprintf(s, "%s %.3f %s %.3f",
         y, camera.par[c][1],
         x, camera.par[c][0]
@@ -1430,8 +1436,6 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, config.depth_size);
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-  printf(__FUNCTION__ " : SetSwap %d\n", SDL_GL_SetSwapInterval(0));
-
   if(stereoMode==ST_QUADBUFFER) {
     SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
   }
@@ -1489,6 +1493,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   grabbedInput = 1;
   SDL_SetRelativeMouseMode(SDL_FALSE);  // This toggle is needed!
   SDL_SetRelativeMouseMode(SDL_TRUE);
+
+  printf(__FUNCTION__ " : SetSwap %d\n", SDL_GL_SetSwapInterval(0));
 
   // Enable shader functions and compile shaders.
   // Needs to be done after setting the video mode.
@@ -2041,6 +2047,7 @@ int main(int argc, char **argv) {
   char* outputFilename = NULL;
 
   // Peel known options off the back..
+  char* prev_arg = NULL;
   while (argc>1) {
     if (!strcmp(argv[argc-1], "--overunder")) {
       stereoMode = ST_OVERUNDER;
@@ -2101,9 +2108,18 @@ int main(int argc, char **argv) {
       kJOYSTICK = atoi(argv[argc-1] + 11);
     } else if (!strncmp(argv[argc-1], "--lifeform=", 11)) {
       lifeform_file = argv[argc-1] + 11;
-    } else break;
+    } else if (!strcmp(argv[argc-1], "--lifeform") && prev_arg != NULL) {
+      lifeform_file = prev_arg;
+    } else {
+	    prev_arg = argv[argc-1];
+	    if (argc<3) break;
+    }
     --argc;
   }
+
+#if defined(_WIN32)
+  SetProcessDPIAware();
+#endif
 
   if (stereoMode == ST_NONE) defines.append("#define ST_NONE\n");
 
@@ -2258,7 +2274,11 @@ int main(int argc, char **argv) {
   int saveWidth = config.width;
   int saveHeight = config.height;
 
-  if (stereoMode == ST_XEYED) config.width *= 2;
+  if (stereoMode == ST_XEYED) {
+	  //config.width *= 2;
+	  config.width = 3840;
+	  config.height = 1080;
+  }
 
   config.sanitizeParameters();
 

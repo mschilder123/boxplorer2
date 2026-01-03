@@ -5,8 +5,8 @@
 bool enableShaderProcs(void);
 
 #define NO_SDL_GLEXT
-#include <SDL2/SDL_opengl.h>
-#include <SDL2/SDL.h>
+#include <SDL_opengl.h>
+#include <SDL.h>
 
 typedef ptrdiff_t GLsizeiptr;
 typedef ptrdiff_t GLintptr;
@@ -14,27 +14,32 @@ typedef ptrdiff_t GLintptr;
 #if (defined __APPLE__)
   #include <OpenGL/glu.h>
   #include <OpenGL/glext.h>
+
 #if !defined(GL_DECLARE_ONLY)
 #ifndef PFNGLUNIFORM1DPROC
 void (*glUniform1d)(int, double) = 0;
 void (*glUniform3dv)(int, int, double*) = 0;
 #endif
-#endif  // GL_DECLARE_ONLY
- #elif (defined __WIN32__)
+#endif  // !GL_DECLARE_ONLY
+
+#elif (defined __WIN32__)
+  // nothing?
 #elif (defined __GNUC__)
   #include <GL/glx.h>
   #include <GL/glxext.h>
 #else
-#error "Unknown target"
+  #error "Unknown target"
 #endif
 
 #if !(defined __APPLE__)
-#include "GL/glext.h"
+#include <GL/glext.h>
 
 #if defined(GL_DECLARE_ONLY)
 #define DECLARE_GL_PROC(type, name) extern type name
+#define DECLARE_GL_PROCX(type, name) extern type x##name
 #else
 #define DECLARE_GL_PROC(type, name) type name = 0
+#define DECLARE_GL_PROCX(type, name) type x##name = 0
 #endif
 
 DECLARE_GL_PROC(PFNGLCREATEPROGRAMPROC, glCreateProgram);
@@ -81,7 +86,7 @@ DECLARE_GL_PROC(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus);
 //DECLARE_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
 
 #if defined(__WIN32__)
-DECLARE_GL_PROC(PFNGLACTIVETEXTUREPROC, glActiveTexture);
+DECLARE_GL_PROCX(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 #endif
 
 #undef DECLARE_GL_PROC
@@ -90,10 +95,15 @@ DECLARE_GL_PROC(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 
 #ifndef GL_DECLARE_ONLY
 bool enableShaderProcs(void) {
+
 #ifndef __APPLE__
 
 #define IMPORT_GL_PROC(type, name) \
   do { if (!(name = (type) SDL_GL_GetProcAddress(#name))) { \
+    fprintf(stderr, "failed to import function " #name "\n"); \
+  } } while (0)
+#define IMPORT_GL_PROCX(type, name) \
+  do { if (!(x##name = (type) SDL_GL_GetProcAddress(#name))) { \
     fprintf(stderr, "failed to import function " #name "\n"); \
   } } while (0)
 
@@ -141,15 +151,15 @@ bool enableShaderProcs(void) {
   //IMPORT_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
 
 #if defined(__WIN32__)
-  IMPORT_GL_PROC(PFNGLACTIVETEXTUREPROC, glActiveTexture);
+  IMPORT_GL_PROCX(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 #endif
 
 #undef IMPORT_GL_PROC
 
-#endif  // __APPLE__
+#endif  // !__APPLE__
 
   return true;
 }
-#endif  // GL_DECLARE_ONLY
+#endif  // !GL_DECLARE_ONLY
 
 #endif  // SHADER_PROCS_H
