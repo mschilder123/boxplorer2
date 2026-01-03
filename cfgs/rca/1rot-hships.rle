@@ -1,5 +1,13 @@
 x = 126, y = 126, rule = SingleRotation
-$
-4bo2$4b2o$4bo7$2b2o2bobo$5b2o$bo4bo8$3b3o$2bo2$4bo$4bo10$o2bo$b2o4bo$4bo2bo$3bo10$4b2o2$2bo$o3b2ob2o3$5bo12$bo$bo2b2o$bobo9$5bo$3b3o$2bobo12$3bo$2b3o$5b2o$6bo2$5bo12$3bo$5bo$3b3o$3bo8$2b2obobo$5bo$5bo$5bo$7bo
-10$bb3o$bo3b2o2$bbo$b2bo
+$4bo2$4b2o$4bo
+7$2b2o2bobo$5b2o$bo4bo
+8$3b3o$2bo2$4bo$4bo
+10$o2bo$b2o4bo$4bo2bo$3bo
+10$4b2o2$2bo$o3b2ob2o3$5bo
+12$bo$bo2b2o$bobo
+9$5bo$3b3o$2bobo
+12$3bo$2b3o$5b2o$6bo2$5bo
+12$3bo$5bo$3b3o$3bo
+8$2b2obobo$5bo$5bo$5bo$7bo
+12$bb3o$bo3b2o2$bbo$b2bo
 !
