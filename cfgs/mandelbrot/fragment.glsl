@@ -4,6 +4,7 @@
 
 // Camera position and direction.
 varying vec3 eye, dir;
+
 #if 0
 // wtf is wrong w/ AMD?
 uniform dvec3 deye;  // eye position in double precision
@@ -21,15 +22,19 @@ uniform float time;
 
 #define surfaceColor par[2]
 #define surfaceColor2 par[3]
-//#define R par[2].x
-//#define G par[2].y
-//#define B par[2].z
+#define R par[2].x
+#define G par[2].y
+#define B par[2].z
+
+double fabs(double f) {
+  return sign(f)*f;
+}
 
 dvec2 complexMul(dvec2 a, dvec2 b) {
   return dvec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y * b.x);
 }
 
-#if 0
+#if 1
 #define Divider par[0].x  // {min=0 max=50}
 #define Power par[0].y  // {min=0 max=6 step=1e-4}
 #define Radius par[0].z // {min=0 max=5}
@@ -42,7 +47,7 @@ vec3 getColor2D(dvec2 c) {
   for (i = 0; i < iters; i++) {
     z = complexMul(z,z) + c;
     if (dot(z,z)> 4.0) break;
-    dist = min(dist, abs(length(z)-Radius));
+    dist = min(dist, fabs(length(z)-Radius));
   }
   if (i < iters) {
     // The color scheme here is based on one
@@ -83,7 +88,7 @@ vec3 getColor2D(dvec2 c) {
 }
 #endif
 
-#if 1
+#if 0
 // https://www.shadertoy.com/view/ldf3DN
 vec3 getColor2D(dvec2 cc) {
   dvec2 z  = dvec2(0.0);
@@ -108,7 +113,7 @@ vec3 getColor2D(dvec2 cc) {
     z = cc + dvec2( z.x*z.x - z.y*z.y, 2.0*z.x*z.y );
       
     // trap 1
-    double d1 = abs(dot(z-dvec2(0.0,1.0), trap1vector));
+    double d1 = fabs(dot(z-dvec2(0.0,1.0), trap1vector));
     double ff = step( d1, 1.0 );
     co2 += ff;
     trap1 += ff*d1;

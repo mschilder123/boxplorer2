@@ -92,12 +92,14 @@ mat3 rotationMatrix;
 #define rotationAngle par[4].x  // { min=-5 max=5 step=.01}
 #define rotationQuat par[3]  // that is par[3].xyz and par[4].x
 
+double fabs(double f) { return sign(f)*f; }
+
 void init() {
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  scale = dvec4(MB_SCALE, MB_SCALE, MB_SCALE, fabs(MB_SCALE)) / minRad2;
   
-  double s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
+  double s = fabs(MB_SCALE), ds = 1.0 / fabs(MB_SCALE);
   for (int i=0; i<iters; i++) s*= ds;
   absScalePowIters = s;
   
@@ -125,7 +127,7 @@ double de_mandelbox(dvec3 pos) {
 
 	  if (r2 > 100.0) break;
   }
-  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
+  return ((length(p.xyz) - fabs(MB_SCALE - 1.0)) / p.w
 			- absScalePowIters) * 0.95 * DIST_MULTIPLIER;
 }
 DECLARE_DE(de_mandelbox)
@@ -140,7 +142,7 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
     p.xyz = clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz;
 
     double r2 = dot(p.xyz, p.xyz);
-    orbitTrap = min(orbitTrap, abs(dvec4(p.xyz, r2)));
+    orbitTrap = min(orbitTrap, fabs(dvec4(p.xyz, r2)));
 
 	  p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
     p = p*scale + P0;
@@ -164,9 +166,9 @@ vec3 c_mandelbox(dvec3 pos, double totalD) {
 dvec3 normal(dvec3 pos, double d_pos) {
   dvec2 Eps = dvec2(0, 3.0*d_pos);
   return normalize(
-     dvec3(-abs(d(pos-Eps.yxx))+abs(d(pos+Eps.yxx)),
-           -abs(d(pos-Eps.xyx))+abs(d(pos+Eps.xyx)),
-           -abs(d(pos-Eps.xxy))+abs(d(pos+Eps.xxy))
+     dvec3(-fabs(d(pos-Eps.yxx))+fabs(d(pos+Eps.yxx)),
+           -fabs(d(pos-Eps.xyx))+fabs(d(pos+Eps.xyx)),
+           -fabs(d(pos-Eps.xxy))+fabs(d(pos+Eps.xxy))
 		  )
      );
 }
@@ -189,7 +191,7 @@ float ambient_occlusion(dvec3 p, dvec3 n, double DistAtp) {
 
   for (int i=0; i<5; i++) {
     double D = d(p + n*dist);
-    ao -= (dist-abs(D)) * w;
+    ao -= (dist-fabs(D)) * w;
     w *= 0.5;
     dist = dist*2.0 - ao_ed;  // 2,3,5,9,17
   }
@@ -238,7 +240,7 @@ bool setup_stereo(inout dvec3 eye_in, inout dvec3 dp) {
   dvec3 eye_d = dvec3(gl_ModelViewMatrix * dvec4(dspeed, 0, 0, 0));
 #endif
   eye_in = deye + eye_d;
-  dp = normalize(dir * (focus + 30.0) * abs(dspeed) - eye_d);
+  dp = normalize(dir * (focus + 30.0) * fabs(dspeed) - eye_d);
 #endif  // ST_OCULUS
 #else  // ST_NONE
   eye_in = deye;
@@ -286,7 +288,7 @@ void main() {
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
     col = c(p, totalD);
-    dvec3 n = normal(p, m_dist/*abs(D)*/);
+    dvec3 n = normal(p, m_dist/*fabs(D)*/);
     col = blinn_phong(n, -dp, normalize(eye_in+dp+dvec3(0,-1,0)), col);
     col = mix(aoColor, col, ambient_occlusion(p, n, 20.*m_dist));
 
@@ -303,14 +305,14 @@ void main() {
   col = mix(col, glowColor, (float(steps)+float(noise))/float(max_steps) * glow_strength);
   //col = mix(col, glowColor, clamp(float(totalD/dspeed/1000.0), 0.0, 1.0));
 
-  double zNear = abs(dspeed);
+  double zNear = fabs(dspeed);
 
   // compute CoC, thin lens model
-  double P = abs(focus + 30.0) * zNear;
+  double P = fabs(focus + 30.0) * zNear;
   D = totalD;
   double A = aperture;  //~aperture;
-  double F = 8.*abs(dspeed); //~focalLength;
-  double CoC = abs(A*(F*(P-D))/(D*(P-F)));
+  double F = 8.*fabs(dspeed); //~focalLength;
+  double CoC = fabs(A*(F*(P-D))/(D*(P-F)));
 
   double zFar = 65535.0 * zNear;
   double a = zFar / (zFar - zNear);
