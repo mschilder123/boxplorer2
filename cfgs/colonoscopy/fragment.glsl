@@ -25,9 +25,6 @@
 #define DIST_MULTIPLIER 0.5
 #define MAX_DIST 4.0
 
-// Camera position and direction.
-varying vec3 eye, dir;
-
 // Interactive parameters.
 uniform vec3 par[10];
 
@@ -37,13 +34,9 @@ uniform float ao_strength;  // Strength of ambient occlusion. {min=0 max=.01 ste
 uniform float glow_strength;  // How much glow is applied after max_steps. {min=0 max=10 step=.05}
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.01}
 
-uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
-
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
 uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
-
-uniform float xres, yres;
 
 #include "setup.inc"
 
