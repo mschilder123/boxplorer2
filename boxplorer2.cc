@@ -1421,7 +1421,7 @@ bool setupDirectories(const char* configFile) {
 // Grabs mouse input.
 //
 // Exits the program if an error occurs.
-bool initGraphics(bool fullscreenToggle, int w, int h) {
+bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
   // Set attributes for the OpenGL window.
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1485,8 +1485,10 @@ bool initGraphics(bool fullscreenToggle, int w, int h) {
   if (arrow_cursor == NULL) arrow_cursor = SDL_GetCursor();
 
   grabbedInput = 1;
-  SDL_SetRelativeMouseMode(SDL_FALSE);  // This toggle is needed!
-  SDL_SetRelativeMouseMode(SDL_TRUE);
+  if (hideMouse) {
+    SDL_SetRelativeMouseMode(SDL_FALSE);  // This toggle is needed!
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+  }
 
   printf(__FUNCTION__ " : SetSwap %d\n", SDL_GL_SetSwapInterval(0));
 
@@ -2314,9 +2316,9 @@ int main(int argc, char **argv) {
 
   // Set up the video mode, OpenGL state, shaders and shader parameters.
   if (config.fullscreen) {
-    initGraphics(true, 0, 0);
+    initGraphics(true, 0, 0, lifeform.empty());
   } else {
-    initGraphics(false, config.width, config.height);
+    initGraphics(false, config.width, config.height, lifeform.empty());
   }
 
   // Parse as many uniforms from glsl source as we can find.
@@ -2874,7 +2876,7 @@ int main(int argc, char **argv) {
       case SDL_WINDOWEVENT: {
         if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
             if (initGraphics(false,
-                             event.window.data1, event.window.data2)) {
+                             event.window.data1, event.window.data2, lifeform.empty())) {
               frameno = 0;
               initTwBar(stereoMode);
 
@@ -2952,7 +2954,9 @@ int main(int argc, char **argv) {
          if (ignoreNextMouseUp == false && grabbedInput == 0) {
            grabbedInput = 1;
            SDL_SetCursor(arrow_cursor);
-           SDL_SetRelativeMouseMode(SDL_TRUE);
+           if (lifeform.empty()) {
+             SDL_SetRelativeMouseMode(SDL_TRUE);
+           }
          }
          ignoreNextMouseUp = false;
          dragging = false;
@@ -2967,7 +2971,9 @@ int main(int argc, char **argv) {
       case SDLK_ESCAPE: {
          if (grabbedInput) {
            grabbedInput = 0;
-           SDL_SetRelativeMouseMode(SDL_FALSE);
+           if (!lifeform.empty()) {
+             SDL_SetRelativeMouseMode(SDL_FALSE);
+           }
          } else {
            done |= 1;
          }
@@ -2975,7 +2981,7 @@ int main(int argc, char **argv) {
 
       // Switch fullscreen mode (drops the whole OpenGL context in Windows).
       case SDLK_RETURN: case SDLK_KP_ENTER: {
-        initGraphics(true, 0, 0);
+        initGraphics(true, 0, 0, lifeform.empty());
         frameno = 0;
         initTwBar(stereoMode);
       } break;
