@@ -2365,6 +2365,7 @@ int main(int argc, char **argv) {
 
   bool ignoreNextMouseUp = false;
   bool dragging = false;
+  bool prevCtrl = false;
 
   if (rendering) {
     // Rendering a sequence to disk. Spline the keyframes now.
@@ -3247,6 +3248,18 @@ int main(int argc, char **argv) {
     (void)mouse_button_right;
     (void)joystick_lt;
     (void)joystick_rt;
+
+    // Single step feature: hold PAUSE and tap CTRL to step.
+    // Primary use case is with lifeform automata.
+    if (keystate[SDL_SCANCODE_PAUSE]) {
+      while (prevCtrl == hasCtrl && keystate[SDL_SCANCODE_PAUSE]) {
+        SDL_Delay(100);
+        SDL_PumpEvents();
+        keystate = SDL_GetKeyboardState(0);
+        hasCtrl = keystate[SDL_SCANCODE_RCTRL] || keystate[SDL_SCANCODE_LCTRL];
+      }
+    }
+    prevCtrl = hasCtrl;
 
     if (keystate[SDL_SCANCODE_W]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDL_SCANCODE_S]) camera.move(0, 0, -camera.speed);  //back
