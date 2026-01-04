@@ -1421,7 +1421,7 @@ bool setupDirectories(const char* configFile) {
 // Grabs mouse input.
 //
 // Exits the program if an error occurs.
-bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
+bool initGraphics(bool fullscreenToggle, int w, int h) {
   // Set attributes for the OpenGL window.
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1769,7 +1769,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, int frameno = 0) {
   // Fill backbuffer w/ starting lifeform, if we have one.
 
   if (config.backbuffer && !lifeform.empty()) {
-    glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[(frameno&1)^1]);
+    glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[1 /* backbuffer */]);
     // Ortho projection, entire screen in regular pixel coordinates.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -2874,8 +2874,8 @@ int main(int argc, char **argv) {
       case SDL_WINDOWEVENT: {
         if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
             if (initGraphics(false,
-                             event.window.data1, event.window.data2,
-                             frameno=0)) {
+                             event.window.data1, event.window.data2)) {
+              frameno = 0;
               initTwBar(stereoMode);
 
               config.fov_x = 0;  // go for square pixels..
@@ -2975,7 +2975,8 @@ int main(int argc, char **argv) {
 
       // Switch fullscreen mode (drops the whole OpenGL context in Windows).
       case SDLK_RETURN: case SDLK_KP_ENTER: {
-        initGraphics(true, 0, 0, frameno=0);
+        initGraphics(true, 0, 0);
+        frameno = 0;
         initTwBar(stereoMode);
       } break;
 
