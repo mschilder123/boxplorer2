@@ -2313,9 +2313,10 @@ int main(int argc, char **argv) {
   }
 
   // Set up the video mode, OpenGL state, shaders and shader parameters.
-  initGraphics(false, config.width, config.height);
   if (config.fullscreen) {
-    initGraphics(true, 0, 0, 0);
+    initGraphics(true, 0, 0);
+  } else {
+    initGraphics(false, config.width, config.height);
   }
 
   // Parse as many uniforms from glsl source as we can find.
@@ -2873,7 +2874,7 @@ int main(int argc, char **argv) {
         if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
             if (initGraphics(false,
                              event.window.data1, event.window.data2,
-                             frameno)) {
+                             frameno=0)) {
               initTwBar(stereoMode);
 
               config.fov_x = 0;  // go for square pixels..
@@ -2973,7 +2974,7 @@ int main(int argc, char **argv) {
 
       // Switch fullscreen mode (drops the whole OpenGL context in Windows).
       case SDLK_RETURN: case SDLK_KP_ENTER: {
-        initGraphics(true, 0, 0, frameno);
+        initGraphics(true, 0, 0, frameno=0);
         initTwBar(stereoMode);
       } break;
 
