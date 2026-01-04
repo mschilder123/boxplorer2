@@ -5,9 +5,8 @@
 #include <sstream>
 
 #include <AntTweakBar.h>
-#include "camera.h"
 
-#define GL_DECLARE_ONLY
+#include "camera.h"
 #include "shader_procs.h"
 
 using namespace std;

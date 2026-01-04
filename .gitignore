@@ -1,0 +1,13 @@
+*.o
+*.obj
+*.exe
+*.swp
+*.dll
+*.exp
+*.lib
+boxplorer2
+sdl2-test
+shadershrink
+edit-cfg
+glsl
+last.cfg

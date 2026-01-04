@@ -112,12 +112,6 @@ using namespace std;
 #undef min
 #endif
 
-#if defined(_WIN32)
-void glActiveTexture( GLenum texture ) {
-	xglActiveTexture(texture);
-}
-#endif
-
 #include "glsl.h"
 
 // Hackery to get the list of DE and COLORING funcs from the glsl.

@@ -1,6 +1,4 @@
 #include "shader.h"
-
-#define GL_DECLARE_ONLY
 #include "shader_procs.h"
 
 using namespace std;

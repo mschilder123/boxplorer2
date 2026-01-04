@@ -1,4 +1,7 @@
-# Needs a SDL2 drop in ./SDL2/
+# Needs a SDL2 tree in ./SDL2:
+# git clone -b release-2.32.x https://github.com/mschilder123/SDL2.git
+#
+# TODO: submodule?
 
 all: boxplorer2.exe shadershrink.exe edit-cfg.exe glsl.exe sdl2-test.exe
 
@@ -8,15 +11,15 @@ clean:
 
 CFLAGS=/nologo /ISDL2/include /I. /Iinclude /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DANT_DEBUG /DNO_HYDRA /DNO_HAVE_SDK4
 
-LDFLAGS=/link /LIBPATH:SDL2/lib/x64 /SUBSYSTEM:console /nologo
+LDFLAGS=/link /LIBPATH:SDL2/VisualC/x64/Release /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj \
 	TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj TwEventSDL20.obj \
 	LoadOGLCore.obj TwOpenGLCore.obj
 
-BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj \
-				oculus_sdk4.obj
+BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj \
+	oculus_sdk4.obj
 
 boxplorer2.exe: $(BX_OBJS) $(TW_OBJS)
 	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
@@ -42,6 +45,9 @@ interpolate.obj: interpolate.cc interpolate.h
 
 shader.obj: shader.cc shader.h
 	cl -c $(CFLAGS) shader.cc
+
+shader_procs.obj: shader_procs.cc shader_procs.h
+	cl -c $(CFLAGS) shader_procs.cc
 
 uniforms.obj: uniforms.cc uniforms.h shader_procs.h camera.h
 	cl -c $(CFLAGS) uniforms.cc

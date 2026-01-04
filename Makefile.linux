@@ -11,7 +11,7 @@ LDFLAGS=-lm -lGL -lX11 -lSDL2 -lSDL2main
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o TwEventSDL20.o
 
-BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o
+BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o shader_procs.o
 
 boxplorer2: $(BX_OBJS) $(TW_OBJS)
 	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer2 $(LDFLAGS)
@@ -44,6 +44,9 @@ camera.o: camera.cc camera.h params.h
 
 uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
 	g++ -c $(CFLAGS) uniforms.cc
+
+shader_procs.o: shader_procs.cc shader_procs.h
+	g++ -c $(CFLAGS) shader_procs.cc
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CFLAGS) $<
