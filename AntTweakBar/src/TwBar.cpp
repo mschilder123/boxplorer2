@@ -6003,12 +6003,12 @@ static void ANT_CALL PopupCallback(void *_ClientData)
 
     if( g_TwMgr!=NULL && g_TwMgr->m_PopupBar!=NULL )
     {
-        unsigned int Enum = *(unsigned int *)&_ClientData;
+        uintptr_t Enum = reinterpret_cast<uintptr_t>(_ClientData);
         CTwVarAtom *Var = g_TwMgr->m_PopupBar->m_VarEnumLinkedToPopupList;
         CTwBar *Bar = g_TwMgr->m_PopupBar->m_BarLinkedToPopupList;
         if( Bar!=NULL && Var!=NULL && !Var->m_ReadOnly && IsEnumType(Var->m_Type) )
         {
-            Var->ValueFromDouble(Enum);
+            Var->ValueFromDouble((unsigned int) Enum);
             //Bar->UnHighlightLine();
             Bar->HaveFocus(true);
             Bar->NotUpToDate();
@@ -6133,7 +6133,14 @@ bool CTwBar::MouseButton(ETwMouseButtonID _Button, bool _Pressed, int _X, int _Y
                         char ID[64];
                         sprintf(ID, "%u", It->first);
                         //ultoa(It->first, ID, 10);
-                        TwAddButton(g_TwMgr->m_PopupBar, ID, PopupCallback, *(void**)&(It->first), NULL);
+#ifdef ANT_WINDOWS
+#pragma warning(push)
+#pragma warning(disable:4312)
+#endif
+                        TwAddButton(g_TwMgr->m_PopupBar, ID, PopupCallback, reinterpret_cast<void*>(It->first), NULL);
+#ifdef ANT_WINDOWS
+#pragma warning(pop)
+#endif
                         CTwVar *Btn = g_TwMgr->m_PopupBar->Find(ID);
                         if( Btn!=NULL )
                         {
