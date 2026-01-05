@@ -2369,6 +2369,10 @@ int main(int argc, char **argv) {
   bool dragging = false;
   bool prevCtrl = false;
 
+  GLSL::vec3 effects_zoom(.5, .5, 1.);  // centered and no zoom
+  int zoomMouseX = 0;
+  int zoomMouseY = 0;
+
   if (rendering) {
     // Rendering a sequence to disk. Spline the keyframes now.
     CatmullRom(keyframes, &splines, config.loop);
@@ -2696,6 +2700,12 @@ int main(int argc, char **argv) {
       // Pass main render as texture 0
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, currentFrame);
+
+      if (!lifeform.empty()) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      }
+
       glUniform1i(glGetUniformLocation(final_program, "iTexture"), 0);
 
       // Pass main depth as texture 1
@@ -2714,6 +2724,7 @@ int main(int argc, char **argv) {
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 1);
       } else {
         // No DoF textures got computed.
+        glUniform3f(glGetUniformLocation(final_program, "iZoom"), effects_zoom.x, effects_zoom.y, effects_zoom.z);
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 0);
       }
 
@@ -2725,11 +2736,11 @@ int main(int argc, char **argv) {
       glUniform1f(glGetUniformLocation(final_program, "gamma"),
                       config.gamma);
 
-     if (stereoMode == ST_OCULUS) {
+      if (stereoMode == ST_OCULUS) {
         glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
         glUniform1f(glGetUniformLocation(final_program, "yres"), config.height);
         glUniform1f(glGetUniformLocation(final_program, "ipd"), config.ipd);
-     }
+      }
 
       drawScreen();
 
@@ -2916,6 +2927,11 @@ int main(int argc, char **argv) {
       } break;
 
       case SDL_MOUSEMOTION: {
+         if (effects_zoom.z == 1.0) {
+           // Only update if zoomed out.
+           zoomMouseX = event.motion.x;
+           zoomMouseY = event.motion.y;
+         }
          if (grabbedInput == 0) {
            if (!dragging) {
               // Peek at framebuffer color for keyframe markers.
@@ -2960,6 +2976,15 @@ int main(int argc, char **argv) {
          }
          ignoreNextMouseUp = false;
          dragging = false;
+      } break;
+
+      case SDL_MOUSEWHEEL: {
+        if (!lifeform.empty()) {
+          effects_zoom.x = (float)zoomMouseX / config.width;
+          effects_zoom.y = (float)(config.height - zoomMouseY) / config.height;
+          effects_zoom.z = GLSL::clamp(effects_zoom.z + event.wheel.y, 1.f, 16.f);
+          //printf("%d, %d at (%f, %f)\n", event.wheel.x, event.wheel.y, effects_zoom.x, effects_zoom.y);
+        }
       } break;
 
       case SDL_KEYDOWN: {

@@ -10,6 +10,8 @@ uniform float exposure;
 uniform float maxBright;
 uniform float gamma;
 
+uniform vec3 iZoom;
+
 #if defined(ST_OCULUS)
 uniform float xres;
 uniform float yres;
@@ -66,7 +68,18 @@ void main() {
     color = min(texture2D(iBlur0, iTexCoord),
                 texture2D(iBlur1, iTexCoord));
   } else {
-    color = texture2D(iTexture, iTexCoord);
+    if (iZoom.z != 1.0) {
+      // optional zoom (mostly for automata).
+      vec2 iZoomCenter = vec2(iZoom.x, iZoom.y);
+      float iZoomFactor = clamp(iZoom.z, 1.f, 16.f);
+      vec2 iZoomOffset = iTexCoord - iZoomCenter;
+      vec2 iZoomSampler = iZoomCenter + iZoomOffset / iZoomFactor;
+      vec4 cur = texture2D(iTexture, iZoomSampler);
+      // show classy full white live pixels when zoomed in.
+      color = vec4(int(cur.a));
+    } else {
+      color = texture2D(iTexture, iTexCoord);
+    }
   }
 
 #endif  // ST_OCULUS
