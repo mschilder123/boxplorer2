@@ -2367,7 +2367,11 @@ int main(int argc, char **argv) {
 
   bool ignoreNextMouseUp = false;
   bool dragging = false;
-  bool prevCtrl = false;
+  bool pausing = false;
+  bool stepping = false;
+
+  bool mixedInOculus = false;
+  bool multiPass = false;
 
   GLSL::vec3 effects_zoom(.5, .5, 1.);  // centered and no zoom
   int zoomMouseX = 0;
@@ -2398,9 +2402,11 @@ int main(int argc, char **argv) {
   float view_q[4] = {0,0,0,1};
 
   while (!done) {
-    if (next_camera != &camera) camera = *next_camera;
-
     int ctlXChanged = 0, ctlYChanged = 0;
+
+    if (!pausing || stepping) {
+
+    if (next_camera != &camera) camera = *next_camera;
 
     // Set up current camera from spline.
     // Splined keyframes playback logic. Messy.
@@ -2459,8 +2465,6 @@ int main(int argc, char **argv) {
     camera.ipd = config.ipd;
 
     next_camera = &camera;
-
-    bool mixedInOculus = false;
 
     if (!rendering) {
 #if defined(_WIN32)
@@ -2532,7 +2536,7 @@ int main(int argc, char **argv) {
     // Figure out whether to render direct or via fbo.
     // A backbuffer (e.g. previous frame), or dof or fxaa
     // requires rendering to fbo.
-    bool multiPass =
+    multiPass =
             (config.enable_dof &&
                ((dof.ok() && camera.enable_dof && camera.aperture != 0) ||
                 (fxaa.ok() && camera.fxaa))) ||
@@ -2590,6 +2594,8 @@ int main(int argc, char **argv) {
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    } // !pausing || stepping
 
     if (multiPass) {
       // We are post-processing of sorts.
@@ -2846,8 +2852,12 @@ int main(int argc, char **argv) {
     CHECK_ERROR;
 
     SDL_GL_SwapWindow(window.window());
-    frameno++;
-    camera.iBackbufferCount++;
+
+    if (!pausing || stepping) {
+      frameno++;
+      camera.iBackbufferCount++;
+      stepping = false;
+    }
 
     if (rendering && !rendercubes && !splines.empty()) {
       // If we're playing a sequence back, save every frame to disk.
@@ -2863,11 +2873,12 @@ int main(int argc, char **argv) {
 
     // Show position and fps in the caption.
     char caption[2048], controllerStr[256];
-    sprintf(caption, "%s %.2ffps %5lu [%.3lf %.3lf %.3lf] %dms",
+    sprintf(caption, "%s %.2ffps %5lu [%.3lf %.3lf %.3lf] %dms %s",
         printController(controllerStr, ctl),
         getFPS(), (unsigned long)splines_index,
         camera.pos()[0], camera.pos()[1], camera.pos()[2],
-        getLastFrameDuration()
+        getLastFrameDuration(),
+        pausing?"(paused)":""
     );
     SDL_SetWindowTitle(window.window(), caption);
 
@@ -2889,6 +2900,7 @@ int main(int argc, char **argv) {
             if (initGraphics(false,
                              event.window.data1, event.window.data2, lifeform.empty())) {
               frameno = 0;
+              stepping = true;
               initTwBar(stereoMode);
 
               config.fov_x = 0;  // go for square pixels..
@@ -2928,7 +2940,7 @@ int main(int argc, char **argv) {
 
       case SDL_MOUSEMOTION: {
          if (effects_zoom.z == 1.0) {
-           // Only update if zoomed out.
+           // Only update zoom center if zoomed out.
            zoomMouseX = event.motion.x;
            zoomMouseY = event.motion.y;
          }
@@ -2953,7 +2965,7 @@ int main(int argc, char **argv) {
              SDL_SetCursor(hand_cursor);
              // Drag currently selected keyframe around.
              if (keyframe < keyframes.size()) {
-               // Should really be some screenspace conversion..
+               // TODO: should really be some screenspace conversion..
                // but this works ok for now.
                double fY = 2.0 * tan(camera.fov_y * PI / 360.0f) / config.height;
                double fX = 2.0 * tan(camera.fov_x * PI / 360.0f) / config.width;
@@ -2983,7 +2995,6 @@ int main(int argc, char **argv) {
           effects_zoom.x = (float)zoomMouseX / config.width;
           effects_zoom.y = (float)(config.height - zoomMouseY) / config.height;
           effects_zoom.z = GLSL::clamp(effects_zoom.z + event.wheel.y, 1.f, 16.f);
-          //printf("%d, %d at (%f, %f)\n", event.wheel.x, event.wheel.y, effects_zoom.x, effects_zoom.y);
         }
       } break;
 
@@ -3008,6 +3019,7 @@ int main(int argc, char **argv) {
       case SDLK_RETURN: case SDLK_KP_ENTER: {
         initGraphics(true, 0, 0, lifeform.empty());
         frameno = 0;
+        stepping = true;
         initTwBar(stereoMode);
       } break;
 
@@ -3073,6 +3085,10 @@ int main(int argc, char **argv) {
       } break;
 
       case SDLK_SPACE:
+        if (pausing) {
+          stepping = true;
+          break;
+        }
       case SDLK_INSERT: {  // Add keyframe.
         splines.clear();
         size_t index = keyframes.size();
@@ -3220,6 +3236,11 @@ int main(int argc, char **argv) {
         }
       } break;
 
+      case SDLK_SCROLLLOCK:
+      case SDLK_PAUSE: {
+        pausing = !pausing;
+      } break;
+
       // See whether the active controller has changed.
       default: {
         Controller oldCtl = ctl;
@@ -3280,18 +3301,6 @@ int main(int argc, char **argv) {
     (void)mouse_button_right;
     (void)joystick_lt;
     (void)joystick_rt;
-
-    // Single step feature: hold PAUSE and tap CTRL to step.
-    // Primary use case is with lifeform automata.
-    if (keystate[SDL_SCANCODE_PAUSE]) {
-      while (prevCtrl == hasCtrl && keystate[SDL_SCANCODE_PAUSE]) {
-        SDL_Delay(100);
-        SDL_PumpEvents();
-        keystate = SDL_GetKeyboardState(0);
-        hasCtrl = keystate[SDL_SCANCODE_RCTRL] || keystate[SDL_SCANCODE_LCTRL];
-      }
-    }
-    prevCtrl = hasCtrl;
 
     if (keystate[SDL_SCANCODE_W]) camera.move(0, 0,  camera.speed);  //forward
     if (keystate[SDL_SCANCODE_S]) camera.move(0, 0, -camera.speed);  //back
