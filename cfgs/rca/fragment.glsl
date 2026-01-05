@@ -2,7 +2,6 @@
 
 varying vec3 dir;
 
-uniform sampler2D iChannel0;
 uniform sampler2D iBackbuffer;
 uniform float xres, yres, time;
 uniform vec3 par[2];
@@ -25,9 +24,7 @@ float rand(vec2 co){
 
 void isAlive(float dx, float dy, inout int count, int factor) {
   vec4 cur = texture2D(iBackbuffer, position + pixelSize*vec2( dx, dy ));
-  // Aliveness is tracked in r or a (except not a at first frame, to load img).
-  float alive = max(cur.r, sign(float(frameno))*cur.a);
-  count += int(alive) * factor;
+  count += int(cur.a) * factor;
 }
 
 vec4 color(vec2 z) {
@@ -50,7 +47,7 @@ vec4 color(vec2 z) {
   // Direction toggle.
   phase *= direction;
 
-  float alive = max(cur.r, sign(float(frameno))*cur.a);
+  float alive = cur.a;
   int count = int(alive);
 
   // Count neighbours in relative 2x2.
