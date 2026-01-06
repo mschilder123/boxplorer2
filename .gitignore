@@ -11,3 +11,5 @@ shadershrink
 edit-cfg
 glsl-test
 last.cfg
+makefile
+GNUmakefile
