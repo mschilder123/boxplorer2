@@ -9,19 +9,19 @@
 #include <map>
 #include <string>
 
+#include "TGA.h"
+#include "glsl.h"
+
 using namespace std;
 
-#if !defined(_WIN32)
-#define __FUNCTION__ "glsl"
-#else
+#if defined(_WIN32)
 #pragma warning(disable : 4996) // unsafe function
 #pragma warning(disable : 4244) // conversion loss
 #pragma warning(disable : 4305) // truncation
 #pragma warning(disable : 4800) // forcing value to bool
-#endif
 
-#include "TGA.h"
-#include "glsl.h"
+#pragma comment(lib, "opengl32.lib")
+#endif // _WIN32
 
 #define ST_NONE // no stereocopy here
 
@@ -142,9 +142,9 @@ bool loadConfig(char const *configFile) {
         if (v == 1) {
           if (DE_funcs.find(s) != DE_funcs.end()) {
             d = DE_funcs[s];
-            printf(__FUNCTION__ " : DE func '%s'\n", s);
+            printf("%s : DE func '%s'\n", __func__, s);
           } else
-            printf(__FUNCTION__ " : WARNING : unknown DE func '%s'\n", s);
+            printf("%s : WARNING : unknown DE func '%s'\n", __func__, s);
         }
       }
       if (!strcmp(s, "c")) {
@@ -152,9 +152,9 @@ bool loadConfig(char const *configFile) {
         if (v == 1) {
           if (COLOR_funcs.find(s) != COLOR_funcs.end()) {
             c = COLOR_funcs[s];
-            printf(__FUNCTION__ " : coloring func '%s'\n", s);
+            printf("%s : coloring func '%s'\n", __func__, s);
           } else
-            printf(__FUNCTION__ " : WARNING : unknown coloring func '%s'\n", s);
+            printf("%s : WARNING : unknown coloring func '%s'\n", __func__, s);
         }
       }
 
@@ -192,10 +192,10 @@ bool loadConfig(char const *configFile) {
       }
     }
     fclose(f);
-    printf(__FUNCTION__ " : read '%s'\n", configFile);
+    printf("%s : read '%s'\n", __func__, configFile);
     result = true;
   } else {
-    printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
+    printf("%s : failed to open '%s'\n", __func__, configFile);
   }
   if (result)
     sanitizeParameters();
@@ -212,12 +212,12 @@ int vertex_main(int argc, char *argv[]) {
 
   if (d == NULL) {
     d = DE_funcs.begin()->second;
-    printf(__FUNCTION__ " : using DE func '%s'\n",
+    printf("%s : using DE func '%s'\n", __func__,
            DE_funcs.begin()->first.c_str());
   }
   if (c == NULL) {
     c = COLOR_funcs.begin()->second;
-    printf(__FUNCTION__ " : using coloring func '%s'\n",
+    printf("%s : using coloring func '%s'\n", __func__,
            COLOR_funcs.begin()->first.c_str());
   }
 

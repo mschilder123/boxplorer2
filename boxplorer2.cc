@@ -1196,9 +1196,12 @@ void m_mul(float *x, int d) { *x *= pow(10, GLSL::sign(d) / 20.); }
 void m_mulSlow(float *x, int d) { *x *= pow(10, GLSL::sign(d) / 40.); }
 void m_mulSlow(double *x, int d) { *x *= pow(10, GLSL::sign(d) / 40.); }
 void m_tan(float *x, int d) {
-  *x = atan(tan(*x * PI / 180 / 2) * pow(0.1, GLSL::sign(d) / 40.)) / PI * 180 * 2;
+  *x = atan(tan(*x * PI / 180 / 2) * pow(0.1, GLSL::sign(d) / 40.)) / PI * 180 *
+       2;
 }
-void m_progressiveInc(int *x, int d) { *x += GLSL::sign(d) * ((abs(d) + 4) / 4); }
+void m_progressiveInc(int *x, int d) {
+  *x += GLSL::sign(d) * ((abs(d) + 4) / 4);
+}
 void m_progressiveAdd(float *x, int d) {
   *x += 0.001 * (GLSL::sign(d) * ((abs(d) + 4) / 4));
 }
@@ -1410,15 +1413,12 @@ void changeController(SDL_Keycode key, Controller *c) {
 ////////////////////////////////////////////////////////////////
 // Graphics.
 
-// Position of the OpenGL window on the screen.
-int viewportOffset[2];
-
 // Is the mouse and keyboard input grabbed?
 int grabbedInput = 0;
 
 void saveScreenshot(char const *tgaFile) {
   TGA tga;
-  tga.readFramebuffer(config.width, config.height, viewportOffset);
+  tga.fromFramebuffer(config.width, config.height);
   string filename(WorkingDir + tgaFile);
   if (tga.writeFile(filename.c_str()))
     printf(__FUNCTION__ " : wrote %s\n", filename.c_str());
@@ -1443,8 +1443,7 @@ unsigned int getBGRpixel(int x, int y) {
   int height = config.height;
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glReadBuffer(GL_FRONT);
-  glReadPixels(viewportOffset[0] + x, viewportOffset[1] + height - 1 - y, 1, 1,
-               GL_BGR, GL_UNSIGNED_BYTE, img);
+  glReadPixels(x, height - 1 - y, 1, 1, GL_BGR, GL_UNSIGNED_BYTE, img);
   unsigned int val = img[0] * 256 * 256 + img[1] * 256 + img[2];
   return val;
 }
@@ -1453,8 +1452,7 @@ GLSL::vec3 getPixelColor(int x, int y) {
   float img[3];
   int height = config.height;
   glReadBuffer(GL_COLOR_ATTACHMENT0);
-  glReadPixels(viewportOffset[0] + x, viewportOffset[1] + height - 1 - y, 1, 1,
-               GL_RGB, GL_FLOAT, img);
+  glReadPixels(x, height - 1 - y, 1, 1, GL_RGB, GL_FLOAT, img);
   return GLSL::vec3(img);
 }
 

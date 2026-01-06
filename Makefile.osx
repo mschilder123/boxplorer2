@@ -34,17 +34,18 @@ edit-cfg: edit-cfg.cc \
 	Makefile.osx
 	g++ $(CPPFLAGS) edit-cfg.cc -o edit-cfg
 
-glsl-test: glsl-test.cc TGA.h glsl.h glsl.o \
+glsl-test: glsl-test.cc glsl.o TGA.o TGA.h glsl.h \
 	cfgs/menger.cfg.data/fragment.glsl \
 	Makefile.osx
-	g++ $(CPPFLAGS) glsl-test.cc glsl.o -o glsl-test
+	g++ $(CPPFLAGS) glsl-test.cc TGA.o glsl.o -o glsl-test $(LDFLAGS)
 
-glsl.o: glsl.cc glsl.h
 interpolate.o: interpolate.cc interpolate.h
 shader.o: shader.cc shader.h shader_procs.h
 shader_procs.o: shader_procs.cc shader_procs.h
 camera.o: camera.cc camera.h params.h
 uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
+glsl.o: glsl.cc glsl.h
+TGA.o: TGA.cc TGA.h glsl.h
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CPPFLAGS) $<

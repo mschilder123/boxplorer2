@@ -18,7 +18,7 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj TwEventSDL20.obj \
         LoadOGLCore.obj TwOpenGLCore.obj
 
-BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj glsl.obj \
+BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj glsl.obj TGA.obj \
         oculus_sdk4.obj
 
 boxplorer2.exe: $(BX_OBJS) $(TW_OBJS) Makefile.win
@@ -30,21 +30,23 @@ sdl2-test.exe: sdl2-test.cc Makefile.win
 shadershrink.exe: shadershrink.cc Makefile.win
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
 
-glsl-test.exe: glsl-test.cc glsl.obj TGA.h glsl.h Makefile.win
-	cl $(CFLAGS) glsl-test.cc glsl.obj $(LDFLAGS)
+glsl-test.exe: glsl-test.cc glsl.obj TGA.obj TGA.h glsl.h Makefile.win
+	cl $(CFLAGS) glsl-test.cc glsl.obj TGA.obj $(LDFLAGS)
 
 edit-cfg.exe: edit-cfg.cc Makefile.win
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
-boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h Makefile.win \
+boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
                 glsl.h interpolate.h uniforms.h camera.h shader.h params.h \
-                cfgs\menger.cfg.data\fragment.glsl include\setup.inc
+                cfgs\menger.cfg.data\fragment.glsl include\setup.inc \
+								Makefile.win
 glsl.obj: glsl.cc glsl.h
 interpolate.obj: interpolate.cc interpolate.h
 shader.obj: shader.cc shader.h
 shader_procs.obj: shader_procs.cc shader_procs.h
 uniforms.obj: uniforms.cc uniforms.h shader_procs.h camera.h
 camera.obj: camera.cc camera.h params.h
+TGA.obj: TGA.cc TGA.h
 
 TwBar.obj: AntTweakBar\src\TwBar.cpp
 	cl $(CFLAGS) -c $**
