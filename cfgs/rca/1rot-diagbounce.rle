@@ -1,0 +1,4 @@
+# https://dmishin.blogspot.com/2015/01/new-single-rotation-spaceships.html 
+# Configurable speed diagonal crawlers.. racing!
+x = 128, y = 128, rule = SingleRotate
+$13bo2$11bo$9b2o$9bo4$19bo2$17bo$15b2o$o14bo2$3bo2$25bo2$8bo14bo$21b2o$11bo9bo4$16bo14bo2$19bo9bo$27b2o$27bo2$24bo2$27bo!
