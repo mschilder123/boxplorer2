@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +10,6 @@
 
 #if !defined(_WIN32)
 
-#include <float.h>
 #include <unistd.h>
 
 #define _strdup strdup
@@ -36,9 +36,11 @@
 #include "oculus_sdk4.h"
 
 #if defined(HYDRA)
+
 #include <sixense.h>
 #pragma comment(lib, "sixense.lib")
 #pragma comment(lib, "sixense_utils.lib")
+
 #endif // HYDRA
 
 #endif // _WIN32
@@ -150,13 +152,6 @@ vec3 (*c)(vec3);
 #undef ST_NONE
 
 } // namespace GLSL
-
-#if defined(_WIN32)
-#pragma warning(disable : 4244) // conversion loss
-#pragma warning(disable : 4305) // truncation
-#endif                          // _WIN32
-
-#define sign(a) GLSL::sign(a)
 
 #define FPS_FRAMES_TO_AVERAGE 20
 
@@ -1197,18 +1192,18 @@ typedef enum Controller {
 // Controller modifiers.
 // They get a pointer to the modified value and a signed count of consecutive
 // changes.
-void m_mul(float *x, int d) { *x *= pow(10, sign(d) / 20.); }
-void m_mulSlow(float *x, int d) { *x *= pow(10, sign(d) / 40.); }
-void m_mulSlow(double *x, int d) { *x *= pow(10, sign(d) / 40.); }
+void m_mul(float *x, int d) { *x *= pow(10, GLSL::sign(d) / 20.); }
+void m_mulSlow(float *x, int d) { *x *= pow(10, GLSL::sign(d) / 40.); }
+void m_mulSlow(double *x, int d) { *x *= pow(10, GLSL::sign(d) / 40.); }
 void m_tan(float *x, int d) {
-  *x = atan(tan(*x * PI / 180 / 2) * pow(0.1, sign(d) / 40.)) / PI * 180 * 2;
+  *x = atan(tan(*x * PI / 180 / 2) * pow(0.1, GLSL::sign(d) / 40.)) / PI * 180 * 2;
 }
-void m_progressiveInc(int *x, int d) { *x += sign(d) * ((abs(d) + 4) / 4); }
+void m_progressiveInc(int *x, int d) { *x += GLSL::sign(d) * ((abs(d) + 4) / 4); }
 void m_progressiveAdd(float *x, int d) {
-  *x += 0.001 * (sign(d) * ((abs(d) + 4) / 4));
+  *x += 0.001 * (GLSL::sign(d) * ((abs(d) + 4) / 4));
 }
 void m_progressiveAdd(double *x, int d) {
-  *x += 0.001 * (sign(d) * ((abs(d) + 4) / 4));
+  *x += 0.001 * (GLSL::sign(d) * ((abs(d) + 4) / 4));
 }
 void m_singlePress(int *x, int d) {
   if (d == 1 || d == -1)
@@ -1216,10 +1211,10 @@ void m_singlePress(int *x, int d) {
 }
 
 void m_rotateX(int d) {
-  camera.rotate(sign(d) * camera.keyb_rot_speed, 0, 1, 0);
+  camera.rotate(GLSL::sign(d) * camera.keyb_rot_speed, 0, 1, 0);
 }
 void m_rotateY(int d) {
-  camera.rotate(-sign(d) * camera.keyb_rot_speed, 1, 0, 0);
+  camera.rotate(-GLSL::sign(d) * camera.keyb_rot_speed, 1, 0, 0);
 }
 
 void m_rotateX2(float d) { camera.rotate(d, 0, 1, 0); }
