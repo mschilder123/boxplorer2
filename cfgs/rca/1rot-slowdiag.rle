@@ -1,0 +1,7 @@
+# https://dmishin.blogspot.com/2014/07/single-rotation-spaceships-205-of-them.html
+# the slowest and the one with longest period racing..
+x = 256, y = 256, rule = SingleRotate
+2bo$b2o$2bo4$bo$bo$2b2o
+16$
+6bo2$b3o2$3b3o
+!

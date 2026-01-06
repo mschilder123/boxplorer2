@@ -1,0 +1,8 @@
+# https://dmishin.blogspot.com/2014/07/single-rotation-spaceships-205-of-them.html
+# modified the formation to not crash into eachother after wraparound.
+# manual sub-optimal RLE encoding ensued ;-)
+x = 720, y = 32, rule = SingleRotate
+$203bo2$131bob2o15bo2bo48bo$100bo29bo20bo2bo47b2o$22bo2bo56bo15b2o14bobo16bo16bobo23b2o2bo$22b2o56b3o16b2o13bobo17bo15bo26bo47bo$99bo2bo28bo20bo25b2o2bo41bo$4bo93bo3bo27bo72bo21bo$5bo43bo31b2o121bo19b2o$3b2o43bobo2bo26bobo119bo22bo$2bo2bo16bo26bo2bo150bo$23b2o$25bo
+$300b114bo2$300b114b3o$300b98b3o14bo16b2o$300b133b2o17bo2bo4bo$300bo47bo3bo19b2o2bo2bobo18bo13bo18bo18bo2b2o3bo18bo$300bo45b3o23bo3bob2o19bo14bo19bo68bo$300bo46bo2bo48bo16bo61bo23b2o$300b20bo3b2o152bo23bo20bo$300b21bo2bo153b2o22bo19b3o$300b4bo16bo180bo19bo2bo$300bob2o$300bo
+$600b97bo14bo$600b75bobo18bo15bo2b2o$600b48b2o24bob2o18bobobo11bo19bob2o18bo2bo$600b22bo24bo51b2o12bo20bo15bo2b3o2bo17b2obo22bo$600b23bo22b2o2b2o47bo33b2o42bo2bobo$600bbo20bo156bo21bo$600b23bo176bobo19bo$600b202bo$600b3o20bo176bo21bobo$600b2bo20bo198b3o$600bobo3$600b2bo$600bo
+!
