@@ -10,6 +10,7 @@ sdl2-test
 shadershrink
 edit-cfg
 glsl-test
+TGA2rle
 last.cfg
 makefile
 GNUmakefile

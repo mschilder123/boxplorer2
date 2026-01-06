@@ -110,6 +110,11 @@ void TGA::set(int x, int y, GLSL::vec3 col) {
   data_[x * 3 + width_ * 3 * y + 2] = GLSL::clamp(256 * col.x, 0, 255); // R
 }
 
+bool TGA::get(int x, int y) {
+  unsigned char r = data_[x * 3 + width_ * 3 * y + 2];
+  return r == 255;
+}
+
 int TGA::width() { return width_; }
 int TGA::height() { return height_; }
 unsigned char *TGA::data() { return data_; }

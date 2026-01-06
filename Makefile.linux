@@ -1,9 +1,9 @@
 # sudo apt-get install libsdl2-dev
 
-all: boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
+all: boxplorer2 shadershrink edit-cfg glsl-test sdl2-test TGA2rle
 
 clean:
-	-rm *.o boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
+	-rm *.o boxplorer2 shadershrink edit-cfg glsl-test sdl2-test TGA2rle
 
 clang-format:
 	clang-format -i *.cc *.h
@@ -87,3 +87,7 @@ TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
 
 TwEventSDL20.o: AntTweakBar/src/TwEventSDL20.c
 	g++ -c $(CPPFLAGS) $<
+
+#tools
+TGA2rle: TGA2rle.cc TGA.h glsl.h TGA.cc glsl.cc
+	g++ $(CPPFLAGS) TGA2rle.cc TGA.cc glsl.cc -lGL -o TGA2rle
