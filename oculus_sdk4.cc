@@ -18,7 +18,7 @@
 #pragma comment(lib, "gdi32.lib")
 
 static ovrHmd hmd = NULL;
-#endif  // HAVE_SDK4
+#endif // HAVE_SDK4
 
 int InitOculusSDK() {
 #if defined(HAVE_SDK4)
@@ -33,17 +33,18 @@ int InitOculusSDK() {
   }
 
   ovrHmd_SetEnabledCaps(hmd,
-      ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
+                        ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
 
   ovrHmd_ConfigureTracking(hmd,
-      ovrTrackingCap_Orientation
-      | ovrTrackingCap_MagYawCorrection
-      | ovrTrackingCap_Position, 0);
-  
+                           ovrTrackingCap_Orientation |
+                               ovrTrackingCap_MagYawCorrection |
+                               ovrTrackingCap_Position,
+                           0);
+
   return 1;
 #else  // HAVE_SDK4
   return 0;
-#endif  // HAVE_SDK4
+#endif // HAVE_SDK4
 }
 
 void GetOculusView(float view[3]) {
@@ -62,12 +63,13 @@ void GetOculusView(float view[3]) {
 bool GetOculusQuat(float quat[4]) {
   bool result = false;
 #if defined(HAVE_SDK4)
-  ovrTrackingState ts = ovrHmd_GetTrackingState(hmd, 0.0/*ovr_GetTimeInSeconds()*/);
+  ovrTrackingState ts =
+      ovrHmd_GetTrackingState(hmd, 0.0 /*ovr_GetTimeInSeconds()*/);
   if (ts.StatusFlags & (ovrStatus_OrientationTracked)) {
     ovrPoseStatef poseState = ts.HeadPose;
     ovrPosef posef = poseState.ThePose;
     ovrQuatf q = posef.Orientation;
-  
+
     quat[0] = q.x;
     quat[1] = q.y;
     quat[2] = q.z;
@@ -84,7 +86,7 @@ bool GetOculusQuat(float quat[4]) {
     printf("pos(%f, %f, %f)\n", p.x, p.y, p.z);
   }
 #endif
-#endif  // HAVE_SDK4
+#endif // HAVE_SDK4
   return result;
 }
 
@@ -95,11 +97,10 @@ void ReleaseOculusSDK() {
     hmd = NULL;
   }
   ovr_Shutdown();
-#endif  // HAVE_SDK4
+#endif // HAVE_SDK4
 }
 
-void SetOculusPrediction(float time) {
-}
+void SetOculusPrediction(float time) {}
 
 int GetOculusDeviceInfo(hmd_settings_t *hmd_settings) {
 #if defined(HAVE_SDK4)
@@ -119,11 +120,11 @@ int GetOculusDeviceInfo(hmd_settings_t *hmd_settings) {
   return 1;
 #else  // HAVE_SDK4
   return 0;
-#endif  // HAVE_SDK4
+#endif // HAVE_SDK4
 }
 
 void ResetOculusOrientation() {
 #if defined(HAVE_SDK4)
   ovrHmd_RecenterPose(hmd);
-#endif  // HAVE_SDK4
+#endif // HAVE_SDK4
 }

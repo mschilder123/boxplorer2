@@ -1,88 +1,88 @@
 # sudo apt-get install libsdl2-dev
 
-all: boxplorer2 shadershrink edit-cfg glsl sdl2-test
+all: boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
 
 clean:
-	rm *.o boxplorer2 shadershrink edit-cfg glsl sdl2-test
+	-rm *.o boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
 
-CFLAGS=-O2 -I/usr/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
+clang-format:
+	clang-format -i *.cc *.h
+
+CPPFLAGS=-O2 -I/usr/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
 
 LDFLAGS=-lm -lGL -lX11 -lSDL2 -lSDL2main
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o TwEventSDL20.o
 
-BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o shader_procs.o
+BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o shader_procs.o glsl.o
 
 boxplorer2: $(BX_OBJS) $(TW_OBJS)
 	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer2 $(LDFLAGS)
 
 sdl2-test: sdl2-test.cc
-	g++ $(CFLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
+	g++ $(CPPFLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
 
 boxplorer2.o: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
-	camera.h interpolate.h uniforms.h Makefile.linux params.h \
-	cfgs/menger.cfg.data/fragment.glsl
-	g++ -c $(CFLAGS) boxplorer2.cc
+	camera.h interpolate.h uniforms.h params.h \
+	cfgs/menger.cfg.data/fragment.glsl \
+	Makefile.linux
+	g++ -c $(CPPFLAGS) boxplorer2.cc
 
-shadershrink: shadershrink.cc shadershrink.h Makefile.linux
-	g++ $(CFLAGS) shadershrink.cc -o shadershrink
+shadershrink: shadershrink.cc shadershrink.h \
+	Makefile.linux
+	g++ $(CPPFLAGS) shadershrink.cc -o shadershrink
 
-edit-cfg: edit-cfg.cc Makefile.linux
-	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
+edit-cfg: edit-cfg.cc \
+	Makefile.linux
+	g++ $(CPPFLAGS) edit-cfg.cc -o edit-cfg
 
-glsl: glsl.cc TGA.h glsl.h Makefile.linux cfgs/menger.cfg.data/fragment.glsl
-	g++ $(CFLAGS) glsl.cc -o glsl
+glsl-test: glsl-test.cc TGA.h glsl.h glsl.o \
+	cfgs/menger.cfg.data/fragment.glsl \
+	Makefile.linux
+	g++ $(CPPFLAGS) glsl-test.cc glsl.o -o glsl-test
 
+glsl.o: glsl.cc glsl.h
 interpolate.o: interpolate.cc interpolate.h
-	g++ -c $(CFLAGS) interpolate.cc
-
-shader.o: shader.cc shader.h
-	g++ -c $(CFLAGS) shader.cc
-
-camera.o: camera.cc camera.h params.h
-	g++ -c $(CFLAGS) camera.cc
-
-uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
-	g++ -c $(CFLAGS) uniforms.cc
-
+shader.o: shader.cc shader.h shader_procs.h
 shader_procs.o: shader_procs.cc shader_procs.h
-	g++ -c $(CFLAGS) shader_procs.cc
+camera.o: camera.cc camera.h params.h
+uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwFonts.o: AntTweakBar/src/TwFonts.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwMgr.o: AntTweakBar/src/TwMgr.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwPrecomp.o: AntTweakBar/src/TwPrecomp.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwColors.o: AntTweakBar/src/TwColors.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwOpenGLCore.o: AntTweakBar/src/TwOpenGLCore.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 LoadOGLCore.o: AntTweakBar/src/LoadOGLCore.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwOpenGL.o: AntTweakBar/src/TwOpenGL.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 LoadOGL.o: AntTweakBar/src/LoadOGL.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwEventSDL12.o: AntTweakBar/src/TwEventSDL12.c
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwEventSDL20.o: AntTweakBar/src/TwEventSDL20.c
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<

@@ -9,9 +9,8 @@ public:
   virtual ~Shader() { clear(); }
 
   // Create, load and link shader.
-  bool compile(const std::string& defines,
-               const std::string& vertex_shader,
-               const std::string& pixel_shader);
+  bool compile(const std::string &defines, const std::string &vertex_shader,
+               const std::string &pixel_shader);
 
   // Detach and delete shader.
   void clear();
@@ -19,9 +18,9 @@ public:
   unsigned int program() { return program_; }
   bool ok() const { return ok_; }
 
-  const std::string& source() const { return source_; }
-  const std::string& log() const { return log_; }
-  const std::string& uniforms() const { return uniforms_; }
+  const std::string &source() const { return source_; }
+  const std::string &log() const { return log_; }
+  const std::string &uniforms() const { return uniforms_; }
 
 private:
   std::string source_;
@@ -31,4 +30,4 @@ private:
   bool ok_;
 };
 
-#endif  // _F_SHADER_H_
+#endif // _F_SHADER_H_

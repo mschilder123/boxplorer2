@@ -1,250 +1,323 @@
 /*
- * Little test program to experiment w/ compiling glsl code as C++.
+ * Minimalist glsl funcs and defs needed to compile
+ * compliant shader code as plain C++.
  */
-
-#include <stdio.h>
 #include <math.h>
-#include <time.h>
-
-#include <string>
-#include <map>
-
-using namespace std;
-
-#if !defined(_WIN32)
-#define __FUNCTION__ "glsl"
-#else
-#pragma warning(disable: 4996) // unsafe function
-#pragma warning(disable: 4244) // conversion loss
-#pragma warning(disable: 4305) // truncation
-#pragma warning(disable: 4800) // forcing value to bool
-#endif
+#include <stdio.h>
 
 #include "glsl.h"
-#include "TGA.h"
 
-#define ST_NONE  // no stereocopy here
-
-// Hackery to get the list of DE and COLORING funcs from the glsl.
-map<string, float (*)(GLSL::vec3)> DE_funcs;
-map<string, double (*)(GLSL::dvec3)> DE64_funcs;
-map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
-
-class DE_initializer {
- public:
-  DE_initializer(string name, float (*func)(GLSL::vec3)) {
-    DE_funcs[name] = func;
-  }
-  DE_initializer(string name, double (*func)(GLSL::dvec3)) {
-    // Strip _64 from name.
-    size_t x64 = name.find("_64");
-    if (x64 != string::npos) name.erase(x64);
-    DE64_funcs[name] = func;
-  }
-};
-#define DECLARE_DE(a) DE_initializer _init##a(#a, &a);
-class COLORING_initializer {
- public:
-  COLORING_initializer(string name, GLSL::vec3 (*func)(GLSL::vec3)) {
-    COLOR_funcs[name] = func;
-  }
-};
-#define DECLARE_COLORING(a) COLORING_initializer _init##a(#a, &a);
+#if defined(_WIN32)
+#pragma warning(disable : 4244) // double / float conversion
+#endif
 
 namespace GLSL {
 
-// 'globals' capturing the fragment shader output.
-float gl_FragDepth;
-vec4 gl_FragColor;
-vec4 gl_FragCoord;
-
-// In the c++ version, these are func ptrs, not straight #defines.
-// We assign them based on values in .cfg
-float (*d)(vec3);
-vec3 (*c)(vec3);
-
-// Compile the fragment shader right here.
-// This defines a bunch more 'globals' and functions.
-#include "cfgs/menger.cfg.data/fragment.glsl"
-
-// Other globals, not referenced by fragment shader,
-// We read them from the .cfg file though.
-vec3 pos;
-vec3 ahead;
-vec3 up;
-float fov_x, fov_y;
-
-#define XRES 1280
-#define YRES 720
-
-// Make sure read parameters are sane.
-void sanitizeParameters(void) {
-  // FOV: keep pixels square unless stated otherwise.
-  // Default FOV_y is 75 degrees.
-  if (fov_x <= 0) {
-    if (fov_y <= 0) { fov_y = 75; }
-    fov_x = atan(tan(fov_y*PI/180/2)*XRES/YRES)/PI*180*2;
-  }
-  if (fov_y <= 0) fov_y = atan(tan(fov_x*PI/180/2)*XRES/YRES)/PI*180*2;
-
-  if (max_steps < 1) max_steps = 128;
-  if (min_dist <= 0) min_dist = 0.0001;
-  if (iters < 1) iters = 13;
-  if (color_iters < 0) color_iters = 9;
-  if (ao_eps <= 0) ao_eps = 0.0005;
-  if (ao_strength <= 0) ao_strength = 0.1;
-  if (glow_strength <= 0) glow_strength = 0.25;
-  if (dist_to_color <= 0) dist_to_color = 0.2;
+vec2::vec2(float a) : x(a), y(a) {}
+vec2::vec2(float a, float b) : x(a), y(b) {}
+vec3 vec2::xxy_() const { return vec3(x, x, y); }
+vec3 vec2::xyx_() const { return vec3(x, y, x); }
+vec3 vec2::yxx_() const { return vec3(y, x, x); }
+vec2 vec2::operator-(const vec2 &b) const { return vec2(x - b.x, y - b.y); }
+vec2 vec2::operator+(const vec2 &b) const { return vec2(x + b.x, y + b.y); }
+vec2 vec2::operator*(const float b) const { return vec2(x * b, y * b); }
+vec2 vec2::operator*(const vec2 &b) const { return vec2(x * b.x, y * b.y); }
+vec2 vec2::operator/(const vec2 &b) const { return vec2(x / b.x, y / b.y); }
+vec2 vec2::operator-=(const vec2 &b) {
+  x -= b.x;
+  y -= b.y;
+  return *this;
+}
+vec2 vec2::operator+=(const vec2 &b) {
+  x += b.x;
+  y += b.y;
+  return *this;
 }
 
-#define PROCESS_CONFIG_PARAMS \
-  PROCESS(fov_x, "fov_x") \
-  PROCESS(fov_y, "fov_y") \
-  PROCESS(min_dist, "min_dist") \
-  PROCESS(max_steps, "max_steps") \
-  PROCESS(ao_eps, "ao_eps") \
-  PROCESS(ao_strength, "ao_strength") \
-  PROCESS(glow_strength, "glow_strength") \
-  PROCESS(dist_to_color, "dist_to_color") \
-  PROCESS(speed, "speed") \
-  PROCESS(iters, "iters") \
-  PROCESS(color_iters, "color_iters") \
-  PROCESS(nrays, "nrays")
+vec3::vec3() : x(0), y(0), z(0) {}
+vec3::vec3(const float *v) : x(v[0]), y(v[1]), z(v[2]) {}
+vec3::vec3(float k) : x(k), y(k), z(k) {}
+vec3::vec3(float xx, float yy, float zz) {
+  x = xx;
+  y = yy;
+  z = zz;
+}
+vec3::vec3(const vec2 &b, float c) : x(b.x), y(b.y), z(c) {}
+vec3::vec3(const vec3 &b) : x(b.x), y(b.y), z(b.z) {}
+vec3::vec3(const dvec3 &b) : x(b.x), y(b.y), z(b.z) {}
+vec3 &vec3::operator=(const vec3 &b) {
+  x = b.x;
+  y = b.y;
+  z = b.z;
+  return *this;
+}
+vec3 &vec3::operator*=(const float k) {
+  x *= k;
+  y *= k;
+  z *= k;
+  return *this;
+}
+vec3 &vec3::operator/=(const float k) {
+  x /= k;
+  y /= k;
+  z /= k;
+  return *this;
+}
+vec3 &vec3::operator+=(const float k) {
+  x += k;
+  y += k;
+  z += k;
+  return *this;
+}
+vec3 &vec3::operator+=(const vec3 &b) {
+  x += b.x;
+  y += b.y;
+  z += b.z;
+  return *this;
+}
+vec3 vec3::operator*(const vec3 &b) const {
+  return vec3(x * b.x, y * b.y, z * b.z);
+}
+vec3 vec3::operator*(const float k) const { return vec3(x * k, y * k, z * k); }
+vec3 vec3::operator-(const vec3 &b) const {
+  return vec3(x - b.x, y - b.y, z - b.z);
+}
+vec3 vec3::operator-() const { return vec3(-x, -y, -z); }
+vec3 vec3::operator+(const vec3 &b) const {
+  return vec3(x + b.x, y + b.y, z + b.z);
+}
+vec3 vec3::operator/(const float k) const { return vec3(x / k, y / k, z / k); }
+vec3 vec3::cross(const vec3 &b) const {
+  return vec3(y * b.z - z * b.y, z * b.x - x * b.z, x * b.y - y * b.x);
+}
+float vec3::dot(const vec3 &b) const { return x * b.x + y * b.y + z * b.z; }
+double vec3::dot(const dvec3 &b) const {
+  return ((double)x) * b.x + ((double)y) * b.y + ((double)z) * b.z;
+}
+void vec3::print(const char *a) const { printf("%s(%f,%f,%f)\n", a, x, y, z); }
+vec3 vec3::yxz_() const { return vec3(y, x, z); }
+vec3 vec3::xzy_() const { return vec3(x, z, y); }
+vec3 vec3::zyx_() const { return vec3(z, y, x); }
+vec3 vec3::zxy_() const { return vec3(z, x, y); }
+vec2 vec3::xy_() const { return vec2(x, y); }
+vec2 vec3::xz_() const { return vec2(x, z); }
 
-// Load configuration.
-bool loadConfig(char const* configFile) {
-  bool result = false;
-  FILE* f;
-  if ((f = fopen(configFile, "r")) != 0) {
-  size_t i;
-  char s[32768];  // max line length
-  while (fscanf(f, " %s", s) == 1) {  // read word
-    if (s[0] == 0 || s[0] == '#') continue;
-
-    int v;
-
-    // Re-assign d() or c() if the .cfg says so.
-    if (!strcmp(s, "d")) {
-      v = fscanf(f, " %s", s);
-      if (v == 1) {
-        if (DE_funcs.find(s) != DE_funcs.end()) {
-          d = DE_funcs[s];
-          printf(__FUNCTION__ " : DE func '%s'\n", s);
-        } else
-          printf(__FUNCTION__
-                 " : WARNING : unknown DE func '%s'\n", s);
-    } }
-    if (!strcmp(s, "c")) {
-      v = fscanf(f, " %s", s);
-      if (v == 1) {
-        if (COLOR_funcs.find(s) != COLOR_funcs.end()) {
-          c = COLOR_funcs[s];
-          printf(__FUNCTION__ " : coloring func '%s'\n", s);
-        } else
-          printf(__FUNCTION__
-                 " : WARNING : unknown coloring func '%s'\n", s);
-    } }
-
-    double val;
-
-    if (!strcmp(s, "position")) { v=fscanf(f, " %f %f %f", &pos.x, &pos.y, &pos.z); continue; }
-    if (!strcmp(s, "direction")) { v=fscanf(f, " %f %f %f", &ahead.x, &ahead.y, &ahead.z); continue; }
-    if (!strcmp(s, "upDirection")) { v=fscanf(f, " %f %f %f", &up.x, &up.y, &up.z); continue; }
-
-    #define PROCESS(name, nameString) \
-      if (!strcmp(s, nameString)) { v=fscanf(f, " %lf", &val); name = val; continue; }
-    PROCESS_CONFIG_PARAMS
-    #undef PROCESS
-
-    for (i=0; i<(sizeof(par) / sizeof(par[0])); i++) {
-      char p[256];
-      sprintf(p, "par%lu", (unsigned long)i);
-      if (!strcmp(s, p)) {
-        v=fscanf(f, " %f %f %f", &par[i].x, &par[i].y, &par[i].z);
-        break;
-      }
-    }
-  }
-  fclose(f);
-  printf(__FUNCTION__ " : read '%s'\n", configFile);
-  result = true;
-  } else {
-    printf(__FUNCTION__ " : failed to open '%s'\n", configFile);
-  }
-  if (result) sanitizeParameters();
-  return result;
+dvec3::dvec3(const dvec3 &b) : x(b.x), y(b.y), z(b.z) {}
+dvec3::dvec3(double xx, double yy, double zz) : x(xx), y(yy), z(zz) {}
+dvec3::dvec3(const double *v) : x(v[0]), y(v[1]), z(v[2]) {}
+dvec3 dvec3::operator*(const double k) const {
+  return dvec3(x * k, y * k, z * k);
+}
+dvec3 dvec3::operator-(const dvec3 &b) const {
+  return dvec3(x - b.x, y - b.y, z - b.z);
+}
+dvec3 &dvec3::operator=(const dvec3 &b) {
+  x = b.x;
+  y = b.y;
+  z = b.z;
+  return *this;
+}
+dvec3 &dvec3::operator+=(const dvec3 &b) {
+  x += b.x;
+  y += b.y;
+  z += b.z;
+  return *this;
 }
 
-// This simulates a pinhole vertex shader
-// and sets up the various varying inputs to the
-// fragment shader (aka GLSL::main()).
-int vertex_main(int argc, char* argv[]) {
-  printf("glsl as C++ test:\n");
+vec4::vec4() : x(0), y(0), z(0), w(0) {}
+vec4::vec4(float xx, float yy, float zz, float ww)
+    : x(xx), y(yy), z(zz), w(ww) {}
+vec4::vec4(const vec3 &v3, float ww) {
+  x = v3.x;
+  y = v3.y;
+  z = v3.z;
+  w = ww;
+}
+vec4::vec4(float v) : x(v), y(v), z(v), w(v) {}
+vec3 vec4::xyz_() const { return vec3(x, y, z); }
+vec2 vec4::xy_() const { return vec2(x, y); }
+vec4 &vec4::operator=(const vec4 &a) {
+  x = a.x;
+  y = a.y;
+  z = a.z;
+  w = a.w;
+  return *this;
+}
+vec4 &vec4::operator/=(const float k) {
+  x /= k;
+  y /= k;
+  z /= k;
+  w /= k;
+  return *this;
+}
+vec4 &vec4::operator*=(const float k) {
+  x *= k;
+  y *= k;
+  z *= k;
+  w *= k;
+  return *this;
+}
+vec4 vec4::operator*(const vec4 &b) const {
+  return vec4(x * b.x, y * b.y, z * b.z, w * b.w);
+}
+vec4 vec4::operator+(const vec4 &b) const {
+  return vec4(x + b.x, y + b.y, z + b.z, w + b.w);
+}
+vec4 vec4::operator/(const float k) const {
+  return vec4(x / k, y / k, z / k, w / k);
+}
+float vec4::dot(const vec4 &b) const {
+  return x * b.x + y * b.y + z * b.z + w * b.w;
+}
 
-  loadConfig(argv[1]);
+dvec4::dvec4() : x(0), y(0), z(0), w(0) {}
+dvec4::dvec4(double xx, double yy, double zz, double ww)
+    : x(xx), y(yy), z(zz), w(ww) {}
+dvec4::dvec4(const dvec3 &v3, double ww) {
+  x = v3.x;
+  y = v3.y;
+  z = v3.z;
+  w = ww;
+}
+dvec4::dvec4(double v) : x(v), y(v), z(v), w(v) {}
+dvec3 dvec4::xyz_() const { return dvec3(x, y, z); }
+dvec4 &dvec4::operator=(const dvec4 &a) {
+  x = a.x;
+  y = a.y;
+  z = a.z;
+  w = a.w;
+  return *this;
+}
+dvec4 &dvec4::operator-=(const dvec4 &a) {
+  x -= a.x;
+  y -= a.y;
+  z -= a.z;
+  w -= a.w;
+  return *this;
+}
+dvec4 &dvec4::operator/=(const double k) {
+  x /= k;
+  y /= k;
+  z /= k;
+  w /= k;
+  return *this;
+}
+dvec4 &dvec4::operator*=(const double k) {
+  x *= k;
+  y *= k;
+  z *= k;
+  w *= k;
+  return *this;
+}
+dvec4 dvec4::operator*(const dvec4 &b) const {
+  return dvec4(x * b.x, y * b.y, z * b.z, w * b.w);
+}
+dvec4 dvec4::operator+(const dvec4 &b) const {
+  return dvec4(x + b.x, y + b.y, z + b.z, w + b.w);
+}
+dvec4 dvec4::operator/(const double k) const {
+  return dvec4(x / k, y / k, z / k, w / k);
+}
+double dvec4::dot(const dvec4 &b) const {
+  return x * b.x + y * b.y + z * b.z + w * b.w;
+}
 
-  if (d == NULL) {
-    d = DE_funcs.begin()->second;
-    printf(__FUNCTION__ " : using DE func '%s'\n",
-           DE_funcs.begin()->first.c_str());
-  }
-  if (c == NULL) {
-    c = COLOR_funcs.begin()->second;
-    printf(__FUNCTION__ " : using coloring func '%s'\n",
-           COLOR_funcs.begin()->first.c_str());
-  }
+float mod(float a, float b) { return a - b * floor(a / b); }
+vec3 mod(const vec3 &a, float b) {
+  return vec3(mod(a.x, b), mod(a.y, b), mod(a.z, b));
+}
+// float max(float a, float b) { return a>b?a:b; }
+double max(double a, double b) { return a > b ? a : b; }
+// float min(float a, float b) { return a<b?a:b; }
+double min(double a, double b) { return a < b ? a : b; }
 
-  time_t start, end;
+float dot(const vec3 &a, const vec3 &b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+double dot(const dvec3 &a, const dvec3 &b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+float dot(const vec2 &a, const vec2 &b) { return a.x * b.x + a.y * b.y; }
 
-  TGA tga(XRES, YRES);
+vec3 cross(const vec3 &a, const vec3 &b) { return a.cross(b); }
+float length(const vec3 &a) { return sqrt(dot(a, a)); }
+double length(const dvec3 &a) { return sqrt(dot(a, a)); }
+float length(const vec2 &a) { return sqrt(dot(a, a)); }
+float abs(float a) { return fabs(a); }
+float fract(float a) { return fabs(a - floor(a)); }
+double abs(double a) { return fabs(a); }
+vec3 abs(const vec3 &a) { return vec3(abs(a.x), abs(a.y), abs(a.z)); }
+float clamp(float v, float l, float h) {
+  if (v < l)
+    return l;
+  if (v > h)
+    return h;
+  return v;
+}
+double clamp(double v, double l, double h) {
+  if (v < l)
+    return l;
+  if (v > h)
+    return h;
+  return v;
+}
+vec3 clamp(const vec3 &v, float l, float h) {
+  return vec3(clamp(v.x, l, h), clamp(v.y, l, h), clamp(v.z, l, h));
+}
+dvec3 clamp(const dvec3 &v, double l, double h) {
+  return dvec3(clamp(v.x, l, h), clamp(v.y, l, h), clamp(v.z, l, h));
+}
+vec3 clamp(const vec3 &v, const vec3 &l, const vec3 &h) {
+  return vec3(clamp(v.x, l.x, h.x), clamp(v.y, l.y, h.y), clamp(v.z, l.z, h.z));
+}
+vec2 clamp(const vec2 &v, float l, float h) {
+  return vec2(clamp(v.x, l, h), clamp(v.y, l, h));
+}
+vec3 normalize(const vec3 &a) { return vec3(a) / length(a); }
+float sign(float a) {
+  if (a < 0)
+    return -1;
+  else
+    return 1;
+}
+vec3 mix(const vec3 &a, const vec3 &b, float r) {
+  float ra = 1 - r;
+  float rb = r;
+  return vec3(a.x * ra + b.x * rb, a.y * ra + b.y * rb, a.z * ra + b.z * rb);
+}
+float radians(float degrees) { return float((degrees * PI) / 180.0); }
+vec3 reflect(const vec3 &d, const vec3 &n) {
+  return normalize(d - n * 2 * dot(n, d));
+}
+float sin(const float &a) { return (float)::sin(a); }
+float cos(const float &a) { return (float)::cos(a); }
+vec3 sin(const vec3 &a) { return vec3(sin(a.x), sin(a.y), sin(a.z)); }
+float floor(const float &a) { return (float)::floor(a); }
 
-  vec3 right = up.cross(ahead);
-  mat4 proj(right.x, up.x, ahead.x, 0,
-            right.y, up.y, ahead.y, 0,
-            right.z, up.z, ahead.z, 0,
-            0,       0,    0,       1);
-  xres = XRES;
+vec2 max(const vec2 &a, const vec2 &b) {
+  return vec2(float(max(a.x, b.x)), float(max(a.y, b.y)));
+}
+vec2 floor(const vec2 &a) { return vec2(floor(a.x), floor(a.y)); }
 
-  start = clock();
-  for (int scr_y = 0; scr_y < YRES; ++scr_y) {
-    for (int scr_x = 0; scr_x < XRES; ++scr_x) {
-      float dx = -1 + scr_x * (2.0/XRES);  // -1..1
-      float dy = -1 + scr_y * (2.0/YRES);  // -1..1
+mat4::mat4(float a1, float a2, float a3, float a4, float b1, float b2, float b3,
+           float b4, float c1, float c2, float c3, float c4, float d1, float d2,
+           float d3, float d4)
+    : r1(a1, a2, a3, a4), r2(b1, b2, b3, b4), r3(c1, c2, c3, c4),
+      r4(d1, d2, d3, d4) {}
 
-      dx *= tan(radians(fov_x * .5));
-      dy *= tan(radians(fov_y * .5));
+vec4 mat4::operator*(const vec4 &b) {
+  return vec4(r1.dot(b), r2.dot(b), r3.dot(b), r4.dot(b));
+}
 
-      vec4 ddir = proj * vec4(dx,dy,1,0);
+mat3::mat3(float a1, float a2, float a3, float b1, float b2, float b3, float c1,
+           float c2, float c3)
+    : r1(a1, a2, a3), r2(b1, b2, b3), r3(c1, c2, c3) {}
 
-      // Setup the various varying inputs for the fragment shader.
-      dir = ddir.xyz;
-      eye = pos;
-      zoom = tan(radians(fov_x * .5));
-
-      // Lower left is (0,0) for gl_FragCoord.
-      gl_FragCoord.x = 0.5 + scr_x;
-      gl_FragCoord.y = YRES - 0.5 - scr_y;
-
-      GLSL::main();  // Call the fragment shader code, compiled as C++
-
-      tga.set(scr_x, scr_y, gl_FragColor.xyz);
-    }
-  }
-  end = clock();
-
-  printf("%lf sec\n", (double)(end-start)/CLOCKS_PER_SEC);
-
-  if (tga.writeFile("test.tga")) printf("wrote ./test.tga\n");
-
-  return 0;
+dvec3 mat3::operator*(const dvec3 &b) {
+  return dvec3(r1.dot(b), r2.dot(b), r3.dot(b));
+}
+vec3 mat3::operator*(const vec3 &b) {
+  return vec3(r1.dot(b), r2.dot(b), r3.dot(b));
 }
 
 } // namespace GLSL
-
-int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    fprintf(stderr, "Usage: glsl .cfg-file\n");
-    return 1;
-  }
-  return GLSL::vertex_main(argc, argv);
-}

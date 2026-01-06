@@ -1,90 +1,86 @@
 # Needs SDL2.framework in /Library/Frameworks/
 #
 # TODO: test (have no OSX machine atm)
-all: boxplorer2 edit-cfg glsl sdl2-test
+all: boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
 
 clean:
-	rm *.o boxplorer2 edit-cfg glsl sdl2-test
+	-rm *.o boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
 
-CFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/ -I/Library/Frameworks/SDL2.framework/Headers/
+CPPFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/ -I/Library/Frameworks/SDL2.framework/Headers/
 
-LDFLAGS=-F/Library/Frameworks/ -framework OpenGL -framework Cocoa \
-	-framework SDL2
+LDFLAGS=-F/Library/Frameworks/ -framework OpenGL -framework Cocoa  -framework SDL2
 
-TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o TwEventSDL20.o TwOpenGLCore.o LoadOGLCore.o
+TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o TwEventSDL20.o
 
-BX_OBJS=boxplorer2.o interpolate.o camera.o uniforms.o shader.o shader_procs.o
+BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o shader_procs.o glsl.o
 
 boxplorer2: $(BX_OBJS) $(TW_OBJS)
 	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer2 $(LDFLAGS)
 
 sdl2-test: sdl2-test.cc
-	g++ $(CFLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
+	g++ $(CPPFLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
 
-boxplorer2.o: boxplorer2.cc default_shaders.h shader_procs.h Makefile.osx \
-       TGA.h cfgs/menger.cfg.data/fragment.glsl interpolate.h camera.h \
-	     uniforms.h shader.h params.h
-	g++ -c $(CFLAGS) boxplorer2.cc
+boxplorer2.o: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
+	camera.h interpolate.h uniforms.h params.h \
+	cfgs/menger.cfg.data/fragment.glsl \
+	Makefile.osx
+	g++ -c $(CPPFLAGS) boxplorer2.cc
 
-shadershrink: shadershrink.cc shadershrink.h Makefile.osx
-	g++ $(CFLAGS) shadershrink.cc -o shadershrink
+shadershrink: shadershrink.cc shadershrink.h \
+	Makefile.osx
+	g++ $(CPPFLAGS) shadershrink.cc -o shadershrink
 
-edit-cfg: edit-cfg.cc Makefile.osx
-	g++ $(CFLAGS) edit-cfg.cc -o edit-cfg
+edit-cfg: edit-cfg.cc \
+	Makefile.osx
+	g++ $(CPPFLAGS) edit-cfg.cc -o edit-cfg
 
-glsl: glsl.cc glsl.h TGA.h Makefile.osx
-	g++ $(CFLAGS) glsl.cc -o glsl
+glsl-test: glsl-test.cc TGA.h glsl.h glsl.o \
+	cfgs/menger.cfg.data/fragment.glsl \
+	Makefile.osx
+	g++ $(CPPFLAGS) glsl-test.cc glsl.o -o glsl-test
 
-shader.o: shader.cc shader.h shader_procs.h
-	g++ -c $(CFLAGS) shader.cc
-
-shader_procs.o: shader_procs.cc shader_procs.h
-	g++ -c $(CFLAGS) shader_proc.cc
-
-camera.o: camera.cc camera.h params.h
-	g++ -c $(CFLAGS) camera.cc
-
+glsl.o: glsl.cc glsl.h
 interpolate.o: interpolate.cc interpolate.h
-	g++ -c $(CFLAGS) interpolate.cc
-
-uniforms.o: uniforms.cc uniforms.h shader_procs.h
-	g++ -c $(CFLAGS) uniforms.cc
+shader.o: shader.cc shader.h shader_procs.h
+shader_procs.o: shader_procs.cc shader_procs.h
+camera.o: camera.cc camera.h params.h
+uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwFonts.o: AntTweakBar/src/TwFonts.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwMgr.o: AntTweakBar/src/TwMgr.cpp
-	g++ -c $(CFLAGS) $<
-
-TwEventSDL12.o: AntTweakBar/src/TwEventSDL12.c
-	g++ -c $(CFLAGS) $<
-
-TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
-	g++ -c $(CFLAGS) $<
-
-TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
-	g++ -c $(CFLAGS) $<
-
-TwEventSDL20.o: AntTweakBar/src/TwEventSDL20.c
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwPrecomp.o: AntTweakBar/src/TwPrecomp.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwColors.o: AntTweakBar/src/TwColors.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwOpenGLCore.o: AntTweakBar/src/TwOpenGLCore.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 LoadOGLCore.o: AntTweakBar/src/LoadOGLCore.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 TwOpenGL.o: AntTweakBar/src/TwOpenGL.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
 
 LoadOGL.o: AntTweakBar/src/LoadOGL.cpp
-	g++ -c $(CFLAGS) $<
+	g++ -c $(CPPFLAGS) $<
+
+TwEventSDL.o: AntTweakBar/src/TwEventSDL.c
+	g++ -c $(CPPFLAGS) $<
+
+TwEventSDL12.o: AntTweakBar/src/TwEventSDL12.c
+	g++ -c $(CPPFLAGS) $<
+
+TwEventSDL13.o: AntTweakBar/src/TwEventSDL13.c
+	g++ -c $(CPPFLAGS) $<
+
+TwEventSDL20.o: AntTweakBar/src/TwEventSDL20.c
+	g++ -c $(CPPFLAGS) $<

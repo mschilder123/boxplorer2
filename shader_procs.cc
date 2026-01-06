@@ -46,8 +46,8 @@ DECLARE_GL_PROC(PFNGLFRAMEBUFFERRENDERBUFFERPROC, glFramebufferRenderbuffer);
 DECLARE_GL_PROC(PFNGLFRAMEBUFFERTEXTURE2DPROC, glFramebufferTexture2D);
 DECLARE_GL_PROC(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus);
 
-//DECLARE_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC, glFramebufferTextureLayer);
-//DECLARE_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
+// DECLARE_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC, glFramebufferTextureLayer);
+// DECLARE_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
 
 #if defined(__WIN32__)
 DECLARE_GL_PROC_X(PFNGLACTIVETEXTUREPROC, glActiveTexture);
@@ -60,18 +60,22 @@ DECLARE_GL_PROC_X(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 
 bool enableShaderProcs(void) { return true; }
 
-#else  // !__APPLE
+#else // !__APPLE
 
 bool enableShaderProcs(void) {
 
-#define IMPORT_GL_PROC(type, name) \
-  do { if (!(name = (type) SDL_GL_GetProcAddress(#name))) { \
-    fprintf(stderr, "failed to import function " #name "\n"); \
-  } } while (0)
-#define IMPORT_GL_PROC_X(type, name) \
-  do { if (!(x_##name = (type) SDL_GL_GetProcAddress(#name))) { \
-    fprintf(stderr, "failed to import function " #name "\n"); \
-  } } while (0)
+#define IMPORT_GL_PROC(type, name)                                             \
+  do {                                                                         \
+    if (!(name = (type)SDL_GL_GetProcAddress(#name))) {                        \
+      fprintf(stderr, "failed to import function " #name "\n");                \
+    }                                                                          \
+  } while (0)
+#define IMPORT_GL_PROC_X(type, name)                                           \
+  do {                                                                         \
+    if (!(x_##name = (type)SDL_GL_GetProcAddress(#name))) {                    \
+      fprintf(stderr, "failed to import function " #name "\n");                \
+    }                                                                          \
+  } while (0)
 
   IMPORT_GL_PROC(PFNGLCREATEPROGRAMPROC, glCreateProgram);
   IMPORT_GL_PROC(PFNGLCREATESHADERPROC, glCreateShader);
@@ -114,8 +118,9 @@ bool enableShaderProcs(void) {
   IMPORT_GL_PROC(PFNGLFRAMEBUFFERTEXTURE2DPROC, glFramebufferTexture2D);
   IMPORT_GL_PROC(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus);
 
-  //IMPORT_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC, glFramebufferTextureLayer);
-  //IMPORT_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
+  // IMPORT_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC,
+  // glFramebufferTextureLayer); IMPORT_GL_PROC(PFNGLTEXSTORAGE3DPROC,
+  // glTexStorage3D);
 
 #if defined(__WIN32__)
   IMPORT_GL_PROC_X(PFNGLACTIVETEXTUREPROC, glActiveTexture);
@@ -128,9 +133,7 @@ bool enableShaderProcs(void) {
 }
 
 #if defined(__WIN32__)
-void glActiveTexture( GLenum texture ) {
-  x_glActiveTexture(texture);
-}
+void glActiveTexture(GLenum texture) { x_glActiveTexture(texture); }
 #endif
 
-#endif  // !__APPLE__
+#endif // !__APPLE__

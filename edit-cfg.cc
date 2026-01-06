@@ -1,15 +1,15 @@
 // Little cmdline utility to change or delete values from .cfg files.
 // Useful for batch editing of set of keyframes.
-#include <string>
-#include <vector>
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
+#include <string>
+#include <vector>
 
 using namespace std;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   int arg = 1;
   bool doDelete = false;
   bool doRename = false;
@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     ++arg;
   }
 
-  string kv(arg<argc?argv[arg++]:"");
+  string kv(arg < argc ? argv[arg++] : "");
 
   if (!doClean && kv.empty()) {
     fprintf(stderr, "usage: edit-cfg [-drc] \"param value\" *.cfg\n");
@@ -58,22 +58,22 @@ int main(int argc, char* argv[]) {
       continue;
     }
     string line;
-    while(infile.good()) {
+    while (infile.good()) {
       getline(infile, line);
       if (line.find_first_of("\r\n") != string::npos)
         line.erase(line.find_first_of("\r\n"));
       // Clean svn diff pollution..
       if (doClean && line.find("<<<<<") == 0) {
-              cleaning = true;
-              continue;
+        cleaning = true;
+        continue;
       }
       if (doClean && line.find("=====") == 0) {
-              cleaning = false;
-              continue;
+        cleaning = false;
+        continue;
       }
       if (doClean && line.find(">>>>>") == 0) {
-              cleaning = false;
-              continue;
+        cleaning = false;
+        continue;
       }
       if (!cleaning && !line.empty())
         content.push_back(line);
@@ -84,16 +84,16 @@ int main(int argc, char* argv[]) {
       // change key value
       bool found = false;
 
-      for (vector<string>::iterator it = content.begin();
-           it != content.end(); ++it) {
+      for (vector<string>::iterator it = content.begin(); it != content.end();
+           ++it) {
         if (doRename && it->find(value) == 0) {
           string line(*it);
           it->clear();
-        } else
-        if (it->find(key) == 0) {
+        } else if (it->find(key) == 0) {
           string line(*it);
           it->clear();
-          if (!doDelete && !doRename) it->assign(kv);
+          if (!doDelete && !doRename)
+            it->assign(kv);
           if (doRename) {
             string newline = line.replace(0, key.size() - 1, value);
             it->assign(newline);
@@ -109,8 +109,8 @@ int main(int argc, char* argv[]) {
     // write file
     ofstream outfile(filename.c_str());
     if (outfile.is_open()) {
-      for(vector<string>::const_iterator it = content.begin();
-          it != content.end(); ++it) {
+      for (vector<string>::const_iterator it = content.begin();
+           it != content.end(); ++it) {
         if (!it->empty()) {
           outfile.write(it->data(), it->size());
           outfile.write("\n", 1);

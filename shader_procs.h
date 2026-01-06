@@ -5,22 +5,22 @@
 bool enableShaderProcs(void);
 
 #define NO_SDL_GLEXT
-#include <SDL_opengl.h>
 #include <SDL.h>
+#include <SDL_opengl.h>
 
 typedef ptrdiff_t GLsizeiptr;
 typedef ptrdiff_t GLintptr;
 
 #if (defined __APPLE__)
-  #include <OpenGL/glu.h>
-  #include <OpenGL/glext.h>
+#include <OpenGL/glext.h>
+#include <OpenGL/glu.h>
 #elif (defined __WIN32__)
-  // nothing?
+// nothing?
 #elif (defined __GNUC__)
-  #include <GL/glx.h>
-  #include <GL/glxext.h>
+#include <GL/glx.h>
+#include <GL/glxext.h>
 #else
-  #error "Unknown target"
+#error "Unknown target"
 #endif
 
 #if !(defined __APPLE__)
@@ -70,8 +70,8 @@ DECLARE_GL_PROC(PFNGLFRAMEBUFFERRENDERBUFFERPROC, glFramebufferRenderbuffer);
 DECLARE_GL_PROC(PFNGLFRAMEBUFFERTEXTURE2DPROC, glFramebufferTexture2D);
 DECLARE_GL_PROC(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus);
 
-//DECLARE_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC, glFramebufferTextureLayer);
-//DECLARE_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
+// DECLARE_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC, glFramebufferTextureLayer);
+// DECLARE_GL_PROC(PFNGLTEXSTORAGE3DPROC, glTexStorage3D);
 
 #if defined(__WIN32__)
 DECLARE_GL_PROC_X(PFNGLACTIVETEXTUREPROC, glActiveTexture);
@@ -80,6 +80,6 @@ DECLARE_GL_PROC_X(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 #undef DECLARE_GL_PROC
 #undef DECLARE_GL_PROC_X
 
-#endif  //!__APPLE__
+#endif //!__APPLE__
 
-#endif  // SHADER_PROCS_H
+#endif // SHADER_PROCS_H
