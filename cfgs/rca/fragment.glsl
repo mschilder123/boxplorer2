@@ -97,6 +97,7 @@ int rotb = 0x0010;
 #if 0
   if (fract(float(frameno) / 2.0) >= .5) {
     // Odd phase does Bounce gas.
+    // See https://dmishin.blogspot.com/2014/06/alternating-rules-and-knightships.html
     rule = 0xe968;
     rotf = 0;
     rotb = 0;
