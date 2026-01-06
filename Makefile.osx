@@ -12,7 +12,7 @@ LDFLAGS=-F/Library/Frameworks/ -framework OpenGL -framework Cocoa  -framework SD
 
 TW_OBJS=TwBar.o TwFonts.o LoadOGL.o TwMgr.o TwEventSDL.o TwPrecomp.o TwColors.o TwOpenGL.o TwEventSDL12.o TwEventSDL13.o LoadOGLCore.o TwOpenGLCore.o TwEventSDL20.o
 
-BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o shader_procs.o glsl.o
+BX_OBJS=boxplorer2.o interpolate.o uniforms.o camera.o shader.o shader_procs.o glsl.o TGA.o
 
 boxplorer2: $(BX_OBJS) $(TW_OBJS)
 	g++ $(BX_OBJS) $(TW_OBJS) -o boxplorer2 $(LDFLAGS)
