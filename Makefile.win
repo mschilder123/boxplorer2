@@ -19,11 +19,11 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj TwEventSDL20.obj \
         LoadOGLCore.obj TwOpenGLCore.obj
 
-BX_OBJS=boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj glsl.obj TGA.obj \
+BX_OBJECTS = boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj glsl.obj TGA.obj utils.obj shader_manager.obj \
         oculus_sdk4.obj
 
-boxplorer2.exe: $(BX_OBJS) $(TW_OBJS) Makefile.win
-	link $(LDFLAGS) $(BX_OBJS) $(TW_OBJS)
+boxplorer2.exe: $(BX_OBJECTS) $(TW_OBJS) Makefile.win
+	link $(LDFLAGS) $(BX_OBJECTS) $(TW_OBJS)
 
 sdl2-test.exe: sdl2-test.cc Makefile.win
 	cl $(CFLAGS) sdl2-test.cc $(LDFLAGS)

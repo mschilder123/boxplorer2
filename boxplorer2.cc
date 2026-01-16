@@ -1,23 +1,27 @@
-#include <assert.h>
-#include <ctype.h>
-#include <float.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+﻿// Standard C/C++
+#include <cassert>
+#include <cctype>
+#include <cfloat>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
 #include <sys/stat.h>
-#include <time.h>
+#include <utility>
+#include <vector>
 
 #if !defined(_WIN32)
-
 #include <unistd.h>
-
 #define _strdup strdup
 #define __FUNCTION__ "boxplorer2"
 #define MAX_PATH 256
-
-#else // _WIN32
-
+#else                           // _WIN32
 #pragma warning(disable : 4996) // unsafe function
 #pragma warning(disable : 4244) // double / float conversion
 #pragma warning(disable : 4305) // double / float truncation
@@ -25,10 +29,8 @@
 
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
-
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "glu32.lib")
-
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
@@ -36,44 +38,34 @@
 #include "oculus_sdk4.h"
 
 #if defined(HYDRA)
-
 #include <sixense.h>
 #pragma comment(lib, "sixense.lib")
 #pragma comment(lib, "sixense_utils.lib")
-
 #endif // HYDRA
 
 #endif // _WIN32
 
-#include <map>
-#include <string>
-#include <vector>
-
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <utility>
-
 using namespace std;
 
+// External Libraries
 #define NO_SDL_GLEXT
+#include <AntTweakBar.h>
 #include <SDL.h>
 #include <SDL_main.h>
 #include <SDL_opengl.h>
 #include <SDL_thread.h>
 
-#include <AntTweakBar.h>
-
-#include "default_shaders.h"
-#include "shader_procs.h"
-
+// Local Headers
 #include "TGA.h"
-
 #include "camera.h"
+#include "default_shaders.h"
 #include "glsl.h"
 #include "interpolate.h"
 #include "shader.h"
+#include "shader_manager.h"
+#include "shader_procs.h"
 #include "uniforms.h"
+#include "utils.h"
 
 #define DEFAULT_CONFIG_FILE "default.cfg"
 #define DEFAULT_CONFIG "cfgs/rrrola/" DEFAULT_CONFIG_FILE
@@ -201,8 +193,8 @@ static SDL_Cursor *init_system_cursor(const char *image[]) {
 }
 
 // SDL cursors.
-SDL_Cursor *arrow_cursor;
-SDL_Cursor *hand_cursor;
+// SDL cursors.
+// Moved to InputContext
 
 void clearGlContext(); // fwd decl.
 
@@ -385,185 +377,139 @@ typedef int ViewQuadrant;
 #define VQ_DONE 6
 #define VQ_LETTER "fbudrl"
 
-#define NFBO 2
-// ogl framebuffer object(s).
-// At least two are needed for the life and accumulation shaders.
-GLuint mainFbo[NFBO];
-// texture that frame got rendered to
-GLuint mainTex[NFBO];
-// depth buffer attached to fbo
-GLuint mainDepth[NFBO];
-
-// Fbo and texture for fxaa output.
-GLuint fxaaFbo = -1;
-GLuint fxaaTex = -1;
-
-// Fbo and texture for tmp rendering pass.
-GLuint scratchFbo = -1;
-GLuint scratchTex = -1;
-
-// framebuffer(s) for post-process blur.
-// We have 2: one holding square and one a diamond.
-// TODO: per eye for xfire?
-#define NBLUR 2
-
-GLuint blurFbo[NBLUR];
-GLuint blurTex[NBLUR];
-
-Shader fractal;
-Shader effects;
-Shader dof;
-
-Shader de_shader;
-GLuint de_fbo;
-GLuint de_texture;
-
-Shader fxaa;
-
 Uniforms uniforms;
 
-string BaseDir;    // Where our executable and include dirs live.
-string WorkingDir; // Where current fractal code & data lives.
-string BaseFile;   // Initial argument filename.
+// BaseDir, WorkingDir, BaseFile moved to utils.cc/h
 
 string lifeform; // Conway's Game of Life creature, if any.
 
-// texture holding background image
-GLuint background_texture;
+// Render globals grouped.
+#define NFBO 2
+#define NBLUR 2
+
+struct RenderContext {
+  GLuint mainFbo[NFBO];
+  GLuint mainTex[NFBO];
+  GLuint mainDepth[NFBO];
+
+  GLuint fxaaFbo = -1;
+  GLuint fxaaTex = -1;
+
+  GLuint scratchFbo = -1;
+  GLuint scratchTex = -1;
+
+  GLuint blurFbo[NBLUR];
+  GLuint blurTex[NBLUR];
+
+  ShaderManager shaderManager;
+
+  GLuint de_fbo;
+  GLuint de_texture;
+
+  GLuint background_texture;
+} render;
 
 // Try release everything that might have been allocated within
 // current glContext. Leaks detected with AMD CodeXL.
 void clearGlContext() {
   // release shaders.
-  fractal.clear();
-  effects.clear();
-  dof.clear();
-  de_shader.clear();
-  fxaa.clear();
+  ::render.shaderManager.fractal.clear();
+  ::render.shaderManager.effects.clear();
+  ::render.shaderManager.dof.clear();
+  ::render.shaderManager.de_shader.clear();
+  ::render.shaderManager.fxaa.clear();
 
   // delete fbos and textures.
-  glDeleteTextures(1, &de_texture);
-  glDeleteFramebuffers(1, &de_fbo);
+  glDeleteTextures(1, &render.de_texture);
+  glDeleteFramebuffers(1, &render.de_fbo);
 
-  glDeleteTextures(1, &background_texture); // free existing
+  glDeleteTextures(1, &render.background_texture); // free existing
 
-  glDeleteFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
-  glDeleteTextures(ARRAYSIZE(mainDepth), mainDepth);
-  glDeleteTextures(ARRAYSIZE(mainTex), mainTex);
+  glDeleteFramebuffers(ARRAYSIZE(render.mainFbo), render.mainFbo);
+  glDeleteTextures(ARRAYSIZE(render.mainDepth), render.mainDepth);
+  glDeleteTextures(ARRAYSIZE(render.mainTex), render.mainTex);
 
-  glDeleteFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
-  glDeleteTextures(ARRAYSIZE(blurTex), blurTex);
+  glDeleteFramebuffers(ARRAYSIZE(render.blurFbo), render.blurFbo);
+  glDeleteTextures(ARRAYSIZE(render.blurTex), render.blurTex);
 
-  glDeleteFramebuffers(1, &scratchFbo);
-  glDeleteTextures(1, &scratchTex);
+  glDeleteFramebuffers(1, &render.scratchFbo);
+  glDeleteTextures(1, &render.scratchTex);
 
-  glDeleteFramebuffers(1, &fxaaFbo);
-  glDeleteTextures(1, &fxaaTex);
+  glDeleteFramebuffers(1, &render.fxaaFbo);
+  glDeleteTextures(1, &render.fxaaTex);
 }
 
 // DLP-Link or interlaced L/R eye polarity
 int polarity = 1;
 
-SDL_Joystick *joystick = NULL;
+struct InputContext {
+  int grabbed = 0;
+  SDL_Joystick *stick = NULL;
+  SDL_Cursor *arrow = NULL;
+  SDL_Cursor *hand = NULL;
+} input;
 
 ////////////////////////////////////////////////////////////////
 // Helper functions
 
-// Allocate a char[] and read a text file into it. Return 0 on error.
-char *_readFile(char const *name) {
-  FILE *f;
-  size_t len;
-  char *s = 0;
-
-  // open file an get its length
-  if (!(f = fopen(name, "r")))
-    goto readFileError1;
-  fseek(f, 0, SEEK_END);
-  len = ftell(f);
-
-  // read the file in an allocated buffer
-  if (!(s = (char *)malloc(len + 1)))
-    goto readFileError2;
-  rewind(f);
-  len = fread(s, 1, len, f);
-  s[len] = '\0';
-
-readFileError2:
-  fclose(f);
-readFileError1:
-  return s;
-}
-
-bool readFile(const string &name, string *content) {
-  string filename(WorkingDir + name);
-  char *s = _readFile(filename.c_str());
-  if (!s) {
-    filename = BaseDir + "include/" + name;
-    s = _readFile(filename.c_str());
-    if (!s)
-      return false;
-  }
-  content->assign(s);
-  free(s);
-  printf(__FUNCTION__ " : read '%s'\n", filename.c_str());
-  return true;
-}
+// readFile moved to utils.cc
 
 ////////////////////////////////////////////////////////////////
 // FPS tracking.
 
-int framesToAverage;
-Uint32 *frameDurations;
-int frameDurationsIndex = 0;
-Uint32 lastFrameTime;
+// FPS tracking.
+struct FPSCounter {
+  int framesToAverage;
+  std::vector<Uint32> frameDurations;
+  int frameDurationsIndex = 0;
+  Uint32 lastFrameTime;
 
-double now() { return (double)SDL_GetTicks() / 1000.0; }
+  double now() { return (double)SDL_GetTicks() / 1000.0; }
 
-// Initialize the FPS structure.
-void initFPS(int framesToAverage_) {
-  assert(framesToAverage_ > 1);
-  framesToAverage = framesToAverage_;
-  frameDurations = (Uint32 *)malloc(sizeof(Uint32) * framesToAverage_);
-  frameDurations[0] = 0;
-  lastFrameTime = SDL_GetTicks();
-}
-
-// Update the FPS structure after drawing a frame.
-void updateFPS(void) {
-  Uint32 time = SDL_GetTicks();
-  frameDurations[frameDurationsIndex++ % framesToAverage] =
-      time - lastFrameTime;
-  lastFrameTime = time;
-}
-
-// Return the duration of the last frame.
-Uint32 getLastFrameDuration(void) {
-  return frameDurations[(frameDurationsIndex + framesToAverage - 1) %
-                        framesToAverage];
-}
-
-// Return the average FPS over the last X frames.
-float getFPS(void) {
-  if (frameDurationsIndex < framesToAverage)
-    return 0; // not enough data
-  int i;
-  Uint32 sum;
-  for (i = sum = 0; i < framesToAverage; i++)
-    sum += frameDurations[i];
-  float fps = framesToAverage * 1000.f / sum;
-
-  static Uint32 lastfps = 0;
-  if (lastFrameTime - lastfps > 5000) {
-    // Once per 5 seconds.
-#if defined(_WIN32)
-    SetOculusPrediction(0.9 / fps); // A bit lower than latency.
-#endif
-    printf("fps %f\n", fps);
-    lastfps = lastFrameTime;
+  // Initialize the FPS structure.
+  void init(int framesToAverage_) {
+    assert(framesToAverage_ > 1);
+    framesToAverage = framesToAverage_;
+    frameDurations.resize(framesToAverage_, 0);
+    lastFrameTime = SDL_GetTicks();
   }
 
-  return fps;
-}
+  // Update the FPS structure after drawing a frame.
+  void update(void) {
+    Uint32 time = SDL_GetTicks();
+    frameDurations[frameDurationsIndex++ % framesToAverage] =
+        time - lastFrameTime;
+    lastFrameTime = time;
+  }
+
+  // Return the duration of the last frame.
+  Uint32 getLastFrameDuration(void) {
+    return frameDurations[(frameDurationsIndex + framesToAverage - 1) %
+                          framesToAverage];
+  }
+
+  // Return the average FPS over the last X frames.
+  float get() {
+    if (frameDurationsIndex < framesToAverage)
+      return 0; // not enough data
+    Uint32 sum = 0;
+    for (int i = 0; i < framesToAverage; i++)
+      sum += frameDurations[i];
+    float fps = framesToAverage * 1000.f / sum;
+
+    static Uint32 lastfps = 0;
+    if (lastFrameTime - lastfps > 5000) {
+      // Once per 5 seconds.
+#if defined(_WIN32)
+      // SetOculusPrediction(0.9 / fps); // A bit lower than latency.
+#endif
+      printf("fps %f\n", fps);
+      lastfps = lastFrameTime;
+    }
+
+    return fps;
+  }
+} fpsCounter;
 
 ////////////////////////////////////////////////////////////////
 // Current logical state of the program.
@@ -814,7 +760,7 @@ public:
       if (defines != NULL)
         fprintf(f, "%s", defines->c_str());
 
-        // Write common parameters.
+      // Write common parameters.
 #define PROCESS(type, name, nameString, doSpline)                              \
   fprintf(f, nameString " %g\n", (double)name);
       PROCESS_COMMON_PARAMS
@@ -845,7 +791,7 @@ public:
   glUniform1i(glGetUniformLocation(program, #name), name);
 
     if (program == 0)
-      program = fractal.program();
+      program = ::render.shaderManager.fractal.program();
 
     // These might be dupes w/ uniforms.send() below.
     // Leave for now until all .cfg got updated.
@@ -948,7 +894,8 @@ public:
       glRectf(0, -1, 1, 1); // draw right half of screen
       break;
     case ST_COMPUTE_DE_ONLY:
-      setUniforms(1.0, 0.0, 1.0, 0.0, speed, de_shader.program());
+      setUniforms(1.0, 0.0, 1.0, 0.0, speed,
+                  ::render.shaderManager.de_shader.program());
       float xrange = 4.0 / window.width(); // Aim for ~8x8 pixels.
       float yrange = 4.0 / window.height();
       glRectf(-1, 1, -1 + xrange, 1 - yrange); // Only care about top corner.
@@ -1112,10 +1059,11 @@ void CatmullRom(const vector<KeyFrame> &keyframes, vector<KeyFrame> *output,
 // Suffers from overshoot for non-evenly spaced control points.
 // TODO: look into Bessel-Overhauser mitigation.
 #define SPLINE(X, p0, p1, p2, p3)                                              \
-  ((X) = (double)(.5 * (2 * (p1) +                                             \
-                        t * ((-(p0) + (p2)) +                                  \
-                             t * ((2 * (p0)-5 * (p1) + 4 * (p2) - (p3)) +      \
-                                  t * (-(p0) + 3 * (p1)-3 * (p2) + (p3)))))))
+  ((X) =                                                                       \
+       (double)(.5 * (2 * (p1) +                                               \
+                      t * ((-(p0) + (p2)) +                                    \
+                           t * ((2 * (p0) - 5 * (p1) + 4 * (p2) - (p3)) +      \
+                                t * (-(p0) + 3 * (p1) - 3 * (p2) + (p3)))))))
 
       // Spline over splinable representation of quat.
       for (size_t j = 0; j < 4; ++j) {
@@ -1414,7 +1362,7 @@ void changeController(SDL_Keycode key, Controller *c) {
 // Graphics.
 
 // Is the mouse and keyboard input grabbed?
-int grabbedInput = 0;
+// Moved to InputContext
 
 void saveScreenshot(char const *tgaFile) {
   TGA tga;
@@ -1456,81 +1404,10 @@ GLSL::vec3 getPixelColor(int x, int y) {
   return GLSL::vec3(img);
 }
 
-string glsl_source;
+// ::render.shaderManager.glsl_source moved to ShaderManager
 
 // Compile and activate shader programs. Return the program handle.
-bool setupShaders(Shader *fractal, const char *extra_define = NULL) {
-  string vertex(default_vs);
-  string fragment(default_fs);
-
-  readFile(VERTEX_SHADER_FILE, &vertex);
-  readFile(FRAGMENT_SHADER_FILE, &fragment);
-
-  // Process synthetic #include statements.
-  size_t inc_pos;
-  while ((inc_pos = fragment.find("#include ")) != string::npos) {
-    size_t name_start = fragment.find("\"", inc_pos) + 1;
-    size_t name_end = fragment.find("\"", name_start);
-    string name(fragment, name_start, name_end - name_start);
-    size_t line_end = fragment.find("\n", inc_pos);
-    string inc;
-    readFile(name, &inc);
-    fragment.replace(inc_pos, line_end - inc_pos, inc);
-  }
-
-  if (extra_define == NULL) {
-    glsl_source.assign(defines + fragment);
-    return fractal->compile(defines, vertex, fragment) != 0;
-  } else {
-    string extra_defines = extra_define + defines;
-    return fractal->compile(extra_defines, vertex, fragment) != 0;
-  }
-}
-
-// Try load various helper shaders.
-// We expect effects to be there and be ok.
-// DoF and fxaa are optional.
-bool setupShaders2(void) {
-  string vertex(effects_default_vs);
-  string fragment(effects_default_fs);
-
-  readFile(EFFECTS_VERTEX_SHADER_FILE, &vertex);
-  readFile(EFFECTS_FRAGMENT_SHADER_FILE, &fragment);
-
-  glsl_source.append(fragment);
-
-  bool ok = (effects.compile(defines, vertex, fragment) != 0);
-
-#if 0
-  if (stereoMode == ST_OCULUS) {
-    // Do not load fxaa / dof for oculus rendering.
-    // We only do aberration pre-compensation in post for oculus.
-    return ok;
-  }
-#endif
-
-  string fxaa_vertex;
-  string fxaa_fragment;
-
-  readFile(FXAA_VERTEX_SHADER_FILE, &fxaa_vertex);
-  readFile(FXAA_FRAGMENT_SHADER_FILE, &fxaa_fragment);
-
-  if (!fxaa_vertex.empty() && !fxaa_fragment.empty()) {
-    ok &= (fxaa.compile(defines, fxaa_vertex, fxaa_fragment) != 0);
-  }
-
-  string dof_vertex;
-  string dof_fragment;
-
-  readFile(DOF_VERTEX_SHADER_FILE, &dof_vertex);
-  readFile(DOF_FRAGMENT_SHADER_FILE, &dof_fragment);
-
-  if (!dof_vertex.empty() && !dof_fragment.empty()) {
-    ok &= (dof.compile(defines, dof_vertex, dof_fragment) != 0);
-  }
-
-  return ok;
-}
+// setupShaders moved to ShaderManager
 
 bool setupDirectories(const char *configFile) {
   BaseFile.clear();
@@ -1641,12 +1518,12 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
   SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &config.depth_size);
   printf(__FUNCTION__ " : depth size %u\n", config.depth_size);
 
-  if (hand_cursor == NULL)
-    hand_cursor = init_system_cursor(kHand);
-  if (arrow_cursor == NULL)
-    arrow_cursor = SDL_GetCursor();
+  if (input.hand == NULL)
+    input.hand = init_system_cursor(kHand);
+  if (input.arrow == NULL)
+    input.arrow = SDL_GetCursor();
 
-  grabbedInput = 1;
+  input.grabbed = 1;
   if (hideMouse) {
     SDL_SetRelativeMouseMode(SDL_FALSE); // This toggle is needed!
     SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -1658,34 +1535,39 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
   // Needs to be done after setting the video mode.
   enableShaderProcs() || die("This program needs support for GLSL shaders.\n");
 
-  setupShaders(&fractal) ||
-      die("Error in GLSL fractal shader compilation:\n%s\n",
-          fractal.log().c_str());
+  ::render.shaderManager.loadFractal(defines) ||
+      die("Error in GLSL ::render.shaderManager.fractal shader "
+          "compilation:\n%s\n",
+          ::render.shaderManager.fractal.log().c_str());
 
-  setupShaders2() || die("Error in GLSL effects shader compilation:\n%s\n",
-                         effects.log().c_str());
+  ::render.shaderManager.loadHelpers(defines, stereoMode) ||
+      die("Error in GLSL ::render.shaderManager.effects shader "
+          "compilation:\n%s\n",
+          ::render.shaderManager.effects.log().c_str());
 
   glEnable(GL_TEXTURE_2D);
 
   if (!config.disable_de) {
 #if defined(GL_RGBA32F) // We need this to be actually capable of GL_FLOAT
     // Try compile same shader to get a minimal DE computation version.
-    setupShaders(&de_shader, "#define ST_COMPUTE_DE_ONLY\n");
+    ::render.shaderManager.loadDEShader(defines, "#define ST_COMPUTE_DE_ONLY\n");
 
-    if (!de_shader.ok()) {
-      printf(__FUNCTION__ " : de_shader failed to compile: no GPU de.\n");
-      printf(__FUNCTION__ " :\n%s\n", de_shader.log().c_str());
+    if (!::render.shaderManager.de_shader.ok()) {
+      printf(__FUNCTION__ " : ::render.shaderManager.de_shader failed to "
+                          "compile: no GPU de.\n");
+      printf(__FUNCTION__ " :\n%s\n",
+             ::render.shaderManager.de_shader.log().c_str());
       while (glGetError() != GL_NO_ERROR)
         ;
     } else {
       // Got a shader that can compute DE.
       // Set-up a float32 fbo for it to write to.
-      glGenTextures(1, &de_texture);
+      glGenTextures(1, &render.de_texture);
 
-      glGenFramebuffers(1, &de_fbo);
+      glGenFramebuffers(1, &render.de_fbo);
 
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, de_texture);
+      glBindTexture(GL_TEXTURE_2D, render.de_texture);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -1694,10 +1576,10 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
                    GL_RGB, GL_FLOAT, NULL);
       glBindTexture(GL_TEXTURE_2D, 0);
 
-      glBindFramebuffer(GL_FRAMEBUFFER, de_fbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, render.de_fbo);
 
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, de_texture, 0);
+                             GL_TEXTURE_2D, render.de_texture, 0);
 
       CHECK_ERROR;
       CHECK_FRAMEBUFFER;
@@ -1727,9 +1609,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
     // Load background image into texture.
 
-    glGenTextures(1, &background_texture);
+    glGenTextures(1, &render.background_texture);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, background_texture);
+    glBindTexture(GL_TEXTURE_2D, render.background_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     GLint magFilter = config.backbuffer ? GL_NEAREST : GL_LINEAR;
@@ -1740,7 +1622,8 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
                  background.width(), background.height(), 0, GL_BGR,
                  GL_UNSIGNED_BYTE, background.data());
     glGenerateMipmap(GL_TEXTURE_2D);
-    printf(__FUNCTION__ " : background texture at %d\n", background_texture);
+    printf(__FUNCTION__ " : background texture at %d\n",
+           render.background_texture);
     glBindTexture(GL_TEXTURE_2D, 0);
     CHECK_ERROR;
   }
@@ -1749,21 +1632,21 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     // Set up fbos for multipass rendering.
 
     // Create depth buffer(s)
-    glGenTextures(ARRAYSIZE(mainDepth), mainDepth);
+    glGenTextures(ARRAYSIZE(render.mainDepth), render.mainDepth);
 
     // Create textures to render to
-    glGenTextures(ARRAYSIZE(mainTex), mainTex);
+    glGenTextures(ARRAYSIZE(render.mainTex), render.mainTex);
 
     // Create framebuffers
-    glGenFramebuffers(ARRAYSIZE(mainFbo), mainFbo);
+    glGenFramebuffers(ARRAYSIZE(render.mainFbo), render.mainFbo);
 
     GLint clamp = config.backbuffer ? GL_REPEAT : GL_CLAMP_TO_EDGE;
     GLint minfilter = config.backbuffer ? GL_NEAREST : GL_LINEAR;
 
-    for (size_t i = 0; i < ARRAYSIZE(mainFbo); ++i) {
+    for (size_t i = 0; i < ARRAYSIZE(render.mainFbo); ++i) {
       // Initialize depth texture
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, mainDepth[i]);
+      glBindTexture(GL_TEXTURE_2D, render.mainDepth[i]);
 
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1777,7 +1660,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
       // Initialize color texture
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, mainTex[i]);
+      glBindTexture(GL_TEXTURE_2D, render.mainTex[i]);
 
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
@@ -1799,17 +1682,17 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       glBindTexture(GL_TEXTURE_2D, 0);
 
       // Initialize render buffer
-      glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[i]);
+      glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[i]);
 
       // Attach colorbuffer
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, mainTex[i], 0);
+                             GL_TEXTURE_2D, render.mainTex[i], 0);
 
       CHECK_ERROR;
 
       // Attach depthbuffer
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-                             mainDepth[i], 0);
+                             render.mainDepth[i], 0);
 
       CHECK_ERROR;
       CHECK_FRAMEBUFFER;
@@ -1819,14 +1702,14 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    if (dof.ok()) {
+    if (::render.shaderManager.dof.ok()) {
       // Create and initialize blur fbos.
 
-      glGenTextures(ARRAYSIZE(blurTex), blurTex);
+      glGenTextures(ARRAYSIZE(render.blurTex), render.blurTex);
 
-      for (size_t i = 0; i < ARRAYSIZE(blurTex); ++i) {
+      for (size_t i = 0; i < ARRAYSIZE(render.blurTex); ++i) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, blurTex[i]);
+        glBindTexture(GL_TEXTURE_2D, render.blurTex[i]);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1842,12 +1725,12 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       }
 
       // Create framebuffers to render to blur array texture.
-      glGenFramebuffers(ARRAYSIZE(blurFbo), blurFbo);
+      glGenFramebuffers(ARRAYSIZE(render.blurFbo), render.blurFbo);
 
-      for (size_t i = 0; i < ARRAYSIZE(blurFbo); ++i) {
-        glBindFramebuffer(GL_FRAMEBUFFER, blurFbo[i]);
+      for (size_t i = 0; i < ARRAYSIZE(render.blurFbo); ++i) {
+        glBindFramebuffer(GL_FRAMEBUFFER, render.blurFbo[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_2D, blurTex[i], 0);
+                               GL_TEXTURE_2D, render.blurTex[i], 0);
 
         CHECK_FRAMEBUFFER;
         CHECK_ERROR;
@@ -1859,15 +1742,15 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       }
     }
 
-    if (dof.ok() || fxaa.ok()) {
+    if (::render.shaderManager.dof.ok() || ::render.shaderManager.fxaa.ok()) {
 
       // Create and initialize scratch fbo.
 
-      glGenTextures(1, &scratchTex);
-      glGenFramebuffers(1, &scratchFbo);
+      glGenTextures(1, &render.scratchTex);
+      glGenFramebuffers(1, &render.scratchFbo);
 
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, scratchTex);
+      glBindTexture(GL_TEXTURE_2D, render.scratchTex);
 
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1877,9 +1760,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F, config.width, config.height,
                    0, GL_BGRA, xGL_FLOAT, NULL);
 
-      glBindFramebuffer(GL_FRAMEBUFFER, scratchFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, render.scratchFbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, scratchTex, 0);
+                             GL_TEXTURE_2D, render.scratchTex, 0);
 
       CHECK_FRAMEBUFFER;
       CHECK_ERROR;
@@ -1888,17 +1771,17 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glBindTexture(GL_TEXTURE_2D, 0);
-    } // dof.ok() || fxaa.ok()
+    } // ::render.shaderManager.dof.ok() || ::render.shaderManager.fxaa.ok()
 
-    if (fxaa.ok()) {
+    if (::render.shaderManager.fxaa.ok()) {
 
-      // Create and initialize fxaa fbo
+      // Create and initialize ::render.shaderManager.fxaa fbo
 
-      glGenTextures(1, &fxaaTex);
-      glGenFramebuffers(1, &fxaaFbo);
+      glGenTextures(1, &render.fxaaTex);
+      glGenFramebuffers(1, &render.fxaaFbo);
 
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, fxaaTex);
+      glBindTexture(GL_TEXTURE_2D, render.fxaaTex);
 
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1908,9 +1791,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       glTexImage2D(GL_TEXTURE_2D, 0, xGL_RGBA32F, config.width, config.height,
                    0, GL_BGRA, xGL_FLOAT, NULL);
 
-      glBindFramebuffer(GL_FRAMEBUFFER, fxaaFbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, render.fxaaFbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, fxaaTex, 0);
+                             GL_TEXTURE_2D, render.fxaaTex, 0);
 
       CHECK_FRAMEBUFFER;
       CHECK_ERROR;
@@ -1919,13 +1802,13 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glBindTexture(GL_TEXTURE_2D, 0);
-    } // fxaa.ok()
+    } // ::render.shaderManager.fxaa.ok()
   }
 
   // Fill backbuffer w/ starting lifeform, if we have one.
 
   if (config.backbuffer && !lifeform.empty()) {
-    glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[1 /* backbuffer */]);
+    glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[1 /* backbuffer */]);
     // Ortho projection, entire screen in regular pixel coordinates.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -2035,14 +1918,16 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
 TwBar *bar = NULL;
 
-// Find '\n#define foo par[x].z  // {twbar params}' in glsl_source.
+// Find '\n#define foo par[x].z  // {twbar params}' in
+// ::render.shaderManager.glsl_source.
 void initTwParDefines() {
   size_t start = 0;
-  while ((start = glsl_source.find("\n#define ", start + 1)) != string::npos) {
-    size_t eol = glsl_source.find("\n", start + 1);
+  while ((start = ::render.shaderManager.glsl_source.find(
+              "\n#define ", start + 1)) != string::npos) {
+    size_t eol = ::render.shaderManager.glsl_source.find("\n", start + 1);
     if (eol == string::npos)
       continue;
-    string line(glsl_source, start + 1, eol - (start + 1));
+    string line(::render.shaderManager.glsl_source, start + 1, eol - (start + 1));
 
     size_t parStart = line.find(" par[");
     if (parStart == string::npos || parStart < 8)
@@ -2082,13 +1967,14 @@ void initTwParDefines() {
   }
 }
 
-// Find '\nuniform <type> name;' in glsl_source.
+// Find '\nuniform <type> name;' in ::render.shaderManager.glsl_source.
 // Pick up type and twbar params, if found.
 void initTwUniform(const string &name, void *addr) {
   size_t start = 0;
-  while ((start = glsl_source.find("\nuniform ", start + 1)) != string::npos) {
-    size_t eol = glsl_source.find("\n", start + 1);
-    string line(glsl_source, start + 1, eol - (start + 1));
+  while ((start = ::render.shaderManager.glsl_source.find(
+              "\nuniform ", start + 1)) != string::npos) {
+    size_t eol = ::render.shaderManager.glsl_source.find("\n", start + 1);
+    string line(::render.shaderManager.glsl_source, start + 1, eol - (start + 1));
 
     size_t attr_start = line.find("{");
     size_t attr_end = line.find("}");
@@ -2127,15 +2013,18 @@ void initTwBar(enum StereoMode stereoMode) {
     TwDefine("GLOBAL fontsize=3");
   }
 
-  if (fxaa.ok()) {
-    TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "group=post");
+  if (::render.shaderManager.fxaa.ok()) {
+    TwAddVarRW(bar, "::render.shaderManager.fxaa", TW_TYPE_BOOL32, &camera.fxaa,
+               "group=post");
   }
-  if (dof.ok()) {
-    TwAddVarRW(bar, "DoF", TW_TYPE_BOOL32, &camera.enable_dof, "group=post");
+  if (::render.shaderManager.dof.ok()) {
+    TwAddVarRW(bar, "::render.shaderManager.dof", TW_TYPE_BOOL32,
+               &camera.enable_dof, "group=post");
     TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.aperture,
                "min=0.0 max=10.0 step=0.01 group=post");
   }
-  if (effects.ok() || fxaa.ok() || dof.ok()) {
+  if (::render.shaderManager.effects.ok() || ::render.shaderManager.fxaa.ok() ||
+      ::render.shaderManager.dof.ok()) {
     // Global, thus on config, not camera.
     TwAddVarRW(bar, "exposure", TW_TYPE_FLOAT, &config.exposure,
                "min=0.0 max=5.0 step=0.01 group=post");
@@ -2234,7 +2123,7 @@ int main(int argc, char **argv) {
   int disableDE = 0;
   int disableSpline = 0;
   bool xbox360 = true; // try find xbox360 controller
-  int kJOYSTICK = 0;   // joystick by index
+  int kJOYSTICK = 0;   // input.stick by index
   char *outputFilename = NULL;
 
   // Peel known options off the back..
@@ -2273,9 +2162,9 @@ int main(int argc, char **argv) {
       fullscreen = true;
     } else if (!strcmp(argv[argc - 1], "--speed")) {
       configSpeed = true;
-    } else if (!strcmp(argv[argc - 1], "--disable-dof")) {
+    } else if (!strcmp(argv[argc - 1], "--disable-::render.shaderManager.dof")) {
       enableDoF = -1;
-    } else if (!strcmp(argv[argc - 1], "--enable-dof")) {
+    } else if (!strcmp(argv[argc - 1], "--enable-::render.shaderManager.dof")) {
       enableDoF = 1;
     } else if (!strcmp(argv[argc - 1], "--disable-de")) {
       disableDE = -1;
@@ -2295,7 +2184,7 @@ int main(int argc, char **argv) {
       outputFilename = argv[argc - 1] + 9;
     } else if (!strncmp(argv[argc - 1], "--kf=", 5)) {
       kKEYFRAME = argv[argc - 1] + 5;
-    } else if (!strncmp(argv[argc - 1], "--joystick=", 11)) {
+    } else if (!strncmp(argv[argc - 1], "--input.stick=", 11)) {
       kJOYSTICK = atoi(argv[argc - 1] + 11);
     } else if (!strncmp(argv[argc - 1], "--lifeform=", 11)) {
       lifeform_file = argv[argc - 1] + 11;
@@ -2322,7 +2211,9 @@ int main(int argc, char **argv) {
   if (setupDirectories(configFile) && config.loadConfig(BaseFile, &defines)) {
     // succuss
   } else {
-    { die("Usage: boxplorer2 <configuration-file.cfg>\n"); }
+    {
+      die("Usage: boxplorer2 <configuration-file.cfg>\n");
+    }
   }
 
   if (lifeform_file) {
@@ -2398,7 +2289,8 @@ int main(int argc, char **argv) {
     config.enable_dof = (enableDoF == 1); // override
   if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER ||
       stereoMode == ST_ANAGLYPH) {
-    config.enable_dof = 0; // fxaa post does not work for these.
+    config.enable_dof =
+        0; // ::render.shaderManager.fxaa post does not work for these.
   }
   if (disableDE)
     config.disable_de = (disableDE == -1); // override
@@ -2413,7 +2305,8 @@ int main(int argc, char **argv) {
     config.fov_x = 100;
     config.fov_y = 100.0;
     fixedFov = true;
-    // Enable multipass but not dof and fxaa.
+    // Enable multipass but not ::render.shaderManager.dof and
+    // ::render.shaderManager.fxaa.
     config.backbuffer = 1;
     config.enable_fxaa = 0;
     config.enable_dof = 0;
@@ -2475,25 +2368,26 @@ int main(int argc, char **argv) {
   window.init();
 
   if (kJOYSTICK) {
-    // open a joystick by explicit index.
+    // open a input.stick by explicit index.
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-    joystick = SDL_JoystickOpen(kJOYSTICK - 1);
-    printf(__FUNCTION__ " : JoystickName '%s'\n", SDL_JoystickName(joystick));
+    input.stick = SDL_JoystickOpen(kJOYSTICK - 1);
+    printf(__FUNCTION__ " : JoystickName '%s'\n",
+           SDL_JoystickName(input.stick));
     printf(__FUNCTION__ " : JoystickNumAxes   : %i\n",
-           SDL_JoystickNumAxes(joystick));
+           SDL_JoystickNumAxes(input.stick));
     printf(__FUNCTION__ " : JoystickNumButtons: %i\n",
-           SDL_JoystickNumButtons(joystick));
+           SDL_JoystickNumButtons(input.stick));
     printf(__FUNCTION__ " : JoystickNumHats   : %i\n",
-           SDL_JoystickNumHats(joystick));
+           SDL_JoystickNumHats(input.stick));
   } else if (xbox360) {
     // find and open the first xbox 360 controller we see.
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-    for (int i = 0; (joystick = SDL_JoystickOpen(i)) != NULL; ++i) {
-      string name(SDL_JoystickName(joystick));
+    for (int i = 0; (input.stick = SDL_JoystickOpen(i)) != NULL; ++i) {
+      string name(SDL_JoystickName(input.stick));
       printf(__FUNCTION__ " : JoystickName '%s'\n", name.c_str());
       if (name.find("X") == 0)
         break; // got it
-      SDL_JoystickClose(joystick);
+      SDL_JoystickClose(input.stick);
     }
   }
 
@@ -2505,10 +2399,10 @@ int main(int argc, char **argv) {
   }
 
   // Parse as many uniforms from glsl source as we can find.
-  uniforms.parseFromGlsl(glsl_source);
+  uniforms.parseFromGlsl(::render.shaderManager.glsl_source);
 
   // TODO: prune uniforms to just those reported active by shader compiler.
-  cout << fractal.uniforms();
+  cout << ::render.shaderManager.fractal.uniforms();
 
   // Bind as many uniforms as we can find a match for to camera.
   uniforms.link(&camera);
@@ -2526,7 +2420,7 @@ int main(int argc, char **argv) {
   }
 
   initTwBar(stereoMode);
-  initFPS(FPS_FRAMES_TO_AVERAGE);
+  fpsCounter.init(FPS_FRAMES_TO_AVERAGE);
 
   // printf(__FUNCTION__ " : GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 
@@ -2544,6 +2438,10 @@ int main(int argc, char **argv) {
   printf(__FUNCTION__ " : frame time %g\n", frame_time);
   double render_time = 0;
   double render_start = 0;
+
+  if (config.loop && !splines.empty()) {
+    render_start = fpsCounter.now();
+  }
 
   double dist_along_spline = 0;
   size_t keyframe = keyframes.size();
@@ -2602,7 +2500,7 @@ int main(int argc, char **argv) {
         if (config.loop && splines_index >= splines.size()) {
           splines_index = 0;
           render_time = 0;
-          render_start = now();
+          render_start = fpsCounter.now();
         }
 
         // Figure out whether to draw a splined frame or skip to next.
@@ -2625,7 +2523,7 @@ int main(int argc, char **argv) {
               render_time += frame_time;
             } else {
               // Previewing. Use real time (low framerate == jumpy preview!).
-              double n = now();
+              double n = fpsCounter.now();
               if (n > render_start + camera.time)
                 continue; // late, skip frame.
               double w = (render_start + camera.time) - n;
@@ -2642,7 +2540,7 @@ int main(int argc, char **argv) {
           splines.clear();
         }
       } else {
-        camera.time = now();
+        camera.time = fpsCounter.now();
       }
 
       // We want current camera to always be in sync with some fields from
@@ -2659,7 +2557,7 @@ int main(int argc, char **argv) {
         // now mix in orientation (and translation.. where's my DK2 Oculus?)
         if (stereoMode == ST_OCULUS) {
           if (GetOculusQuat(view_q)) {
-            if (grabbedInput) {
+            if (input.grabbed) {
               camera.mixSensorOrientation(view_q);
               mixedInOculus = true;
             }
@@ -2685,10 +2583,10 @@ int main(int argc, char **argv) {
             de = de_func_64 ? GLSL::abs(de_func_64(pos))
                             : GLSL::abs(de_func(pos));
 
-          } else if (de_shader.ok()) {
+          } else if (::render.shaderManager.de_shader.ok()) {
             // We did not find a CPU based DE; try the GPU based one.
             glDisable(GL_DEPTH_TEST);
-            glBindFramebuffer(GL_FRAMEBUFFER, de_fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, render.de_fbo);
 
             // Read previous' round computation, stored as pixel.
             GLSL::vec3 col = getPixelColor(0, 0);
@@ -2697,7 +2595,7 @@ int main(int argc, char **argv) {
             // Compute DE using shader.
             // We'll read the result next round so no costly glFinish needed.
             // TODO: use for auto-focus using center-weighted samples?
-            glUseProgram(de_shader.program());
+            glUseProgram(::render.shaderManager.de_shader.program());
             camera.render(ST_COMPUTE_DE_ONLY);
 
             glUseProgram(0);
@@ -2710,34 +2608,35 @@ int main(int argc, char **argv) {
             last_de = de;
           }
         } // !config.disable_de
-      }   // !rendering
+      } // !rendering
 
       glEnable(GL_DEPTH_TEST);
       glDepthFunc(GL_ALWAYS); // we're writing Z every pixel
       // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      GLuint program = fractal.program();
-      glUseProgram(program); // the fractal shader
+      GLuint program = ::render.shaderManager.fractal.program();
+      glUseProgram(program); // the ::render.shaderManager.fractal shader
 
       // Figure out whether to render direct or via fbo.
-      // A backbuffer (e.g. previous frame), or dof or fxaa
-      // requires rendering to fbo.
+      // A backbuffer (e.g. previous frame), or ::render.shaderManager.dof or
+      // ::render.shaderManager.fxaa requires rendering to fbo.
       multiPass = (config.enable_dof &&
-                   ((dof.ok() && camera.enable_dof && camera.aperture != 0) ||
-                    (fxaa.ok() && camera.fxaa))) ||
+                   ((::render.shaderManager.dof.ok() && camera.enable_dof &&
+                     camera.aperture != 0) ||
+                    (::render.shaderManager.fxaa.ok() && camera.fxaa))) ||
                   config.backbuffer;
 
-      // Set up input texture to fractal shader.
-      if (background_texture) {
+      // Set up input texture to ::render.shaderManager.fractal shader.
+      if (render.background_texture) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, background_texture);
+        glBindTexture(GL_TEXTURE_2D, render.background_texture);
         glUniform1i(glGetUniformLocation(program, "iChannel0"), 0);
       }
 
       // Set up backbuffer as input.
       if (config.backbuffer) {
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, mainTex[(frameno & 1) ^ 1]);
+        glBindTexture(GL_TEXTURE_2D, render.mainTex[(frameno & 1) ^ 1]);
         glUniform1i(glGetUniformLocation(program, "iBackbuffer"), 1);
         glUniform1i(glGetUniformLocation(program, "iBackbufferCount"),
                     camera.iBackbufferCount);
@@ -2746,7 +2645,7 @@ int main(int argc, char **argv) {
       glUniform1i(glGetUniformLocation(program, "frameno"), frameno);
 
       if (multiPass) {
-        glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[frameno & 1]);
+        glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[frameno & 1]);
       }
 
       camera.speed *= speed_factor;
@@ -2754,8 +2653,8 @@ int main(int argc, char **argv) {
       if (rendercubes) {
         glViewport(0, 0, config.width, config.height);
         for (int vq = VQ_FRONT; vq < VQ_DONE; ++vq) {
-          // Hack: render to fxaaFbo
-          glBindFramebuffer(GL_FRAMEBUFFER, mainFbo[frameno & 1]);
+          // Hack: render to render.fxaaFbo
+          glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[frameno & 1]);
 
           camera.render(stereoMode, vq); // This is where the tflops go.
 
@@ -2791,7 +2690,7 @@ int main(int argc, char **argv) {
       glMatrixMode(GL_MODELVIEW);
       glLoadIdentity();
 
-      GLuint currentFrame = mainTex[frameno & 1];
+      GLuint currentFrame = render.mainTex[frameno & 1];
 
       if (!config.backbuffer) {
         glEnable(GL_TEXTURE_2D);
@@ -2802,14 +2701,14 @@ int main(int argc, char **argv) {
         // glGenerateMipmap(GL_TEXTURE_2D);
       }
 
-      if (fxaa.ok() && config.enable_fxaa && camera.fxaa) {
-        // We have a fxaa shader.
+      if (::render.shaderManager.fxaa.ok() && config.enable_fxaa && camera.fxaa) {
+        // We have a ::render.shaderManager.fxaa shader.
         // Compute and point currentFrame(s) at output.
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, currentFrame);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, fxaaFbo);
-        GLuint program = fxaa.program();
+        glBindFramebuffer(GL_FRAMEBUFFER, render.fxaaFbo);
+        GLuint program = ::render.shaderManager.fxaa.program();
         glUseProgram(program);
         glUniform1i(glGetUniformLocation(program, "iTexture"), 0);
         glUniform1f(glGetUniformLocation(program, "xres"), config.width);
@@ -2819,12 +2718,12 @@ int main(int argc, char **argv) {
         glUseProgram(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        currentFrame = fxaaTex; // Our output is input for next stage.
-      }                         // fxaa
+        currentFrame = render.fxaaTex; // Our output is input for next stage.
+      } // ::render.shaderManager.fxaa
 
-      if (dof.ok() && config.enable_dof && camera.enable_dof &&
-          camera.aperture != 0) {
-        // We have a DoF shader.
+      if (::render.shaderManager.dof.ok() && config.enable_dof &&
+          camera.enable_dof && camera.aperture != 0) {
+        // We have a ::render.shaderManager.dof shader.
         // Compute iBlur0 and iBlur1
         for (int i = 0; i < NBLUR * 2; ++i) {
 
@@ -2842,7 +2741,7 @@ int main(int argc, char **argv) {
             int odd = (i & 1);
             if (odd) {
               glActiveTexture(GL_TEXTURE0);
-              glBindTexture(GL_TEXTURE_2D, scratchTex);
+              glBindTexture(GL_TEXTURE_2D, render.scratchTex);
             } else {
               glActiveTexture(GL_TEXTURE0);
               glBindTexture(GL_TEXTURE_2D, currentFrame);
@@ -2853,15 +2752,17 @@ int main(int argc, char **argv) {
           }
 
           // setup output buffer
-          glBindFramebuffer(GL_FRAMEBUFFER,
-                            ((i & 1) == 0)
-                                ? scratchFbo            // scratch as output
-                                : blurFbo[writeLevel]); // target blur as output
+          glBindFramebuffer(
+              GL_FRAMEBUFFER,
+              ((i & 1) == 0)
+                  ? render.scratchFbo            // scratch as output
+                  : render.blurFbo[writeLevel]); // target blur as output
 
           glActiveTexture(GL_TEXTURE2);
-          glBindTexture(GL_TEXTURE_2D, mainDepth[frameno & 1]); // current depth
+          glBindTexture(GL_TEXTURE_2D,
+                        render.mainDepth[frameno & 1]); // current depth
 
-          GLuint dof_program = dof.program();
+          GLuint dof_program = ::render.shaderManager.dof.program();
           glUseProgram(dof_program);
 
           glUniform1i(glGetUniformLocation(dof_program, "iTexture"), 0);
@@ -2881,10 +2782,10 @@ int main(int argc, char **argv) {
           // glDisable(GL_TEXTURE_2D);  // no texture
           glBindFramebuffer(GL_FRAMEBUFFER, 0); // default framebuffer
         }
-      } // dof
+      } // ::render.shaderManager.dof
 
       // Combine input(s) into final frame.
-      GLuint final_program = effects.program();
+      GLuint final_program = ::render.shaderManager.effects.program();
       glUseProgram(final_program);
 
       glEnable(GL_TEXTURE_2D);
@@ -2902,20 +2803,21 @@ int main(int argc, char **argv) {
 
       // Pass main depth as texture 1
       glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, mainDepth[frameno & 1]);
+      glBindTexture(GL_TEXTURE_2D, render.mainDepth[frameno & 1]);
       glUniform1i(glGetUniformLocation(final_program, "iDepth"), 1);
 
-      if (dof.ok() && camera.enable_dof && camera.aperture != 0) {
+      if (::render.shaderManager.dof.ok() && camera.enable_dof &&
+          camera.aperture != 0) {
         // Pass blur textures as 2 and 3, if we computed them.
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, blurTex[0]);
+        glBindTexture(GL_TEXTURE_2D, render.blurTex[0]);
         glUniform1i(glGetUniformLocation(final_program, "iBlur0"), 2);
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, blurTex[1]);
+        glBindTexture(GL_TEXTURE_2D, render.blurTex[1]);
         glUniform1i(glGetUniformLocation(final_program, "iBlur1"), 3);
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 1);
       } else {
-        // No DoF textures got computed.
+        // No ::render.shaderManager.dof textures got computed.
         glUniform3f(glGetUniformLocation(final_program, "iZoom"),
                     effects_zoom.x, effects_zoom.y, effects_zoom.z);
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 0);
@@ -3026,7 +2928,7 @@ int main(int argc, char **argv) {
     CHECK_ERROR;
 
     // Draw AntTweakBar
-    if (!grabbedInput && !rendering) {
+    if (!input.grabbed && !rendering) {
       // glBindFramebuffer(GL_FRAMEBUFFER, 0);
       // glDisable(GL_TEXTURE_2D);
       // glDisable(GL_LINE_SMOOTH);
@@ -3053,14 +2955,15 @@ int main(int argc, char **argv) {
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    updateFPS();
+    fpsCounter.update();
 
     // Show position and fps in the caption.
     char caption[2048], controllerStr[256];
     sprintf(caption, "%s %.2ffps %5lu [%.3lf %.3lf %.3lf] %dms %s",
-            printController(controllerStr, ctl), getFPS(),
+            printController(controllerStr, ctl), fpsCounter.get(),
             (unsigned long)splines_index, camera.pos()[0], camera.pos()[1],
-            camera.pos()[2], getLastFrameDuration(), pausing ? "(paused)" : "");
+            camera.pos()[2], fpsCounter.getLastFrameDuration(),
+            pausing ? "(paused)" : "");
     SDL_SetWindowTitle(window.window(), caption);
 
     // Process UI events.
@@ -3075,7 +2978,7 @@ int main(int argc, char **argv) {
         event.key.keysym.mod = 0;
         event.type = SDL_KEYDOWN;
       }
-      if (grabbedInput ||
+      if (input.grabbed ||
           !TwEventSDL(&event, SDL_MAJOR_VERSION, SDL_MINOR_VERSION))
         switch (event.type) {
         case SDL_WINDOWEVENT: {
@@ -3097,7 +3000,7 @@ int main(int argc, char **argv) {
           break;
 
         case SDL_MOUSEBUTTONDOWN: {
-          if (grabbedInput == 0) {
+          if (input.grabbed == 0) {
             unsigned int bgr = getBGRpixel(event.button.x, event.button.y);
             if ((bgr & 0xffff) == 0) {
               // No red or green at all : probably a keyframe marker (fragile).
@@ -3111,7 +3014,7 @@ int main(int argc, char **argv) {
           } else
             switch (event.button.button) {
             case 1: // left mouse
-              grabbedInput = 0;
+              input.grabbed = 0;
               SDL_SetRelativeMouseMode(SDL_FALSE);
               ignoreNextMouseUp = true;
               break;
@@ -3130,7 +3033,7 @@ int main(int argc, char **argv) {
             zoomMouseX = event.motion.x;
             zoomMouseY = event.motion.y;
           }
-          if (grabbedInput == 0) {
+          if (input.grabbed == 0) {
             if (!dragging) {
               // Peek at framebuffer color for keyframe markers.
               unsigned int bgr = getBGRpixel(event.motion.x, event.motion.y);
@@ -3140,15 +3043,15 @@ int main(int argc, char **argv) {
                 size_t kf = 255 - (bgr >> 16);
                 if (kf < keyframes.size()) {
                   printf("keyframe %lu\n", (unsigned long)kf);
-                  SDL_SetCursor(hand_cursor);
+                  SDL_SetCursor(input.hand);
                 } else {
-                  SDL_SetCursor(arrow_cursor);
+                  SDL_SetCursor(input.arrow);
                 }
               } else {
-                SDL_SetCursor(arrow_cursor);
+                SDL_SetCursor(input.arrow);
               }
             } else {
-              SDL_SetCursor(hand_cursor);
+              SDL_SetCursor(input.hand);
               // Drag currently selected keyframe around.
               if (keyframe < keyframes.size()) {
                 // TODO: should really be some screenspace conversion..
@@ -3169,9 +3072,9 @@ int main(int argc, char **argv) {
         } break;
 
         case SDL_MOUSEBUTTONUP: {
-          if (ignoreNextMouseUp == false && grabbedInput == 0) {
-            grabbedInput = 1;
-            SDL_SetCursor(arrow_cursor);
+          if (ignoreNextMouseUp == false && input.grabbed == 0) {
+            input.grabbed = 1;
+            SDL_SetCursor(input.arrow);
             if (lifeform.empty()) {
               SDL_SetRelativeMouseMode(SDL_TRUE);
             }
@@ -3197,8 +3100,8 @@ int main(int argc, char **argv) {
 
           switch (event.key.keysym.sym) {
           case SDLK_ESCAPE: {
-            if (grabbedInput) {
-              grabbedInput = 0;
+            if (input.grabbed) {
+              input.grabbed = 0;
               if (!lifeform.empty()) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
               }
@@ -3242,7 +3145,7 @@ int main(int argc, char **argv) {
               splines_index = 0;
               dist_along_spline = 0;
               render_time = 0;
-              render_start = now();
+              render_start = fpsCounter.now();
               keyframe = 0;
             } else
               next_camera = &config;
@@ -3364,7 +3267,7 @@ int main(int argc, char **argv) {
                           break;
                     }
                     render_time = splines[splines_index].time;
-                    render_start = now() - render_time;
+                    render_start = fpsCounter.now() - render_time;
                   }
                 } else {
                   splines.clear();
@@ -3496,22 +3399,22 @@ int main(int argc, char **argv) {
 
     // Continue after calling SDL_GetRelativeMouseState() so view direction
     // does not jump after closing AntTweakBar.
-    if (!grabbedInput) {
+    if (!input.grabbed) {
       if (mixedInOculus) {
         camera.unmixSensorOrientation(view_q);
       }
       continue;
     }
 
-    if (joystick) {
+    if (input.stick) {
       SDL_JoystickUpdate();
-      joystick_x = SDL_JoystickGetAxis(joystick, 2);
-      joystick_y = SDL_JoystickGetAxis(joystick, 3);
-      joystick_z = SDL_JoystickGetAxis(joystick, 1);
-      joystick_r = SDL_JoystickGetAxis(joystick, 0);
-      joystick_lt = SDL_JoystickGetAxis(joystick, 4);
-      joystick_rt = SDL_JoystickGetAxis(joystick, 5);
-      joystick_hat = SDL_JoystickGetHat(joystick, 0);
+      joystick_x = SDL_JoystickGetAxis(input.stick, 2);
+      joystick_y = SDL_JoystickGetAxis(input.stick, 3);
+      joystick_z = SDL_JoystickGetAxis(input.stick, 1);
+      joystick_r = SDL_JoystickGetAxis(input.stick, 0);
+      joystick_lt = SDL_JoystickGetAxis(input.stick, 4);
+      joystick_rt = SDL_JoystickGetAxis(input.stick, 5);
+      joystick_hat = SDL_JoystickGetHat(input.stick, 0);
       if (abs(joystick_x) < 5000)
         joystick_x = 0;
       if (abs(joystick_y) < 5000)
@@ -3552,7 +3455,7 @@ int main(int argc, char **argv) {
       camera.move(0, camera.speed, 0); // up
 
     // Mouse look.
-    if (grabbedInput && (mouse_dx != 0 || mouse_dy != 0)) {
+    if (input.grabbed && (mouse_dx != 0 || mouse_dy != 0)) {
       m_rotateX2(camera.mouse_rot_speed * mouse_dx * camera.fov_x / 90.0);
       m_rotateY2(camera.mouse_rot_speed * mouse_dy * camera.fov_y / 75.0);
     }
@@ -3561,7 +3464,7 @@ int main(int argc, char **argv) {
     if (keystate[SDL_SCANCODE_E])
       m_rotateZ2(-camera.keyb_rot_speed);
 
-    // Joystick look.
+    // input.stick look.
     if (joystick_x != 0 || joystick_y != 0) {
       m_rotateX2(camera.mouse_rot_speed * joystick_x * camera.fov_x / 90.0 /
                  20000.0);
@@ -3736,3 +3639,4 @@ int main(int argc, char **argv) {
 
   return 0;
 }
+
