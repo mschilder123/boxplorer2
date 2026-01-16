@@ -18,7 +18,7 @@ string WorkingDir;
 string BaseFile;
 
 // Allocate a char[] and read a text file into it. Return 0 on error.
-char *_readFile(char const *name) {
+static char *_readFile(char const *name) {
   FILE *f;
   size_t len;
   char *s = 0;

@@ -12,7 +12,7 @@
   {                                                                            \
     GLenum __s;                                                                \
     if ((__s = (f)) != (v)) {                                                  \
-      printf(__FUNCTION__ "[%d] : %s() : %04x\n", __LINE__, #f, __s);          \
+      printf("%s[%d] : %s() : %04x\n", __func__, __LINE__, #f, __s);           \
     }                                                                          \
   }
 
@@ -29,4 +29,3 @@ extern std::string BaseFile;
 
 // Utility functions
 bool readFile(const std::string &name, std::string *content);
-char *_readFile(char const *name); // Internal helper exposed if needed
