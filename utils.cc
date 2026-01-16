@@ -53,6 +53,6 @@ bool readFile(const string &name, string *content) {
   }
   content->assign(s);
   free(s);
-  printf(__FUNCTION__ " : read '%s'\n", filename.c_str());
+  printf("%s : read '%s'\n", __func__, filename.c_str());
   return true;
 }
