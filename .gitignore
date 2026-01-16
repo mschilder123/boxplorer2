@@ -5,6 +5,8 @@
 *.dll
 *.exp
 *.lib
+.vscode/
+SDL2/
 boxplorer2
 sdl2-test
 shadershrink
