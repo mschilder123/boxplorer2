@@ -1,8 +1,6 @@
-#ifndef _F_UNIFORMS_H_
-#define _F_UNIFORMS_H_
+#pragma once
 
 #include <string>
-
 #include <unordered_map>
 
 class KeyFrame;
@@ -73,5 +71,3 @@ private:
 
   std::unordered_map<std::string, iUniformPtr, std::hash<std::string>> uniforms;
 };
-
-#endif // F_UNIFORMS_H_
