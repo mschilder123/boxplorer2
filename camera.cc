@@ -85,7 +85,7 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
 }
 
 void *KeyFrame::map_address(const string &type, const string &name, int n) {
-  // cerr << __FUNCTION__ << ": looking for " << type << " " << name << endl;
+  // cerr << __func__ << ": looking for " << type << " " << name << endl;
 
   // TODO: handle arrays
   if (name.find("[") != string::npos)

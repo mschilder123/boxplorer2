@@ -61,6 +61,7 @@ using namespace std;
 #include "default_shaders.h"
 #include "glsl.h"
 #include "interpolate.h"
+#include "params.h"
 #include "shader.h"
 #include "shader_manager.h"
 #include "shader_procs.h"
@@ -513,8 +514,6 @@ struct FPSCounter {
 
 ////////////////////////////////////////////////////////////////
 // Current logical state of the program.
-
-#include "params.h"
 
 class Camera : public KeyFrame {
 public:
