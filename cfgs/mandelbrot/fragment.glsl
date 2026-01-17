@@ -1,4 +1,5 @@
 #extension GL_ARB_gpu_shader_fp64 : enable
+
 // 2D Mandelbrot
 // shader parts from https://github.com/Syntopia/Fragmentarium
 
@@ -31,25 +32,25 @@ double fabs(double f) {
 }
 
 dvec2 complexMul(dvec2 a, dvec2 b) {
-  return dvec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y * b.x);
+  return dvec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
 }
 
-#if 1
+#if 0
 #define Divider par[0].x  // {min=0 max=50}
 #define Power par[0].y  // {min=0 max=6 step=1e-4}
-#define Radius par[0].z // {min=0 max=5}
+#define Radius par[0].z // {min=0 max=5 step=.01}
 
 // Mandelbrot for c.x,c.y
-vec3 getColor2D(dvec2 c) {
+vec3 getColor2D(dvec2 c, int maxIters) {
   dvec2 z = vec2(0.0,0.0);
   int i = 0;
   double dist = 10000.0;
-  for (i = 0; i < iters; i++) {
+  for (i = 0; i < maxIters; i++) {
     z = complexMul(z,z) + c;
-    if (dot(z,z)> 4.0) break;
     dist = min(dist, fabs(length(z)-Radius));
+    if (dot(z,z)> 4.0) break;
   }
-  if (i < iters) {
+  if (i < maxIters) {
     // The color scheme here is based on one
     // from Inigo Quilez's Shader Toy:
     float co = float(i) + 1.0 - log2(.5*log2(float(dot(z,z))));
@@ -65,80 +66,42 @@ vec3 getColor2D(dvec2 c) {
 }
 #endif
 
-#if 0
-// kali's grid deform coloring
-// http://www.fractalforums.com/mandelbrot-and-julia-set/how-mandelbrot-deforms-a-grid/
+#if 1
+// MaddHattPatt youtube inspired
 
-#define Power par[0].y  // {min=0 max=6 step=1e-4}
+vec3 HSVtoRGB(vec3 hsv) {
+  vec4 k = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(hsv.xxx + k.xyz) * 6.0 - k.www);
+  return hsv.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), hsv.y);
+}
 
-vec3 getColor2D(dvec2 c) {
+vec3 SimpleSmoothedLoopedHue(int iteration, double dist, double z, int maxIters) {
+  float smoothIter = iteration + 1.0 - log2(log2(float(length(z))));
+  float t = float(smoothIter) / float(maxIters);
+
+  vec3 color = vec3(0.0);
+
+  if (iteration < maxIters) {
+    vec3 hsv = vec3(t * 3.0 - (0.2 * time), 1.0 * dist, 1.0);
+    color = HSVtoRGB(hsv);
+  }
+  return color;
+}
+
+#define TrapVector par[4]
+
+vec3 getColor2D(dvec2 c, int maxIters) {
   dvec2 z = dvec2(0.0,0.0);
-  for (int i = 0; i < iters; i++) {
+  int i = 0;
+  double dist = 10000.0;
+  for (i = 0; i < maxIters; i++) {
     z = complexMul(z,z) + c;
-    if (dot(z,z) > 4.0) break;
+    dist = min(dist, length(z - TrapVector.xy));
+    if (dot(z,z) > 16.0) break;
   }
-  z.xy *= Power;
-  float dx = fract(z.x);
-  float dy = fract(z.y);
-  if ((dx > .5 && dy > .5) ||
-      (dx < .5 && dy < .5))
-      return surfaceColor;
-  else
-      return surfaceColor2;
+  return SimpleSmoothedLoopedHue(i, dist, z, maxIters);
 }
-#endif
 
-#if 0
-// https://www.shadertoy.com/view/ldf3DN
-vec3 getColor2D(dvec2 cc) {
-  dvec2 z  = dvec2(0.0);
-  dvec2 dz = dvec2(0.0);
-  double trap1 = 0.0;
-  double trap2 = 1e20;
-  double co2 = 0.0;
-
-#define trap2Vector par[4]
-  dvec2 t2c = dvec2(trap2Vector.xy);
-
-#define trap1Vector par[5]
-  dvec2 trap1vector = dvec2(trap1Vector.xy);
-
-  for( int i=0; i<iters; i++ ) {
-    if( dot(z,z)>iters ) break;
-
-    // Z' -> 2·Z·Z' + 1
-    dz = 2.0*dvec2(z.x*dz.x-z.y*dz.y, z.x*dz.y + z.y*dz.x ) + dvec2(1.0,0.0);
-      
-    // Z -> Z² + c      
-    z = cc + dvec2( z.x*z.x - z.y*z.y, 2.0*z.x*z.y );
-      
-    // trap 1
-    double d1 = fabs(dot(z-dvec2(0.0,1.0), trap1vector));
-    double ff = step( d1, 1.0 );
-    co2 += ff;
-    trap1 += ff*d1;
-
-    //trap2
-    trap2 = min( trap2, dot(z-t2c,z-t2c) );
-  }
-
-    // distance, d(c) = |Z|·log|Z|/|Z'|
-  double d = sqrt( dot(z,z)/dot(dz,dz) )*log(float(length(z)));
-
-#define fzoo par[1].x  //{min=0 max=1 step=.001}
-//  float zoo = 1.0 / 250.0;
-
-  double zoo = dspeed * fzoo;
-  
-  float c1 = pow( float(clamp( 2.00*d/zoo,    0.0, 1.0 )), 0.5 );
-  float c2 = pow( float(clamp( 1.5*trap1/co2, 0.0, 1.0 )), 2.0 );
-  float c3 = pow( float(clamp( 0.4*trap2, 0.0, 1.0 )), 0.25 );
-
-  vec3 col1 = 0.5 + 0.5*sin( 3.0 + 4.0*c2 + surfaceColor );
-  vec3 col2 = 0.5 + 0.5*sin( 4.1 + 2.0*c3 + surfaceColor2 );
-  vec3 col = 2.0*sqrt(c1*col1*col2);
-  return col;
-}
 #endif
 
 
@@ -149,8 +112,11 @@ void main() {
   double totalD = -p.z / dir.z;
   p += totalD * dir;
 
+  // Attempt at auto maxIters
+  int maxIters = int(2.0*pow(log(float(3840.0 / totalD)), 1.8));
+
   vec3 col = vec3(0.0);
-  if (totalD > 0.0) col = getColor2D(dvec2(p));
+  if (totalD > 0.0) col = getColor2D(dvec2(p), maxIters);
 
   // Write zBuffer and pixel
   float zFar = 5.0;
