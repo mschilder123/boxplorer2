@@ -16,6 +16,13 @@
 #include <utility>
 #include <vector>
 
+// debug
+#define XXX_SDL_SetCursor(x)                                                   \
+  do {                                                                         \
+    fprintf(stderr, "line %d: %s\n", __LINE__, #x);                            \
+    SDL_SetCursor(x);                                                          \
+  } while (0)
+
 #if !defined(_WIN32)
 
 #include <unistd.h>
@@ -55,6 +62,7 @@ using namespace std;
 #include <AntTweakBar.h>
 #include <SDL.h>
 #include <SDL_main.h>
+#include <SDL_mouse.h>
 #include <SDL_opengl.h>
 #include <SDL_thread.h>
 
@@ -132,53 +140,6 @@ vec3 (*c)(vec3);
 #define FPS_FRAMES_TO_AVERAGE 20
 
 const char *kKEYFRAME = "keyframe";
-
-static const char *kHand[] = {
-    "     XX                 ", "    X..X                ",
-    "    X..X                ", "    X..X                ",
-    "    X..XXXXXX           ", "    X..X..X..XXX        ",
-    "XXX X..X..X..X..X       ", "X..XX..X..X..X..X       ",
-    "X...X..X..X..X..X       ", " X..X..X..X..X..X       ",
-    " X..X........X..X       ", " X..X...........X       ",
-    " X..............X       ", " X.............X        ",
-    " X.............X        ", "  X...........X         ",
-    "   X.........X          ", "    X........X          ",
-    "    X........X          ", "    XXXXXXXXXX          ",
-};
-
-static SDL_Cursor *init_system_cursor(const char *image[]) {
-  int i = -1;
-  Uint8 data[3 * 20];
-  Uint8 mask[3 * 20];
-
-  for (int row = 0; row < 20; ++row) {
-    for (int col = 0; col < 24; ++col) {
-      if (col % 8) {
-        data[i] <<= 1;
-        mask[i] <<= 1;
-      } else {
-        ++i;
-        data[i] = mask[i] = 0;
-      }
-      switch (image[row][col]) {
-      case '.':
-        data[i] |= 0x01;
-        mask[i] |= 0x01;
-        break;
-      case 'X':
-        mask[i] |= 0x01;
-        break;
-      case ' ':
-        break;
-      }
-    }
-  }
-  return SDL_CreateCursor(data, mask, 24, 20, 5, 0);
-}
-
-// SDL cursors.
-// SDL cursors.
-// Moved to InputContext
 
 void clearGlContext(); // fwd decl.
 
@@ -339,8 +300,6 @@ StereoMode stereoMode = ST_NONE;
 
 Uniforms uniforms;
 
-// BaseDir, WorkingDir, BaseFile moved to utils.cc/h
-
 string lifeform; // Conway's Game of Life creature, if any.
 
 // Render globals grouped.
@@ -403,20 +362,14 @@ void clearGlContext() {
 }
 
 struct InputContext {
-  int grabbed = 0;
+  bool grabbed = false;
   SDL_Joystick *stick = NULL;
   SDL_Cursor *arrow = NULL;
   SDL_Cursor *hand = NULL;
+  SDL_Cursor *crosshair = NULL;
 } input;
 
 ////////////////////////////////////////////////////////////////
-// Helper functions
-
-// readFile moved to utils.cc
-
-////////////////////////////////////////////////////////////////
-// FPS tracking.
-
 // FPS tracking.
 struct FPSCounter {
   int framesToAverage;
@@ -872,9 +825,6 @@ void changeController(SDL_Keycode key, Controller *c) {
 ////////////////////////////////////////////////////////////////
 // Graphics.
 
-// Is the mouse and keyboard input grabbed?
-// Moved to InputContext
-
 void saveScreenshot(char const *tgaFile) {
   TGA tga;
   tga.fromFramebuffer(config.width, config.height);
@@ -915,11 +865,6 @@ GLSL::vec3 getPixelColor(int x, int y) {
   return GLSL::vec3(img);
 }
 
-// ::render.shaderManager.glsl_source moved to ShaderManager
-
-// Compile and activate shader programs. Return the program handle.
-// setupShaders moved to ShaderManager
-
 bool setupDirectories(const char *configFile) {
   BaseFile.clear();
   BaseDir.clear();
@@ -942,7 +887,7 @@ bool setupDirectories(const char *configFile) {
     }
     WorkingDir.assign(dirName);
   }
-#else
+#else // !_WIN32
   strncpy(dirName, configFile, sizeof dirName);
   dirName[sizeof dirName - 1] = 0;
   int i = strlen(dirName);
@@ -1029,15 +974,21 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
   SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &config.depth_size);
   printf(__FUNCTION__ " : depth size %u\n", config.depth_size);
 
-  if (input.hand == NULL)
-    input.hand = init_system_cursor(kHand);
   if (input.arrow == NULL)
-    input.arrow = SDL_GetCursor();
+    input.arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+  if (input.hand == NULL)
+    input.hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+  if (input.crosshair == NULL)
+    input.crosshair = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
 
-  input.grabbed = 1;
+  input.grabbed = true;
+
   if (hideMouse) {
+    XXX_SDL_SetCursor(input.arrow);
     SDL_SetRelativeMouseMode(SDL_FALSE); // This toggle is needed!
     SDL_SetRelativeMouseMode(SDL_TRUE);
+  } else {
+    XXX_SDL_SetCursor(input.crosshair);
   }
 
   printf(__FUNCTION__ " : SetSwap %d\n", SDL_GL_SetSwapInterval(0));
@@ -1528,12 +1479,10 @@ void initTwBar(enum StereoMode stereoMode) {
   }
 
   if (::render.shaderManager.fxaa.ok()) {
-    TwAddVarRW(bar, "::render.shaderManager.fxaa", TW_TYPE_BOOL32, &camera.fxaa,
-               "group=post");
+    TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "group=post");
   }
   if (::render.shaderManager.dof.ok()) {
-    TwAddVarRW(bar, "::render.shaderManager.dof", TW_TYPE_BOOL32,
-               &camera.enable_dof, "group=post");
+    TwAddVarRW(bar, "dof", TW_TYPE_BOOL32, &camera.enable_dof, "group=post");
     TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.aperture,
                "min=0.0 max=10.0 step=0.01 group=post");
   }
@@ -2070,7 +2019,7 @@ int main(int argc, char **argv) {
         // now mix in orientation (and translation.. where's my DK2 Oculus?)
         if (stereoMode == ST_OCULUS) {
           if (GetOculusQuat(view_q)) {
-            if (input.grabbed) {
+            if (input.grabbed == true) {
               camera.mixSensorOrientation(view_q);
               mixedInOculus = true;
             }
@@ -2300,7 +2249,7 @@ int main(int argc, char **argv) {
           // glDisable(GL_TEXTURE_2D);  // no texture
           glBindFramebuffer(GL_FRAMEBUFFER, 0); // default framebuffer
         }
-      } // ::render.shaderManager.dof
+      } // dof
 
       // Combine input(s) into final frame.
       GLuint final_program = ::render.shaderManager.effects.program();
@@ -2335,7 +2284,7 @@ int main(int argc, char **argv) {
         glUniform1i(glGetUniformLocation(final_program, "iBlur1"), 3);
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 1);
       } else {
-        // No ::render.shaderManager.dof textures got computed.
+        // No dof textures got computed.
         glUniform3f(glGetUniformLocation(final_program, "iZoom"),
                     effects_zoom.x, effects_zoom.y, effects_zoom.z);
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 0);
@@ -2446,7 +2395,7 @@ int main(int argc, char **argv) {
     CHECK_ERROR;
 
     // Draw AntTweakBar
-    if (!input.grabbed && !rendering) {
+    if (input.grabbed == false && !rendering) {
       // glBindFramebuffer(GL_FRAMEBUFFER, 0);
       // glDisable(GL_TEXTURE_2D);
       // glDisable(GL_LINE_SMOOTH);
@@ -2496,8 +2445,19 @@ int main(int argc, char **argv) {
         event.key.keysym.mod = 0;
         event.type = SDL_KEYDOWN;
       }
-      if (input.grabbed ||
-          !TwEventSDL(&event, SDL_MAJOR_VERSION, SDL_MINOR_VERSION))
+
+#if defined(_WIN32)
+      // Save current cursor in case Tw*() mucks with it.
+      HCURSOR old_cur = ::GetCursor();
+#endif
+      if (input.grabbed == true ||
+          !TwEventSDL(&event, SDL_MAJOR_VERSION, SDL_MINOR_VERSION)) {
+#if defined(_WIN32)
+        // Restore saved cursor after Tw*() call.
+        if (::GetCursor() != old_cur) {
+          ::SetCursor(old_cur);
+        }
+#endif
         switch (event.type) {
         case SDL_WINDOWEVENT: {
           if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
@@ -2518,7 +2478,7 @@ int main(int argc, char **argv) {
           break;
 
         case SDL_MOUSEBUTTONDOWN: {
-          if (input.grabbed == 0) {
+          if (input.grabbed == false) {
             unsigned int bgr = getBGRpixel(event.button.x, event.button.y);
             if ((bgr & 0xffff) == 0) {
               // No red or green at all : probably a keyframe marker (fragile).
@@ -2527,12 +2487,14 @@ int main(int argc, char **argv) {
                 printf("selected keyframe %lu\n", (unsigned long)kf);
                 keyframe = kf;
                 dragging = true;
+                ignoreNextMouseUp = true;
+                XXX_SDL_SetCursor(input.hand);
               }
             }
-          } else
+          } else { // input.grabbed == true
             switch (event.button.button) {
             case 1: // left mouse
-              input.grabbed = 0;
+              input.grabbed = false;
               SDL_SetRelativeMouseMode(SDL_FALSE);
               ignoreNextMouseUp = true;
               break;
@@ -2543,6 +2505,7 @@ int main(int argc, char **argv) {
               camera.speed *= 0.9;
               break;
             }
+          }
         } break;
 
         case SDL_MOUSEMOTION: {
@@ -2551,8 +2514,8 @@ int main(int argc, char **argv) {
             zoomMouseX = event.motion.x;
             zoomMouseY = event.motion.y;
           }
-          if (input.grabbed == 0) {
-            if (!dragging) {
+          if (input.grabbed == false) {
+            if (dragging == false) {
               // Peek at framebuffer color for keyframe markers.
               unsigned int bgr = getBGRpixel(event.motion.x, event.motion.y);
               // printf("bgr = %06x\n", bgr);
@@ -2561,23 +2524,31 @@ int main(int argc, char **argv) {
                 size_t kf = 255 - (bgr >> 16);
                 if (kf < keyframes.size()) {
                   printf("keyframe %lu\n", (unsigned long)kf);
-                  SDL_SetCursor(input.hand);
+                  if (SDL_GetCursor() == input.arrow) {
+                    XXX_SDL_SetCursor(input.hand);
+                  }
                 } else {
-                  SDL_SetCursor(input.arrow);
+                  if (SDL_GetCursor() == input.hand) {
+                    XXX_SDL_SetCursor(input.arrow);
+                  }
                 }
               } else {
-                SDL_SetCursor(input.arrow);
+                if (SDL_GetCursor() == input.hand) {
+                  XXX_SDL_SetCursor(input.arrow);
+                }
               }
-            } else {
-              SDL_SetCursor(input.hand);
+            } else { // dragging == true
+              if (SDL_GetCursor() != input.hand) {
+                XXX_SDL_SetCursor(input.hand);
+              }
               // Drag currently selected keyframe around.
               if (keyframe < keyframes.size()) {
                 // TODO: should really be some screenspace conversion..
-                // but this works ok for now.
+                // but this works ~OK for now.
                 double fY =
-                    2.0 * tan(camera.fov_y * PI / 360.0f) / config.height;
+                    1.83 * tan(camera.fov_y * PI / 360.0f) / config.height;
                 double fX =
-                    2.0 * tan(camera.fov_x * PI / 360.0f) / config.width;
+                    1.83 * tan(camera.fov_x * PI / 360.0f) / config.width;
                 keyframes[keyframe].moveAbsolute(
                     camera.up(), event.motion.yrel * -fY *
                                      camera.distanceTo(keyframes[keyframe]));
@@ -2590,11 +2561,13 @@ int main(int argc, char **argv) {
         } break;
 
         case SDL_MOUSEBUTTONUP: {
-          if (ignoreNextMouseUp == false && input.grabbed == 0) {
-            input.grabbed = 1;
-            SDL_SetCursor(input.arrow);
+          if (ignoreNextMouseUp == false && input.grabbed == false) {
+            input.grabbed = true;
             if (lifeform.empty()) {
+              XXX_SDL_SetCursor(input.arrow);
               SDL_SetRelativeMouseMode(SDL_TRUE);
+            } else {
+              XXX_SDL_SetCursor(input.crosshair);
             }
           }
           ignoreNextMouseUp = false;
@@ -2618,8 +2591,8 @@ int main(int argc, char **argv) {
 
           switch (event.key.keysym.sym) {
           case SDLK_ESCAPE: {
-            if (input.grabbed) {
-              input.grabbed = 0;
+            if (input.grabbed == true) {
+              input.grabbed = false;
               if (!lifeform.empty()) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
               }
@@ -2892,12 +2865,14 @@ int main(int argc, char **argv) {
           }
         } break;
         }
+      }
     }
 
     if (done)
       break;
 
     // Get keyboard and mouse state.
+    // TODO: max 60/s rate?
     const Uint8 *keystate = SDL_GetKeyboardState(0);
     int mouse_dx, mouse_dy;
     Sint16 joystick_x = 0, joystick_y = 0, joystick_z = 0, joystick_r = 0,
@@ -2917,7 +2892,7 @@ int main(int argc, char **argv) {
 
     // Continue after calling SDL_GetRelativeMouseState() so view direction
     // does not jump after closing AntTweakBar.
-    if (!input.grabbed) {
+    if (input.grabbed == false) {
       if (mixedInOculus) {
         camera.unmixSensorOrientation(view_q);
       }
@@ -2973,7 +2948,7 @@ int main(int argc, char **argv) {
       camera.move(0, camera.speed, 0); // up
 
     // Mouse look.
-    if (input.grabbed && (mouse_dx != 0 || mouse_dy != 0)) {
+    if (input.grabbed == true && (mouse_dx != 0 || mouse_dy != 0)) {
       m_rotateX2(camera.mouse_rot_speed * mouse_dx * camera.fov_x / 90.0);
       m_rotateY2(camera.mouse_rot_speed * mouse_dy * camera.fov_y / 75.0);
     }
