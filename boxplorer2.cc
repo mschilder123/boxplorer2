@@ -1944,6 +1944,8 @@ int main(int argc, char **argv) {
 
   float view_q[4] = {0, 0, 0, 1};
 
+  uint32_t poll_ticks = SDL_GetTicks();
+
   while (!done) {
     int ctlXChanged = 0, ctlYChanged = 0;
 
@@ -2871,143 +2873,147 @@ int main(int argc, char **argv) {
     if (done)
       break;
 
-    // Get keyboard and mouse state.
-    // TODO: max 60/s rate?
-    const Uint8 *keystate = SDL_GetKeyboardState(0);
-    int mouse_dx, mouse_dy;
-    Sint16 joystick_x = 0, joystick_y = 0, joystick_z = 0, joystick_r = 0,
-           joystick_lt = -32768, joystick_rt = -32768;
-    Uint8 joystick_hat = 0;
-    Uint8 mouse_buttons = SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
-    int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
-    int mouse_button_right = mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
+    // Poll keyboard and mouse state for level-based inputs.
+    // At around 1000/16 per second polling rate (or slower if FPS is slower..).
+    if (SDL_GetTicks() - poll_ticks >= 16) {
+      poll_ticks += 16;
 
-    bool hasAlt = keystate[SDL_SCANCODE_RALT] || keystate[SDL_SCANCODE_LALT];
-    bool hasCtrl = keystate[SDL_SCANCODE_RCTRL] || keystate[SDL_SCANCODE_LCTRL];
-    bool hasShift =
-        keystate[SDL_SCANCODE_RSHIFT] || keystate[SDL_SCANCODE_LSHIFT];
-    (void)hasAlt;
-    (void)hasShift;
-    (void)hasCtrl;
+      const Uint8 *keystate = SDL_GetKeyboardState(0);
+      int mouse_dx, mouse_dy;
+      Sint16 joystick_x = 0, joystick_y = 0, joystick_z = 0, joystick_r = 0,
+             joystick_lt = -32768, joystick_rt = -32768;
+      Uint8 joystick_hat = 0;
+      Uint8 mouse_buttons = SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
+      int mouse_button_left = mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
+      int mouse_button_right = mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
 
-    // Continue after calling SDL_GetRelativeMouseState() so view direction
-    // does not jump after closing AntTweakBar.
-    if (input.grabbed == false) {
-      if (mixedInOculus) {
-        camera.unmixSensorOrientation(view_q);
+      bool hasAlt = keystate[SDL_SCANCODE_RALT] || keystate[SDL_SCANCODE_LALT];
+      bool hasCtrl =
+          keystate[SDL_SCANCODE_RCTRL] || keystate[SDL_SCANCODE_LCTRL];
+      bool hasShift =
+          keystate[SDL_SCANCODE_RSHIFT] || keystate[SDL_SCANCODE_LSHIFT];
+      (void)hasAlt;
+      (void)hasShift;
+      (void)hasCtrl;
+
+      // Continue after calling SDL_GetRelativeMouseState() so view direction
+      // does not jump after closing AntTweakBar.
+      if (input.grabbed == false) {
+        if (mixedInOculus) {
+          camera.unmixSensorOrientation(view_q);
+        }
+        continue;
       }
-      continue;
-    }
 
-    if (input.stick) {
-      SDL_JoystickUpdate();
-      joystick_x = SDL_JoystickGetAxis(input.stick, 2);
-      joystick_y = SDL_JoystickGetAxis(input.stick, 3);
-      joystick_z = SDL_JoystickGetAxis(input.stick, 1);
-      joystick_r = SDL_JoystickGetAxis(input.stick, 0);
-      joystick_lt = SDL_JoystickGetAxis(input.stick, 4);
-      joystick_rt = SDL_JoystickGetAxis(input.stick, 5);
-      joystick_hat = SDL_JoystickGetHat(input.stick, 0);
-      if (abs(joystick_x) < 5000)
-        joystick_x = 0;
-      if (abs(joystick_y) < 5000)
-        joystick_y = 0;
-      if (abs(joystick_z) < 5000)
-        joystick_z = 0;
-      if (abs(joystick_r) < 10000)
-        joystick_r = 0;
-    }
+      if (input.stick) {
+        SDL_JoystickUpdate();
+        joystick_x = SDL_JoystickGetAxis(input.stick, 2);
+        joystick_y = SDL_JoystickGetAxis(input.stick, 3);
+        joystick_z = SDL_JoystickGetAxis(input.stick, 1);
+        joystick_r = SDL_JoystickGetAxis(input.stick, 0);
+        joystick_lt = SDL_JoystickGetAxis(input.stick, 4);
+        joystick_rt = SDL_JoystickGetAxis(input.stick, 5);
+        joystick_hat = SDL_JoystickGetHat(input.stick, 0);
+        if (abs(joystick_x) < 5000)
+          joystick_x = 0;
+        if (abs(joystick_y) < 5000)
+          joystick_y = 0;
+        if (abs(joystick_z) < 5000)
+          joystick_z = 0;
+        if (abs(joystick_r) < 10000)
+          joystick_r = 0;
+      }
 
-    (void)mouse_buttons;
-    (void)mouse_button_left;
-    (void)mouse_button_right;
-    (void)joystick_lt;
-    (void)joystick_rt;
+      (void)mouse_buttons;
+      (void)mouse_button_left;
+      (void)mouse_button_right;
+      (void)joystick_lt;
+      (void)joystick_rt;
 
-    if (keystate[SDL_SCANCODE_W])
-      camera.move(0, 0, camera.speed); // forward
-    if (keystate[SDL_SCANCODE_S])
-      camera.move(0, 0, -camera.speed); // back
+      if (keystate[SDL_SCANCODE_W])
+        camera.move(0, 0, camera.speed); // forward
+      if (keystate[SDL_SCANCODE_S])
+        camera.move(0, 0, -camera.speed); // back
 #if !defined(MOVE_W_TRIGGERS)
-    if (joystick_z != 0)
-      camera.move(0, 0, camera.speed * -joystick_z / 20000.0);
+      if (joystick_z != 0)
+        camera.move(0, 0, camera.speed * -joystick_z / 20000.0);
 #else
-    if (joystick_lt != -32768)
-      camera.move(0, 0, camera.speed * (joystick_lt + 32768) / 20000.0);
-    if (joystick_rt != -32768)
-      camera.move(0, 0, -camera.speed * (joystick_rt + 32768) / 20000.0);
+      if (joystick_lt != -32768)
+        camera.move(0, 0, camera.speed * (joystick_lt + 32768) / 20000.0);
+      if (joystick_rt != -32768)
+        camera.move(0, 0, -camera.speed * (joystick_rt + 32768) / 20000.0);
 #endif
 
-    if (keystate[SDL_SCANCODE_A] || (joystick_hat & SDL_HAT_LEFT))
-      camera.move(-camera.speed, 0, 0); // left
-    if (keystate[SDL_SCANCODE_D] || (joystick_hat & SDL_HAT_RIGHT))
-      camera.move(camera.speed, 0, 0); // right
-    if (joystick_hat & SDL_HAT_DOWN)
-      camera.move(0, -camera.speed, 0); // down
-    if (joystick_hat & SDL_HAT_UP)
-      camera.move(0, camera.speed, 0); // up
+      if (keystate[SDL_SCANCODE_A] || (joystick_hat & SDL_HAT_LEFT))
+        camera.move(-camera.speed, 0, 0); // left
+      if (keystate[SDL_SCANCODE_D] || (joystick_hat & SDL_HAT_RIGHT))
+        camera.move(camera.speed, 0, 0); // right
+      if (joystick_hat & SDL_HAT_DOWN)
+        camera.move(0, -camera.speed, 0); // down
+      if (joystick_hat & SDL_HAT_UP)
+        camera.move(0, camera.speed, 0); // up
 
-    // Mouse look.
-    if (input.grabbed == true && (mouse_dx != 0 || mouse_dy != 0)) {
-      m_rotateX2(camera.mouse_rot_speed * mouse_dx * camera.fov_x / 90.0);
-      m_rotateY2(camera.mouse_rot_speed * mouse_dy * camera.fov_y / 75.0);
-    }
-    if (keystate[SDL_SCANCODE_Q])
-      m_rotateZ2(camera.keyb_rot_speed);
-    if (keystate[SDL_SCANCODE_E])
-      m_rotateZ2(-camera.keyb_rot_speed);
+      // Mouse look.
+      if (input.grabbed == true && (mouse_dx != 0 || mouse_dy != 0)) {
+        m_rotateX2(camera.mouse_rot_speed * mouse_dx * camera.fov_x / 90.0);
+        m_rotateY2(camera.mouse_rot_speed * mouse_dy * camera.fov_y / 75.0);
+      }
+      if (keystate[SDL_SCANCODE_Q])
+        m_rotateZ2(camera.keyb_rot_speed);
+      if (keystate[SDL_SCANCODE_E])
+        m_rotateZ2(-camera.keyb_rot_speed);
 
-    // input.stick look.
-    if (joystick_x != 0 || joystick_y != 0) {
-      m_rotateX2(camera.mouse_rot_speed * joystick_x * camera.fov_x / 90.0 /
-                 20000.0);
-      m_rotateY2(camera.mouse_rot_speed * -joystick_y * camera.fov_y / 75.0 /
-                 10000.0);
-    }
-    if (joystick_r != 0)
-      m_rotateZ2(camera.keyb_rot_speed * -joystick_r / 100000.0);
+      // input.stick look.
+      if (joystick_x != 0 || joystick_y != 0) {
+        m_rotateX2(camera.mouse_rot_speed * joystick_x * camera.fov_x / 90.0 /
+                   20000.0);
+        m_rotateY2(camera.mouse_rot_speed * -joystick_y * camera.fov_y / 75.0 /
+                   10000.0);
+      }
+      if (joystick_r != 0)
+        m_rotateZ2(camera.keyb_rot_speed * -joystick_r / 100000.0);
 
-    if (keystate[SDL_SCANCODE_Z]) {
-      if (camera.speed > 0.000001)
-        camera.speed -= camera.speed / 10;
-      printf("speed %.8e\n", camera.speed);
-    }
-    if (keystate[SDL_SCANCODE_C]) {
-      if (camera.speed < 1.0)
-        camera.speed += camera.speed / 10;
-      printf("speed %.8e\n", camera.speed);
-    }
+      if (keystate[SDL_SCANCODE_Z]) {
+        if (camera.speed > 0.000001)
+          camera.speed -= camera.speed / 10;
+        printf("speed %.8e\n", camera.speed);
+      }
+      if (keystate[SDL_SCANCODE_C]) {
+        if (camera.speed < 1.0)
+          camera.speed += camera.speed / 10;
+        printf("speed %.8e\n", camera.speed);
+      }
 
-    // Change the value of the active controller.
-    if (!ctlXChanged) {
-      if (keystate[SDL_SCANCODE_LEFT]) {
-        ctlXChanged = 1;
-        updateControllerX(ctl, -++consecutiveChanges, hasAlt);
+      // Change the value of the active controller.
+      if (!ctlXChanged) {
+        if (keystate[SDL_SCANCODE_LEFT]) {
+          ctlXChanged = 1;
+          updateControllerX(ctl, -++consecutiveChanges, hasAlt);
+        }
+        if (keystate[SDL_SCANCODE_RIGHT]) {
+          ctlXChanged = 1;
+          updateControllerX(ctl, ++consecutiveChanges, hasAlt);
+        }
       }
-      if (keystate[SDL_SCANCODE_RIGHT]) {
-        ctlXChanged = 1;
-        updateControllerX(ctl, ++consecutiveChanges, hasAlt);
+      if (!ctlYChanged) {
+        if (keystate[SDL_SCANCODE_DOWN]) {
+          ctlYChanged = 1;
+          updateControllerY(ctl, -++consecutiveChanges, hasAlt);
+        }
+        if (keystate[SDL_SCANCODE_UP]) {
+          ctlYChanged = 1;
+          updateControllerY(ctl, ++consecutiveChanges, hasAlt);
+        }
       }
-    }
-    if (!ctlYChanged) {
-      if (keystate[SDL_SCANCODE_DOWN]) {
-        ctlYChanged = 1;
-        updateControllerY(ctl, -++consecutiveChanges, hasAlt);
-      }
-      if (keystate[SDL_SCANCODE_UP]) {
-        ctlYChanged = 1;
-        updateControllerY(ctl, ++consecutiveChanges, hasAlt);
-      }
-    }
 
 #if defined(HYDRA)
-    // Sixense Hydra
-    if (sixenseGetAllNewestData(&ssdata) == SIXENSE_SUCCESS) {
-      //  printf("%f %f %f %f\n",
-      //  ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
+      // Sixense Hydra
+      if (sixenseGetAllNewestData(&ssdata) == SIXENSE_SUCCESS) {
+        //  printf("%f %f %f %f\n",
+        //  ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
 
-      int clbuttons = ssdata.controllers[1].buttons;
-      int crbuttons = ssdata.controllers[0].buttons;
+        int clbuttons = ssdata.controllers[1].buttons;
+        int crbuttons = ssdata.controllers[0].buttons;
 
 #if 0
   camera.move(0, 0, camera.speed *   ssdata.controllers[0].joystick_y);
@@ -3016,89 +3022,93 @@ int main(int argc, char **argv) {
   m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
 #endif
 
-      //  printf("%08x, %f\n", ssdata.controllers[0].buttons,
-      //  ssdata.controllers[0].trigger); printf("%+7.7f %+7.7f %+7.7f, ",
-      //  ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
-      //  printf("%+7.7f %+7.7f %+7.7f\n",
-      //  ssdata.controllers[1].pos[0],ssdata.controllers[1].pos[1],ssdata.controllers[1].pos[2]);
+        //  printf("%08x, %f\n", ssdata.controllers[0].buttons,
+        //  ssdata.controllers[0].trigger); printf("%+7.7f %+7.7f %+7.7f, ",
+        //  ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
+        //  printf("%+7.7f %+7.7f %+7.7f\n",
+        //  ssdata.controllers[1].pos[0],ssdata.controllers[1].pos[1],ssdata.controllers[1].pos[2]);
 
-      float dx = ssdata.controllers[0].pos[0] - ssdata.controllers[1].pos[0];
-      float dy = ssdata.controllers[0].pos[1] - ssdata.controllers[1].pos[1];
-      float dz = ssdata.controllers[0].pos[2] - ssdata.controllers[1].pos[2];
-      float d = sqrt(dx * dx + dy * dy + dz * dz);
+        float dx = ssdata.controllers[0].pos[0] - ssdata.controllers[1].pos[0];
+        float dy = ssdata.controllers[0].pos[1] - ssdata.controllers[1].pos[1];
+        float dz = ssdata.controllers[0].pos[2] - ssdata.controllers[1].pos[2];
+        float d = sqrt(dx * dx + dy * dy + dz * dz);
 
-      // printf("%+7.7f\n", d);
+        // printf("%+7.7f\n", d);
 
-      // spot in between two hands.
-      dx = (ssdata.controllers[0].pos[0] + ssdata.controllers[1].pos[0]) / 2.0;
-      dy = (ssdata.controllers[0].pos[1] + ssdata.controllers[1].pos[1]) / 2.0;
-      dz = (ssdata.controllers[0].pos[2] + ssdata.controllers[1].pos[2]) / 2.0;
+        // spot in between two hands.
+        dx =
+            (ssdata.controllers[0].pos[0] + ssdata.controllers[1].pos[0]) / 2.0;
+        dy =
+            (ssdata.controllers[0].pos[1] + ssdata.controllers[1].pos[1]) / 2.0;
+        dz =
+            (ssdata.controllers[0].pos[2] + ssdata.controllers[1].pos[2]) / 2.0;
 
-      // set neutral when any start button is pressed.
-      bool calibrate =
-          (lbuttons | rbuttons | clbuttons | crbuttons) & SIXENSE_BUTTON_START;
+        // set neutral when any start button is pressed.
+        bool calibrate = (lbuttons | rbuttons | clbuttons | crbuttons) &
+                         SIXENSE_BUTTON_START;
 
-      if (calibrate) {
-        speed_base = d;
-        neutral_x = dx;
-        neutral_y = dy;
-        neutral_z = dz;
-      }
-
-      // distance between controllers is eye separation / speed multiplier.
-      speed_factor = d / speed_base;
-
-      //  printf("triggers %+7.7f, %+7.7f\n", ssdata.controllers[0].trigger,
-      //  ssdata.controllers[1].trigger); printf("buttons  %+7.7x, %+7.7x\n",
-      //  clbuttons, crbuttons);
-
-      // flip back&forth through keyframes w/ edge trigger of bumper button
-      // presses.
-      if ((clbuttons & SIXENSE_BUTTON_BUMPER) &&
-          ((clbuttons ^ lbuttons) & SIXENSE_BUTTON_BUMPER)) {
-        --keyframe;
-        if (keyframe >= keyframes.size())
-          keyframe = keyframes.size() - 1;
-        if (keyframe < keyframes.size()) {
-          next_camera = &keyframes[keyframe];
-        } else {
-          next_camera = &config;
+        if (calibrate) {
+          speed_base = d;
+          neutral_x = dx;
+          neutral_y = dy;
+          neutral_z = dz;
         }
-      }
-      lbuttons = clbuttons;
 
-      if ((crbuttons & SIXENSE_BUTTON_BUMPER) &&
-          ((crbuttons ^ rbuttons) & SIXENSE_BUTTON_BUMPER)) {
-        ++keyframe;
-        if (keyframe >= keyframes.size())
-          keyframe = 0;
-        if (keyframe < keyframes.size()) {
-          next_camera = &keyframes[keyframe];
-        } else {
-          next_camera = &config;
+        // distance between controllers is eye separation / speed multiplier.
+        speed_factor = d / speed_base;
+
+        //  printf("triggers %+7.7f, %+7.7f\n", ssdata.controllers[0].trigger,
+        //  ssdata.controllers[1].trigger); printf("buttons  %+7.7x, %+7.7x\n",
+        //  clbuttons, crbuttons);
+
+        // flip back&forth through keyframes w/ edge trigger of bumper button
+        // presses.
+        if ((clbuttons & SIXENSE_BUTTON_BUMPER) &&
+            ((clbuttons ^ lbuttons) & SIXENSE_BUTTON_BUMPER)) {
+          --keyframe;
+          if (keyframe >= keyframes.size())
+            keyframe = keyframes.size() - 1;
+          if (keyframe < keyframes.size()) {
+            next_camera = &keyframes[keyframe];
+          } else {
+            next_camera = &config;
+          }
         }
+        lbuttons = clbuttons;
+
+        if ((crbuttons & SIXENSE_BUTTON_BUMPER) &&
+            ((crbuttons ^ rbuttons) & SIXENSE_BUTTON_BUMPER)) {
+          ++keyframe;
+          if (keyframe >= keyframes.size())
+            keyframe = 0;
+          if (keyframe < keyframes.size()) {
+            next_camera = &keyframes[keyframe];
+          } else {
+            next_camera = &config;
+          }
+        }
+        rbuttons = crbuttons;
+
+        dx = (neutral_x - dx) / 100.0;
+        dy = (neutral_y - dy) / 100.0;
+        dz = (neutral_z - dz) / 100.0;
+
+        // printf("%+8.8lf %+8.8lf %+8.8lf\n", dx, dy, dz);
+
+        dx *= (camera.speed * speed_factor);
+        dy *= (camera.speed * speed_factor);
+        dz *= (camera.speed * speed_factor);
+        camera.move(-dx, -dy, dz);
       }
-      rbuttons = crbuttons;
-
-      dx = (neutral_x - dx) / 100.0;
-      dy = (neutral_y - dy) / 100.0;
-      dz = (neutral_z - dz) / 100.0;
-
-      // printf("%+8.8lf %+8.8lf %+8.8lf\n", dx, dy, dz);
-
-      dx *= (camera.speed * speed_factor);
-      dy *= (camera.speed * speed_factor);
-      dz *= (camera.speed * speed_factor);
-      camera.move(-dx, -dy, dz);
-    }
 #endif // HYDRA
 
-    if (!(ctlXChanged || ctlYChanged))
-      consecutiveChanges = 0;
+      if (!(ctlXChanged || ctlYChanged))
+        consecutiveChanges = 0;
 
-    // We might have changed view. Preserve changes, minus HMD orientation.
-    if (mixedInOculus) {
-      camera.unmixSensorOrientation(view_q);
+      // We might have changed view. Preserve changes, minus HMD orientation.
+      if (mixedInOculus) {
+        camera.unmixSensorOrientation(view_q);
+      }
     }
 
     if (outputFilename != NULL) {
