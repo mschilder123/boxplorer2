@@ -1,0 +1,12 @@
+#N maxpredecessor25x25.rle
+#C https://conwaylife.com/wiki/Max
+#C https://www.conwaylife.com/patterns/maxpredecessor25x25.rle
+x = 25, y = 25, rule = B3/S23
+obobob2o3bobo2b3o3b2o$3obo3bo3bo3b2o3b3o$3b4o2bob2o3bobobobo$2b3obo2b
+2obob3o3bobobo$8o2b2ob2o2bob2o2bo$2b2obob2obobo3bobobob3o$2o2bo2b2o4bo
+3bo6bo$o2bobo3bob3ob4o2bobo$o2bo6b2o2b5o3b3o$2b2obobob3o2bo4b3o$2o4bob
+o7b6ob2o$3b2obo2b2ob2ob2o2bob2obo$o3bo2b4ob3o2bo6bo$ob2o4bo7b3ob2o$2ob
+obo2b2obobo3bo3bob2o$3b2o2bobo3bo2bo2bob2o$2ob4ob2o5b2obo5bo$b2o2b3o2b
+2obob2o3b2o2bo$o2bo4bob2o7b3ob2o$o2b2o2b2ob4o6b3o$2bobobobo9bo3bo$6bob
+ob2o3b3o4b3o$3ob2obo2b2o3bo3b2ob2o$b3obob2o2bo2bobo5bobo$3o3b3o2b2o5b
+2o2bo!
