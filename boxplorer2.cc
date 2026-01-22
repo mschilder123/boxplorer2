@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -300,7 +301,11 @@ StereoMode stereoMode = ST_NONE;
 
 Uniforms uniforms;
 
-string lifeform; // Conway's Game of Life creature, if any.
+// Available .rle or .lif files.
+vector<string> lifeform_files;
+vector<string> lifeforms;
+vector<string> lifeform_names;
+size_t current_lifeform = 0;
 
 // Render globals grouped.
 #define NFBO 2
@@ -905,8 +910,19 @@ bool setupDirectories(const char *configFile) {
   cout << __FUNCTION__ << " : " << BaseDir << ", " << WorkingDir << ", "
        << BaseFile << endl;
 
+  // Collect all available .lif and .rle filenames.
+  const std::filesystem::path cfgs{WorkingDir};
+  for (auto const &dir_entry : std::filesystem::directory_iterator{cfgs}) {
+    string ext(dir_entry.path().extension().string());
+    if (ext == ".lif" || ext == ".rle") {
+      lifeform_files.push_back(dir_entry.path().filename().string());
+    }
+  }
+
   return true;
 }
+
+void drawLifeform(void); // fwd decl
 
 // Initializes the video mode, OpenGL state, shaders,
 // camera and shader parameters.
@@ -1268,10 +1284,22 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     } // ::render.shaderManager.fxaa.ok()
   }
 
-  // Fill backbuffer w/ starting lifeform, if we have one.
+  drawLifeform();
 
-  if (config.backbuffer && !lifeform.empty()) {
+  return true;
+}
+
+void drawLifeform(void) {
+  // Fill backbuffer w/ current lifeform, if we have one.
+
+  if (config.backbuffer && !lifeforms.empty()) {
+    glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[1 /* backbuffer */]);
+
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LINE_SMOOTH);
+
     // Ortho projection, entire screen in regular pixel coordinates.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -1279,13 +1307,21 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    CHECK_FRAMEBUFFER;
+    CHECK_ERROR;
+
     glPointSize(1);
     glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
     glColor4f(1, 1, 1, 1);
     glBegin(GL_POINTS);
 
+    cout << __func__ << ": lifeform '" << lifeform_names[current_lifeform]
+         << "'" << endl;
+
     {
-      istringstream in(lifeform);
+      istringstream in(lifeforms[current_lifeform]);
       string line;
       bool isRLE = false, done = !in.good();
       int x = 0, y = 0, accu = 0, xo = 0, yo = 0;
@@ -1295,8 +1331,12 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
             done = true;
             continue;
           }
-          if (line.empty() || line[0] == '#')
+          if (line.empty())
             continue;
+          if (line[0] == '#') {
+            cout << line << endl;
+            continue;
+          }
           if (line[0] == 'x') {
             // Try parse RLE format lifeform dimensions and center it.
             sscanf(line.c_str(), "x = %d, y = %d,", &xo, &yo);
@@ -1375,8 +1415,6 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     glFinish();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
   }
-
-  return true;
 }
 
 TwBar *bar = NULL;
@@ -1687,7 +1725,22 @@ int main(int argc, char **argv) {
     if (!base)
       base = lifeform_file;
     // Load definition into our global string.
+    string lifeform;
     readFile(base, &lifeform);
+    if (!lifeform.empty()) {
+      lifeforms.push_back(lifeform);
+      lifeform_names.push_back(base);
+    }
+  } else if (!lifeform_files.empty()) {
+    for (const auto &it : lifeform_files) {
+      string lifeform;
+      readFile(it, &lifeform);
+      if (!lifeform.empty()) {
+        lifeforms.push_back(lifeform);
+        lifeform_names.push_back(it);
+      }
+    }
+    cout << "Read " << lifeforms.size() << " lifeforms" << endl;
   }
 
   if (fullscreen)
@@ -1855,9 +1908,9 @@ int main(int argc, char **argv) {
 
   // Set up the video mode, OpenGL state, shaders and shader parameters.
   if (config.fullscreen) {
-    initGraphics(true, 0, 0, lifeform.empty());
+    initGraphics(true, 0, 0, lifeforms.empty());
   } else {
-    initGraphics(false, config.width, config.height, lifeform.empty());
+    initGraphics(false, config.width, config.height, lifeforms.empty());
   }
 
   // Parse as many uniforms from glsl source as we can find.
@@ -1904,6 +1957,8 @@ int main(int argc, char **argv) {
   if (config.loop && !splines.empty()) {
     render_start = fpsCounter.now();
   }
+
+  bool redraw_lifeform = false;
 
   double dist_along_spline = 0;
   size_t keyframe = keyframes.size();
@@ -2020,6 +2075,13 @@ int main(int argc, char **argv) {
       camera.ipd = config.ipd;
 
       next_camera = &camera;
+
+      if (redraw_lifeform) {
+        redraw_lifeform = false;
+
+        frameno = 0;
+        drawLifeform();
+      }
 
       if (!rendering) {
 #if defined(_WIN32)
@@ -2269,7 +2331,7 @@ int main(int argc, char **argv) {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, currentFrame);
 
-      if (!lifeform.empty()) {
+      if (!lifeforms.empty()) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       }
@@ -2470,7 +2532,7 @@ int main(int argc, char **argv) {
         case SDL_WINDOWEVENT: {
           if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
             if (initGraphics(false, event.window.data1, event.window.data2,
-                             lifeform.empty())) {
+                             lifeforms.empty())) {
               frameno = 0;
               stepping = true;
               initTwBar(stereoMode);
@@ -2594,7 +2656,7 @@ int main(int argc, char **argv) {
         case SDL_MOUSEBUTTONUP: {
           if (ignoreNextMouseUp == false && input.grabbed == false) {
             input.grabbed = true;
-            if (lifeform.empty()) {
+            if (lifeforms.empty()) {
               XXX_SDL_SetCursor(input.arrow);
               SDL_SetRelativeMouseMode(SDL_TRUE);
             } else {
@@ -2606,7 +2668,7 @@ int main(int argc, char **argv) {
         } break;
 
         case SDL_MOUSEWHEEL: {
-          if (!lifeform.empty()) {
+          if (!lifeforms.empty()) {
             effects_zoom.x = (float)zoomMouseX / config.width;
             effects_zoom.y =
                 (float)(config.height - zoomMouseY) / config.height;
@@ -2624,7 +2686,7 @@ int main(int argc, char **argv) {
           case SDLK_ESCAPE: {
             if (input.grabbed == true) {
               input.grabbed = false;
-              if (!lifeform.empty()) {
+              if (!lifeforms.empty()) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
               }
             } else {
@@ -2635,7 +2697,7 @@ int main(int argc, char **argv) {
           // Switch fullscreen mode (drops the whole OpenGL context in Windows).
           case SDLK_RETURN:
           case SDLK_KP_ENTER: {
-            initGraphics(true, 0, 0, lifeform.empty());
+            initGraphics(true, 0, 0, lifeforms.empty());
             frameno = 0;
             stepping = true;
             initTwBar(stereoMode);
@@ -2794,6 +2856,12 @@ int main(int argc, char **argv) {
                 } else {
                   splines.clear();
                 }
+
+                if (!lifeforms.empty()) {
+                  if (++current_lifeform >= lifeforms.size())
+                    current_lifeform = 0;
+                  redraw_lifeform = true;
+                }
               }
               break;
             } // shift-tab == backspace, fall through
@@ -2807,9 +2875,17 @@ int main(int argc, char **argv) {
               printf("at keyframe %lu, speed %.8e, delta_time %f\n",
                      (unsigned long)keyframe, keyframes[keyframe].speed,
                      keyframes[keyframe].delta_time);
-            } else
+            } else {
               next_camera = &config;
+            }
             splines.clear();
+
+            if (!lifeforms.empty()) {
+              if (--current_lifeform >= lifeforms.size()) {
+                current_lifeform = lifeforms.size() - 1;
+              }
+              redraw_lifeform = true;
+            }
           } break;
 
           // Resolve controller value changes that happened during rendering.

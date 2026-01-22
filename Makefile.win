@@ -10,7 +10,7 @@ clean:
 	del boxplorer2.exe shadershrink.exe edit-cfg.exe glsl-test.exe sdl2-test.exe
 	del boxplorer2.exp boxplorer2.lib
 
-CFLAGS=/nologo /ISDL2/include /I. /Iinclude /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DANT_DEBUG /DNO_HYDRA /DNO_HAVE_SDK4
+CFLAGS=/nologo /ISDL2/include /I. /Iinclude /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DANT_DEBUG /DNO_HYDRA /DNO_HAVE_SDK4 /std:c++17
 
 LDFLAGS=/link /LIBPATH:SDL2/VisualC/x64/Release /SUBSYSTEM:console /nologo
 

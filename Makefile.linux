@@ -8,7 +8,7 @@ clean:
 clang-format:
 	clang-format -i *.cc *.h
 
-CPPFLAGS=-O2 -I/usr/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++0x
+CPPFLAGS=-O2 -I/usr/include/SDL2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -Wall -D_UNIX -std=c++17
 
 LDFLAGS=-lm -lGL -lX11 -lSDL2 -lSDL2main
 

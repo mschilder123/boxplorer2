@@ -6,7 +6,7 @@ all: boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
 clean:
 	-rm *.o boxplorer2 shadershrink edit-cfg glsl-test sdl2-test
 
-CPPFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/ -I/Library/Frameworks/SDL2.framework/Headers/
+CPPFLAGS=-O2 -IAntTweakBar/include -IAntTweakBar/src -Iinclude -DTW_NO_LIB_PRAGMA -DTW_STATIC -D_MACOSX -std=c++17 -ObjC++ -D__PLACEMENT_NEW_INLINE -I/System/Library/Frameworks/OpenGL.framework/Headers/ -I/System/Library/Frameworks/AppKit.framework/Headers/ -I/Library/Frameworks/SDL2.framework/Headers/
 
 LDFLAGS=-F/Library/Frameworks/ -framework OpenGL -framework Cocoa  -framework SDL2
 
