@@ -1,0 +1,6 @@
+#N blinkerfusecopperheadc10.rle
+#C https://conwaylife.com/wiki/Blinker_fuse
+#C https://www.conwaylife.com/patterns/blinkerfusecopperheadc10.rle
+x = 27, y = 10, rule = B3/S23
+5bo$5bo$6bo2bo$4b3ob2obo$2o6b2ob2o$2o6b2ob2o$4b3ob2ob2obo3bo3bo3bo$6bo
+2bo4bo3bo3bo3bo$5bo8bo3bo3bo3bo$5bo!
