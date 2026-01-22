@@ -1417,6 +1417,36 @@ void drawLifeform(void) {
   }
 }
 
+// Draw a zero border around the screen edge to stop life from crossing.
+// Chaos at edge still ensues though, not a quiet death for most.
+void borderLifeform(int frameno) {
+  if (config.backbuffer && !lifeforms.empty()) {
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[(frameno & 1) ^ 1]);
+
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LINE_SMOOTH);
+
+    // Ortho projection, entire screen in regular pixel coordinates.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, config.width, config.height, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glLineWidth(1);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    glColor4f(1, 1, 1, 0);
+    glRectf(0.5, 0.5, config.width - 0.5, config.height - 0.5);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+}
+
 TwBar *bar = NULL;
 
 // Find '\n#define foo par[x].z  // {twbar params}' in
@@ -1569,6 +1599,7 @@ void LoadKeyFrames(bool fixedFov) {
     if (!camera.loadConfig(filename))
       break;
     if (fixedFov) {
+      // Overwrite dims and fov with those from config.
       camera.width = config.width;
       camera.height = config.height;
       camera.fov_x = config.fov_x;
@@ -1701,6 +1732,7 @@ int main(int argc, char **argv) {
   }
 
 #if defined(_WIN32)
+  // Get full raw resolutions when we ask for it.
   SetProcessDPIAware();
 #endif
 
@@ -1959,6 +1991,7 @@ int main(int argc, char **argv) {
   }
 
   bool redraw_lifeform = false;
+  bool border_lifeform = false;
 
   double dist_along_spline = 0;
   size_t keyframe = keyframes.size();
@@ -2081,6 +2114,10 @@ int main(int argc, char **argv) {
 
         frameno = 0;
         drawLifeform();
+      }
+
+      if (border_lifeform) {
+        borderLifeform(frameno);
       }
 
       if (!rendering) {
@@ -2694,6 +2731,13 @@ int main(int argc, char **argv) {
             }
           } break;
 
+          // Automata border toggle.
+          case SDLK_b: {
+            border_lifeform = !border_lifeform;
+            cout << __func__ << ": border_lifeform = " << border_lifeform
+                 << endl;
+          } break;
+
           // Switch fullscreen mode (drops the whole OpenGL context in Windows).
           case SDLK_RETURN:
           case SDLK_KP_ENTER: {
@@ -2770,7 +2814,8 @@ int main(int argc, char **argv) {
             if (pausing) {
               stepping = true;
               break;
-            }
+            } // fall through
+
           case SDLK_INSERT: { // Add keyframe.
             splines.clear();
             size_t index = keyframes.size();
