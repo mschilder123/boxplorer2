@@ -2,9 +2,7 @@
  * Minimalist glsl funcs and defs needed to compile
  * compliant shader code as plain C++.
  */
-#ifndef _F_INCLUDE_GLSL_H__
-#define _F_INCLUDE_GLSL_H__
-
+#pragma once
 #define _FAKE_GLSL_
 
 namespace GLSL { // Wrap in namespace so we collide less w/ globals.
@@ -224,5 +222,3 @@ vec2 floor(const vec2 &a);
 #define uniform
 
 } // namespace GLSL
-
-#endif

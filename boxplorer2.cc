@@ -1910,6 +1910,12 @@ int main(int argc, char **argv) {
 
   bool ignoreNextMouseUp = false;
   bool dragging = false;
+  struct {
+    GLSL::dvec3 center;
+    double dist;
+    float step_x;
+    float step_y;
+  } DragCtx;
   bool pausing = false;
   bool stepping = false;
 
@@ -2491,6 +2497,32 @@ int main(int argc, char **argv) {
                 dragging = true;
                 ignoreNextMouseUp = true;
                 XXX_SDL_SetCursor(input.hand);
+
+                // Compute center point of dragging plane,
+                // the plane though keyframe and orthogonal to view dir.
+                double raw_dist = camera.distanceTo(keyframes[keyframe]);
+                float dx = -event.button.x + config.width / 2;  // [-w/2 .. w/2]
+                float dy = -config.height / 2 + event.button.y; // [-h/2 .. h/2]
+                float ax = (camera.fov_x / (float)config.width) * dx;
+                float ay = (camera.fov_y / (float)config.height) * dy;
+                // Straight ahead dist to keyframe plane
+                double dist =
+                    raw_dist * cos(GLSL::radians(ax)) * cos(GLSL::radians(ay));
+
+                GLSL::dvec3 O(camera.pos()), dir(camera.ahead());
+                O += dir * dist; // Center on keyframe plane, parallel to screen
+
+                // Compute step per pixel at distance 1
+                float step_x =
+                    tan(GLSL::radians(camera.fov_x / 2)) / (config.width / 2);
+                float step_y =
+                    tan(GLSL::radians(camera.fov_y / 2)) / (config.height / 2);
+
+                // Populate DragCtx
+                DragCtx.center = O;
+                DragCtx.dist = dist;
+                DragCtx.step_x = step_x;
+                DragCtx.step_y = step_y;
               }
             }
           } else { // input.grabbed == true
@@ -2545,18 +2577,15 @@ int main(int argc, char **argv) {
               }
               // Drag currently selected keyframe around.
               if (keyframe < keyframes.size()) {
-                // TODO: should really be some screenspace conversion..
-                // but this works ~OK for now.
-                double fY =
-                    1.83 * tan(camera.fov_y * PI / 360.0f) / config.height;
-                double fX =
-                    1.83 * tan(camera.fov_x * PI / 360.0f) / config.width;
-                keyframes[keyframe].moveAbsolute(
-                    camera.up(), event.motion.yrel * -fY *
-                                     camera.distanceTo(keyframes[keyframe]));
-                keyframes[keyframe].moveAbsolute(
-                    camera.right(), event.motion.xrel * fX *
-                                        camera.distanceTo(keyframes[keyframe]));
+                GLSL::dvec3 v(DragCtx.center);
+                GLSL::dvec3 up(camera.up()), right(camera.right());
+                float dx = -event.motion.x + config.width / 2;  // [-w/2 .. w/2]
+                float dy = -config.height / 2 + event.motion.y; // [-h/2 .. h/2]
+                                                                //
+                v += right * DragCtx.step_x * -dx * DragCtx.dist;
+                v += up * DragCtx.step_y * -dy * DragCtx.dist;
+
+                keyframes[keyframe].set(v.x, v.y, v.z);
               }
             }
           }

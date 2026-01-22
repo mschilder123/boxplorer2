@@ -102,6 +102,7 @@ vec3 vec3::zxy_() const { return vec3(z, x, y); }
 vec2 vec3::xy_() const { return vec2(x, y); }
 vec2 vec3::xz_() const { return vec2(x, z); }
 
+dvec3::dvec3() : x(0), y(0), z(0) {}
 dvec3::dvec3(const dvec3 &b) : x(b.x), y(b.y), z(b.z) {}
 dvec3::dvec3(double xx, double yy, double zz) : x(xx), y(yy), z(zz) {}
 dvec3::dvec3(const double *v) : x(v[0]), y(v[1]), z(v[2]) {}
