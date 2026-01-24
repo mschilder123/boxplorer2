@@ -1314,11 +1314,12 @@ void drawLifeform(void) {
 
     glPointSize(1);
     glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
-    glColor4f(1, 1, 1, 1);
+    glColor4f(1, 0, 1, 1);
     glBegin(GL_POINTS);
 
-    cout << __func__ << ": lifeform '" << lifeform_names[current_lifeform]
-         << "'" << endl;
+    cout << __func__ << ": lifeform " << current_lifeform << "/"
+         << lifeforms.size() << " '" << lifeform_names[current_lifeform] << "'"
+         << endl;
 
     {
       istringstream in(lifeforms[current_lifeform]);
@@ -1438,7 +1439,7 @@ void borderLifeform(int frameno) {
     glLineWidth(1);
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    glColor4f(1, 1, 1, 0);
+    glColor4f(0, 1, 0, 1); // Green virus.
     glRectf(0.5, 0.5, config.width - 0.5, config.height - 0.5);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -2811,8 +2812,12 @@ int main(int argc, char **argv) {
           } break;
 
           case SDLK_SPACE:
-            if (pausing) {
-              stepping = true;
+            if (!lifeforms.empty()) {
+              if (pausing)
+                stepping = true;
+              pausing = true;
+              if (hasCtrl)
+                pausing = false;
               break;
             } // fall through
 
@@ -2906,6 +2911,7 @@ int main(int argc, char **argv) {
                   if (++current_lifeform >= lifeforms.size())
                     current_lifeform = 0;
                   redraw_lifeform = true;
+                  stepping = true;
                 }
               }
               break;

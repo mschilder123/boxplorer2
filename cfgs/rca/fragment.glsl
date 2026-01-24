@@ -11,31 +11,17 @@ uniform int frameno;
 #define decayG par[0].y  // {min=0 max=1 step=.0001}
 #define decayB par[0].z  // {min=0 max=1 step=.0001}
 
-#define random par[1].x  // {min=0 max=1 step=1}
-
 #define direction par[1].y  // {min=-1 max=1 step=2}
 
 vec2 position;
 vec2 pixelSize = vec2(1.0/xres, 1.0/yres);
 
-float rand(vec2 co){
-  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
-
-void isAlive(float dx, float dy, inout int count, int factor) {
+void Count(float dx, float dy, inout int count, int factor) {
   vec4 cur = texture2D(iBackbuffer, position + pixelSize*vec2( dx, dy ));
   count += int(cur.a) * factor;
 }
 
-vec4 color(vec2 z) {
-  // Ring o'fire; generate random live cells.
-  if (random > 0.0) {
-    if (length(z) < 0.02 /*&& length(z) > 0.08*/) {
-      // Within tiny circle: random life!
-      return (rand(time*z) < 0.5 ? vec4(1.0,0.0,0.0,1.0) : vec4(0.0));
-    }
-  }
-
+vec4 color() {
   vec4 cur = texture2D(iBackbuffer, position);
 
   // Relative position of self in 2x2 cell.
@@ -51,9 +37,9 @@ vec4 color(vec2 z) {
   int count = int(alive);
 
   // Count neighbours in relative 2x2.
-  isAlive(phase.x, 0.0, count, 2);
-  isAlive(0.0, phase.y, count, 4);
-  isAlive(phase.x, phase.y, count, 8);
+  Count(phase.x, 0.0, count, 2);
+  Count(0.0, phase.y, count, 4);
+  Count(phase.x, phase.y, count, 8);
  
   // Bounce gas
   //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
@@ -109,20 +95,20 @@ int rotb = 0x0010;
   // add rotb if going backward.
   rule += rotb * int(clamp(-direction * phase.x * phase.y, 0.0, 1.0));
 
-  if (fract(float(rule) / pow(2.0, float(count + 1))) < .5) {
+  if (fract(float(rule) / pow(2.0, float(count + 1))) < 0.5) {
     // dead: decay to black
-    return cur * vec4(par[0], .5);
-  } else if (fract(float(count) / 2.0) < .5) {
-    const float t = .5 * .5;
+    return cur * vec4(par[0], 0.5);
+  } else if (fract(float(count) / 2.0) < 0.5) {
+    const float t = 0.5 * 0.5;
     if (alive >= t) {
       // period 2: green
-      return vec4(cur.r * .0, 1.0, cur.b * .0, 1.0);
+      return vec4(cur.r * 0.0, 1.0, cur.b * 0.0, 1.0);
     } else if (alive >= t * t) {
       // period 4: yellow
       return vec4(1.0, 1.0, cur.b * 0.0, 1.0);
     } else {
       // others: blue
-      return vec4(cur.r * .0, cur.g * .0, 1.0, 1.0);
+      return vec4(cur.r * .0, cur.g * 0.0, 1.0, 1.0);
     }
   } else {
     // stable: climb to full red
@@ -133,7 +119,5 @@ int rotb = 0x0010;
 
 void main() {
   position = gl_FragCoord.xy * pixelSize;  // [0..1>
-  vec2 z = -1.0 + 2.0 * position;          // <-1..1>
-  z -= dir.xy;  // respond to mouse move, somewhat.
-  gl_FragColor = color(z);
+  gl_FragColor = color();
 }
