@@ -104,6 +104,12 @@ bool TGA::fromFramebuffer(int width, int height) {
   return true;
 }
 
+void TGA::set(int x, int y, unsigned char r, unsigned char g, unsigned char b) {
+  data_[x * 3 + width_ * 3 * y + 0] = b;
+  data_[x * 3 + width_ * 3 * y + 1] = g;
+  data_[x * 3 + width_ * 3 * y + 2] = r;
+}
+
 void TGA::set(int x, int y, GLSL::vec3 col) {
   data_[x * 3 + width_ * 3 * y + 0] = GLSL::clamp(256 * col.z, 0, 255); // B
   data_[x * 3 + width_ * 3 * y + 1] = GLSL::clamp(256 * col.y, 0, 255); // G

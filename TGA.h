@@ -14,6 +14,7 @@ public:
   bool readFile(const char *filename);
   bool writeFile(const char *filename);
   bool fromFramebuffer(int width, int height);
+  void set(int x, int y, unsigned char r, unsigned char g, unsigned char b);
   void set(int x, int y, GLSL::vec3 col);
   bool get(int x, int y);
   int width();
