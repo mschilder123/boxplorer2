@@ -341,9 +341,11 @@ void Uniforms::bindToUI(void *bar) {
 }
 
 void Uniforms::send(int program) {
+  // printf("^%s:%d\n", __func__, __LINE__);
   for (unordered_map<string, iUniformPtr>::iterator it = uniforms.begin();
        it != uniforms.end(); ++it) {
     if (it->second->ok())
       it->second->send(program);
   }
+  // printf("~%s:%d\n", __func__, __LINE__);
 }

@@ -81,7 +81,8 @@ bool ShaderManager::loadHelpers(const string &defines, int stereoMode) {
   readFile(EFFECTS_VERTEX_SHADER_FILE, &vertex);
   readFile(EFFECTS_FRAGMENT_SHADER_FILE, &fragment);
 
-  glsl_source.append(fragment);
+  // TODO: is there ever any organic uniform in effects?
+  // glsl_source.append(fragment);
 
   bool ok = (effects.compile(defines, vertex, fragment) != 0);
 

@@ -2135,6 +2135,8 @@ int main(int argc, char **argv) {
         }
 #endif
 
+        // printf("-- begin frame --\n");
+
         if (!config.disable_de) {
           // Try get a DE for current position.
           // We use DE as speed and interpupillairy distance (aka head size).

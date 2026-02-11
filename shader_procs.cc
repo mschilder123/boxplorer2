@@ -21,7 +21,10 @@ DECLARE_GL_PROC(PFNGLUSEPROGRAMPROC, glUseProgram);
 DECLARE_GL_PROC(PFNGLGETSHADERIVPROC, glGetProgramiv);
 DECLARE_GL_PROC(PFNGLGETSHADERINFOLOGPROC, glGetShaderInfoLog);
 DECLARE_GL_PROC(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog);
-DECLARE_GL_PROC(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+
+// DECLARE_GL_PROC(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+DECLARE_GL_PROC_X(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+
 DECLARE_GL_PROC(PFNGLUNIFORM1FPROC, glUniform1f);
 DECLARE_GL_PROC(PFNGLUNIFORM3FPROC, glUniform3f);
 DECLARE_GL_PROC(PFNGLUNIFORM1IPROC, glUniform1i);
@@ -88,7 +91,10 @@ bool enableShaderProcs(void) {
   IMPORT_GL_PROC(PFNGLGETSHADERIVPROC, glGetProgramiv);
   IMPORT_GL_PROC(PFNGLGETSHADERINFOLOGPROC, glGetShaderInfoLog);
   IMPORT_GL_PROC(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog);
-  IMPORT_GL_PROC(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+
+  // IMPORT_GL_PROC(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+  IMPORT_GL_PROC_X(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+
   IMPORT_GL_PROC(PFNGLUNIFORM1FPROC, glUniform1f);
   IMPORT_GL_PROC(PFNGLUNIFORM3FPROC, glUniform3f);
   IMPORT_GL_PROC(PFNGLUNIFORM1IPROC, glUniform1i);
@@ -118,10 +124,6 @@ bool enableShaderProcs(void) {
   IMPORT_GL_PROC(PFNGLFRAMEBUFFERTEXTURE2DPROC, glFramebufferTexture2D);
   IMPORT_GL_PROC(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus);
 
-  // IMPORT_GL_PROC(PFNGLFRAMEBUFFERTEXTURELAYERPROC,
-  // glFramebufferTextureLayer); IMPORT_GL_PROC(PFNGLTEXSTORAGE3DPROC,
-  // glTexStorage3D);
-
 #if defined(__WIN32__)
   IMPORT_GL_PROC_X(PFNGLACTIVETEXTUREPROC, glActiveTexture);
 #endif
@@ -135,5 +137,12 @@ bool enableShaderProcs(void) {
 #if defined(__WIN32__)
 void glActiveTexture(GLenum texture) { x_glActiveTexture(texture); }
 #endif
+
+// Interposer for optional logging
+GLint glGetUniformLocation(GLuint program, const GLchar *name) {
+  GLint r = x_glGetUniformLocation(program, name);
+  //  printf("%s:%d(%d, %s) = %d\n", __func__, __LINE__, program, name, r);
+  return r;
+}
 
 #endif // !__APPLE__
