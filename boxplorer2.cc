@@ -20,7 +20,7 @@
 // debug
 #define XXX_SDL_SetCursor(x)                                                   \
   do {                                                                         \
-    fprintf(stderr, "line %d: %s\n", __LINE__, #x);                            \
+    DEBUG(#x);                                                                 \
     SDL_SetCursor(x);                                                          \
   } while (0)
 
@@ -99,11 +99,11 @@ map<string, GLSL::vec3 (*)(GLSL::vec3)> COLOR_funcs;
 class DE_initializer {
 public:
   DE_initializer(string name, float (*func)(GLSL::vec3)) {
-    printf("DECLARE_DE(%s)\n", name.c_str());
+    DEBUG("DECLARE_DE(%s)", name.c_str());
     DE_funcs[name] = func;
   }
   DE_initializer(string name, double (*func)(GLSL::dvec3)) {
-    printf("DECLARE_DE(%s)\n", name.c_str());
+    DEBUG("DECLARE_DE(%s)", name.c_str());
     // Strip _64 from name.
     size_t x64 = name.find("_64");
     if (x64 != string::npos)
@@ -198,7 +198,7 @@ public:
 
     reset();
 
-    printf(__FUNCTION__ ": %dx%d display %d\n", w, h, d);
+    DEBUG("%dx%d display %d", w, h, d);
     window_ = SDL_CreateWindow("test", last_x_, last_y_, w, h,
                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     glcontext_ = SDL_GL_CreateContext(window_);
@@ -237,7 +237,7 @@ public:
       }
       if (rect_[i].h == 1080)
         alternate1080p = i;
-      printf("screen %d: %dx%d\n", i, rect_[i].w, rect_[i].h);
+      DEBUG("screen %d: %dx%d", i, rect_[i].w, rect_[i].h);
     }
 
     int targetWidth = rect_[d].w;
@@ -253,16 +253,14 @@ public:
     }
 
     if (!fullscreen_) {
-      printf(__FUNCTION__ ": to fullscreen %dx%d display %d\n", targetWidth,
-             targetHeight, d);
+      DEBUG("to fullscreen %dx%d display %d", targetWidth, targetHeight, d);
       window_ = SDL_CreateWindow(
           "boxplorer2", rect_[d].x, rect_[d].y, targetWidth, targetHeight,
           SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
       width_ = targetWidth;
       height_ = targetHeight;
     } else {
-      printf(__FUNCTION__ ": from fullscreen %dx%d display %d\n", last_width_,
-             last_height_, d);
+      DEBUG("from fullscreen %dx%d display %d", last_width_, last_height_, d);
       window_ = SDL_CreateWindow("boxplorer2", last_x_, last_y_, last_width_,
                                  last_height_,
                                  SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
@@ -421,7 +419,7 @@ struct FPSCounter {
 #if defined(_WIN32)
       // SetOculusPrediction(0.9 / fps); // A bit lower than latency.
 #endif
-      printf("fps %f\n", fps);
+      DEBUG("fps %f", fps);
       lastfps = lastFrameTime;
     }
 
@@ -835,9 +833,9 @@ void saveScreenshot(char const *tgaFile) {
   tga.fromFramebuffer(config.width, config.height);
   string filename(WorkingDir + tgaFile);
   if (tga.writeFile(filename.c_str()))
-    printf(__FUNCTION__ " : wrote %s\n", filename.c_str());
+    DEBUG("wrote %s", filename.c_str());
   else
-    printf(__FUNCTION__ " : failed to write %s\n", filename.c_str());
+    DEBUG("failed to write %s", filename.c_str());
 }
 
 TGA background;
@@ -846,8 +844,7 @@ void LoadBackground() {
   string filename(WorkingDir + "background.tga");
   background.readFile(filename.c_str());
   if (background.data()) {
-    printf(__FUNCTION__ " : loaded background image from '%s'\n",
-           filename.c_str());
+    DEBUG("loaded background image from '%s'", filename.c_str());
   }
 }
 
@@ -907,8 +904,7 @@ bool setupDirectories(const char *configFile) {
   if (BaseFile.empty())
     BaseFile.assign(DEFAULT_CONFIG_FILE);
 
-  cout << __FUNCTION__ << " : " << BaseDir << ", " << WorkingDir << ", "
-       << BaseFile << endl;
+  DEBUG("%s, %s, %s", BaseDir.c_str(), WorkingDir.c_str(), BaseFile.c_str());
 
   // Collect all available .lif and .rle filenames.
   const std::filesystem::path cfgs{WorkingDir};
@@ -965,18 +961,18 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
   GLint maxRenderBufferSize;
   glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &maxRenderBufferSize);
-  printf(__FUNCTION__ " : max render buffer size %d\n", maxRenderBufferSize);
+  DEBUG("max render buffer size %d", maxRenderBufferSize);
   GLint dims[2];
   glGetIntegerv(GL_MAX_VIEWPORT_DIMS, &dims[0]);
-  printf(__FUNCTION__ " : max viewport dims %dx%d\n", dims[0], dims[1]);
+  DEBUG("max viewport dims %dx%d", dims[0], dims[1]);
 
-  printf(__FUNCTION__ " : GetSwap %d\n", SDL_GL_GetSwapInterval());
+  DEBUG("GetSwap %d", SDL_GL_GetSwapInterval());
 
   if (stereoMode == ST_QUADBUFFER) {
     int ga = 0;
     SDL_GL_GetAttribute(SDL_GL_STEREO, &ga);
     if (ga == 0)
-      die("No stereo rendering available: %s\n", SDL_GetError());
+      DIE("No stereo rendering available: %s", SDL_GetError());
   }
 
   // Take the window size the system provided. Might be higher than requested.
@@ -985,10 +981,10 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     config.height = window.height();
   }
 
-  printf(__FUNCTION__ " : %dx%d\n", config.width, config.height);
+  DEBUG("%dx%d", config.width, config.height);
 
   SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &config.depth_size);
-  printf(__FUNCTION__ " : depth size %u\n", config.depth_size);
+  DEBUG("depth size %u", config.depth_size);
 
   if (input.arrow == NULL)
     input.arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
@@ -1007,20 +1003,20 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     XXX_SDL_SetCursor(input.crosshair);
   }
 
-  printf(__FUNCTION__ " : SetSwap %d\n", SDL_GL_SetSwapInterval(0));
+  DEBUG("SetSwap %d", SDL_GL_SetSwapInterval(0));
 
   // Enable shader functions and compile shaders.
   // Needs to be done after setting the video mode.
-  enableShaderProcs() || die("This program needs support for GLSL shaders.\n");
+  enableShaderProcs() || DIE("This program needs support for GLSL shaders.");
 
   ::render.shaderManager.loadFractal(defines) ||
-      die("Error in GLSL ::render.shaderManager.fractal shader "
-          "compilation:\n%s\n",
+      DIE("Error in GLSL ::render.shaderManager.fractal shader "
+          "compilation:\n%s",
           ::render.shaderManager.fractal.log().c_str());
 
   ::render.shaderManager.loadHelpers(defines, stereoMode) ||
-      die("Error in GLSL ::render.shaderManager.effects shader "
-          "compilation:\n%s\n",
+      DIE("Error in GLSL ::render.shaderManager.effects shader "
+          "compilation:\n%s",
           ::render.shaderManager.effects.log().c_str());
 
   glEnable(GL_TEXTURE_2D);
@@ -1032,10 +1028,9 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
                                         "#define ST_COMPUTE_DE_ONLY\n");
 
     if (!::render.shaderManager.de_shader.ok()) {
-      printf(__FUNCTION__ " : ::render.shaderManager.de_shader failed to "
-                          "compile: no GPU de.\n");
-      printf(__FUNCTION__ " :\n%s\n",
-             ::render.shaderManager.de_shader.log().c_str());
+      DEBUG("::render.shaderManager.de_shader failed to "
+            "compile: no GPU de.");
+      DEBUG(":\n%s", ::render.shaderManager.de_shader.log().c_str());
       while (glGetError() != GL_NO_ERROR)
         ;
     } else {
@@ -1101,8 +1096,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
                  background.width(), background.height(), 0, GL_BGR,
                  GL_UNSIGNED_BYTE, background.data());
     glGenerateMipmap(GL_TEXTURE_2D);
-    printf(__FUNCTION__ " : background texture at %d\n",
-           render.background_texture);
+    DEBUG("background texture at %d", render.background_texture);
     glBindTexture(GL_TEXTURE_2D, 0);
     CHECK_ERROR;
   }
@@ -1317,9 +1311,8 @@ void drawLifeform(void) {
     glColor4f(1, 0, 1, 1);
     glBegin(GL_POINTS);
 
-    cout << __func__ << ": lifeform " << current_lifeform << "/"
-         << lifeforms.size() << " '" << lifeform_names[current_lifeform] << "'"
-         << endl;
+    DEBUG("lifeform %zd/%zd '%s'", current_lifeform, lifeforms.size(),
+          lifeform_names[current_lifeform].c_str());
 
     {
       istringstream in(lifeforms[current_lifeform]);
@@ -1483,8 +1476,8 @@ void initTwParDefines() {
     if (_xyz < 'x' || _xyz > 'z')
       continue;
 
-    printf("parameter %s par[%d].%c {%s}\n", varName.c_str(), index, _xyz,
-           attr.c_str());
+    DEBUG("parameter %s par[%d].%c {%s}", varName.c_str(), index, _xyz,
+          attr.c_str());
 
     float *address = &camera.par[index][_xyz - 'x'];
 
@@ -1608,8 +1601,7 @@ void LoadKeyFrames(bool fixedFov) {
     }
     keyframes.push_back(camera);
   }
-  printf(__FUNCTION__ " : loaded %lu keyframes\n",
-         (unsigned long)keyframes.size());
+  DEBUG("loaded %lu keyframes", (unsigned long)keyframes.size());
 }
 
 void drawScreen(int leftRight = 3) {
@@ -1746,7 +1738,7 @@ int main(int argc, char **argv) {
   if (setupDirectories(configFile) && config.loadConfig(BaseFile, &defines)) {
     // succuss
   } else {
-    { die("Usage: boxplorer2 <configuration-file.cfg>\n"); }
+    { DIE("Usage: boxplorer2 <configuration-file.cfg>"); }
   }
 
   if (lifeform_file) {
@@ -1782,17 +1774,17 @@ int main(int argc, char **argv) {
 #if defined(_WIN32)
   if (stereoMode == ST_OCULUS) {
     if (!InitOculusSDK()) {
-      die("InitOculusSDK() fail!");
+      DIE("InitOculusSDK() fail!");
     }
 
     hmd_settings_t hmd;
     if (!GetOculusDeviceInfo(&hmd)) {
-      die("GetOculusDeviceInfo() fail!");
+      DIE("GetOculusDeviceInfo() fail!");
     }
-    printf("Oculus %dx%d\n", hmd.h_resolution, hmd.v_resolution);
-    printf("Oculus ipd %f\n", hmd.interpupillary_distance);
-    printf("Oculus distortion (%f,%f,%f,%f)\n", hmd.distortion_k[0],
-           hmd.distortion_k[1], hmd.distortion_k[2], hmd.distortion_k[3]);
+    DEBUG("Oculus %dx%d", hmd.h_resolution, hmd.v_resolution);
+    DEBUG("Oculus ipd %f", hmd.interpupillary_distance);
+    DEBUG("Oculus distortion (%f,%f,%f,%f)", hmd.distortion_k[0],
+          hmd.distortion_k[1], hmd.distortion_k[2], hmd.distortion_k[3]);
     // TODO: actually do something w/ these values.
 
     SetOculusPrediction(.025); // Also gets adjusted later based on fps.
@@ -1802,22 +1794,22 @@ int main(int argc, char **argv) {
 
 #if defined(HYDRA)
   if (sixenseInit() != SIXENSE_SUCCESS) {
-    die("sixenseInit() fail!");
+    DIE("sixenseInit() fail!");
   }
 
   sixenseSetFilterEnabled(1);
   if (sixenseSetFilterParams(0.0, 0.0, 2000.0, 1.0) != SIXENSE_SUCCESS) {
-    die("SetFilterParams() fail!");
+    DIE("SetFilterParams() fail!");
   }
 
   if (sixenseSetActiveBase(0) != SIXENSE_SUCCESS) {
-    die("sixenseSetActiveBase() fail!");
+    DIE("sixenseSetActiveBase() fail!");
   }
 
   sixenseAllControllerData ssdata;
 
   if (sixenseIsControllerEnabled(0) != SIXENSE_SUCCESS) {
-    die("controller(0) not enabled!");
+    DIE("controller(0) not enabled!");
   }
 
   double speed_base = 200.0;
@@ -1903,14 +1895,14 @@ int main(int argc, char **argv) {
 
   config.sanitizeParameters();
 
-  printf(__FUNCTION__ ": sanitized: size %dx%d\n", config.width, config.height);
-  printf(__FUNCTION__ ": sanitized: view %fx%f\n", config.fov_x, config.fov_y);
+  DEBUG("sanitized: size %dx%d", config.width, config.height);
+  DEBUG("sanitized: view %fx%f", config.fov_x, config.fov_y);
 
   LoadBackground();
 
   // Initialize SDL and OpenGL graphics.
   SDL_Init(SDL_INIT_VIDEO) == 0 ||
-      die("SDL initialization failed: %s\n", SDL_GetError());
+      DIE("SDL initialization failed: %s", SDL_GetError());
   atexit(SDL_Quit);
 
   window.init();
@@ -1919,20 +1911,16 @@ int main(int argc, char **argv) {
     // open a input.stick by explicit index.
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
     input.stick = SDL_JoystickOpen(kJOYSTICK - 1);
-    printf(__FUNCTION__ " : JoystickName '%s'\n",
-           SDL_JoystickName(input.stick));
-    printf(__FUNCTION__ " : JoystickNumAxes   : %i\n",
-           SDL_JoystickNumAxes(input.stick));
-    printf(__FUNCTION__ " : JoystickNumButtons: %i\n",
-           SDL_JoystickNumButtons(input.stick));
-    printf(__FUNCTION__ " : JoystickNumHats   : %i\n",
-           SDL_JoystickNumHats(input.stick));
+    DEBUG("JoystickName '%s'", SDL_JoystickName(input.stick));
+    DEBUG("JoystickNumAxes   : %i", SDL_JoystickNumAxes(input.stick));
+    DEBUG("JoystickNumButtons: %i", SDL_JoystickNumButtons(input.stick));
+    DEBUG("JoystickNumHats   : %i", SDL_JoystickNumHats(input.stick));
   } else if (xbox360) {
     // find and open the first xbox 360 controller we see.
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
     for (int i = 0; (input.stick = SDL_JoystickOpen(i)) != NULL; ++i) {
       string name(SDL_JoystickName(input.stick));
-      printf(__FUNCTION__ " : JoystickName '%s'\n", name.c_str());
+      DEBUG("JoystickName '%s'", name.c_str());
       if (name.find("X") == 0)
         break; // got it
       SDL_JoystickClose(input.stick);
@@ -1970,7 +1958,7 @@ int main(int argc, char **argv) {
   initTwBar(stereoMode);
   fpsCounter.init(FPS_FRAMES_TO_AVERAGE);
 
-  // printf(__FUNCTION__ " : GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
+  // DEBUG("GL_EXTENSIONS: %s", glGetString(GL_EXTENSIONS));
 
   // Main loop.
   Controller ctl = CTL_CAM; // the default controller is camera rotation
@@ -1983,7 +1971,7 @@ int main(int argc, char **argv) {
   size_t splines_index = 0;
 
   double frame_time = 1 / config.fps;
-  printf(__FUNCTION__ " : frame time %g\n", frame_time);
+  DEBUG("frame time %g", frame_time);
   double render_time = 0;
   double render_start = 0;
 
@@ -2032,7 +2020,7 @@ int main(int argc, char **argv) {
       // Next pick float version.
       de_func = DE_funcs[de_func_name];
     } else {
-      printf(__FUNCTION__ " : unknown DE %s\n", de_func_name.c_str());
+      DEBUG("unknown DE %s", de_func_name.c_str());
       de_func_name.clear();
     }
   }
@@ -2135,7 +2123,7 @@ int main(int argc, char **argv) {
         }
 #endif
 
-        // printf("-- begin frame --\n");
+        // DEBUG("-- begin frame --");
 
         if (!config.disable_de) {
           // Try get a DE for current position.
@@ -2177,7 +2165,7 @@ int main(int argc, char **argv) {
           }
 
           if (de != 0.0 && de != last_de) {
-            printf("de=%12.12e\n", de);
+            DEBUG("de=%12.12e", de);
             camera.speed = de / 10.0;
             last_de = de;
           }
@@ -2594,7 +2582,7 @@ int main(int argc, char **argv) {
               // No red or green at all : probably a keyframe marker (fragile).
               size_t kf = 255 - (bgr >> 16);
               if (kf < keyframes.size()) {
-                printf("selected keyframe %lu\n", (unsigned long)kf);
+                DEBUG("selected keyframe %lu", (unsigned long)kf);
                 keyframe = kf;
                 dragging = true;
                 ignoreNextMouseUp = true;
@@ -2654,12 +2642,12 @@ int main(int argc, char **argv) {
             if (dragging == false) {
               // Peek at framebuffer color for keyframe markers.
               unsigned int bgr = getBGRpixel(event.motion.x, event.motion.y);
-              // printf("bgr = %06x\n", bgr);
+              // DEBUG("bgr = %06x", bgr);
               if ((bgr & 0xffff) == 0) {
                 // No red or green at all : probably a keyframe marker.
                 size_t kf = 255 - (bgr >> 16);
                 if (kf < keyframes.size()) {
-                  printf("keyframe %lu\n", (unsigned long)kf);
+                  DEBUG("keyframe %lu", (unsigned long)kf);
                   if (SDL_GetCursor() == input.arrow) {
                     XXX_SDL_SetCursor(input.hand);
                   }
@@ -2737,8 +2725,7 @@ int main(int argc, char **argv) {
           // Automata border toggle.
           case SDLK_b: {
             border_lifeform = !border_lifeform;
-            cout << __func__ << ": border_lifeform = " << border_lifeform
-                 << endl;
+            DEBUG("border_lifeform = %s", border_lifeform ? "true" : "false");
           } break;
 
           // Switch fullscreen mode (drops the whole OpenGL context in Windows).
@@ -2883,9 +2870,9 @@ int main(int argc, char **argv) {
                 }
 
                 if (keyframe < keyframes.size()) {
-                  printf("at keyframe %lu, speed %.8e, delta_time %f\n",
-                         (unsigned long)keyframe, keyframes[keyframe].speed,
-                         keyframes[keyframe].delta_time);
+                  DEBUG("at keyframe %lu, speed %.8e, delta_time %f",
+                        (unsigned long)keyframe, keyframes[keyframe].speed,
+                        keyframes[keyframe].delta_time);
                 }
 
                 if (keyframes.empty())
@@ -2925,9 +2912,9 @@ int main(int argc, char **argv) {
               keyframe = keyframes.size() - 1;
             if (keyframe < keyframes.size()) {
               next_camera = &keyframes[keyframe];
-              printf("at keyframe %lu, speed %.8e, delta_time %f\n",
-                     (unsigned long)keyframe, keyframes[keyframe].speed,
-                     keyframes[keyframe].delta_time);
+              DEBUG("at keyframe %lu, speed %.8e, delta_time %f",
+                    (unsigned long)keyframe, keyframes[keyframe].speed,
+                    keyframes[keyframe].delta_time);
             } else {
               next_camera = &config;
             }
@@ -3134,12 +3121,12 @@ int main(int argc, char **argv) {
       if (keystate[SDL_SCANCODE_Z]) {
         if (camera.speed > 0.000001)
           camera.speed -= camera.speed / 10;
-        printf("speed %.8e\n", camera.speed);
+        DEBUG("speed %.8e", camera.speed);
       }
       if (keystate[SDL_SCANCODE_C]) {
         if (camera.speed < 1.0)
           camera.speed += camera.speed / 10;
-        printf("speed %.8e\n", camera.speed);
+        DEBUG("speed %.8e", camera.speed);
       }
 
       // Change the value of the active controller.
@@ -3167,7 +3154,7 @@ int main(int argc, char **argv) {
 #if defined(HYDRA)
       // Sixense Hydra
       if (sixenseGetAllNewestData(&ssdata) == SIXENSE_SUCCESS) {
-        //  printf("%f %f %f %f\n",
+        //  DEBUG("%f %f %f %f",
         //  ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
 
         int clbuttons = ssdata.controllers[1].buttons;
@@ -3180,10 +3167,10 @@ int main(int argc, char **argv) {
   m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
 #endif
 
-        //  printf("%08x, %f\n", ssdata.controllers[0].buttons,
-        //  ssdata.controllers[0].trigger); printf("%+7.7f %+7.7f %+7.7f, ",
+        //  DEBUG("%08x, %f", ssdata.controllers[0].buttons,
+        //  ssdata.controllers[0].trigger); DEBUG("%+7.7f %+7.7f %+7.7f, ",
         //  ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
-        //  printf("%+7.7f %+7.7f %+7.7f\n",
+        //  DEBUG("%+7.7f %+7.7f %+7.7f",
         //  ssdata.controllers[1].pos[0],ssdata.controllers[1].pos[1],ssdata.controllers[1].pos[2]);
 
         float dx = ssdata.controllers[0].pos[0] - ssdata.controllers[1].pos[0];
@@ -3191,7 +3178,7 @@ int main(int argc, char **argv) {
         float dz = ssdata.controllers[0].pos[2] - ssdata.controllers[1].pos[2];
         float d = sqrt(dx * dx + dy * dy + dz * dz);
 
-        // printf("%+7.7f\n", d);
+        // DEBUG("%+7.7f", d);
 
         // spot in between two hands.
         dx =
@@ -3215,8 +3202,8 @@ int main(int argc, char **argv) {
         // distance between controllers is eye separation / speed multiplier.
         speed_factor = d / speed_base;
 
-        //  printf("triggers %+7.7f, %+7.7f\n", ssdata.controllers[0].trigger,
-        //  ssdata.controllers[1].trigger); printf("buttons  %+7.7x, %+7.7x\n",
+        //  DEBUG("triggers %+7.7f, %+7.7f", ssdata.controllers[0].trigger,
+        //  ssdata.controllers[1].trigger); DEBUG("buttons  %+7.7x, %+7.7x",
         //  clbuttons, crbuttons);
 
         // flip back&forth through keyframes w/ edge trigger of bumper button
@@ -3251,7 +3238,7 @@ int main(int argc, char **argv) {
         dy = (neutral_y - dy) / 100.0;
         dz = (neutral_z - dz) / 100.0;
 
-        // printf("%+8.8lf %+8.8lf %+8.8lf\n", dx, dy, dz);
+        // DEBUG("%+8.8lf %+8.8lf %+8.8lf", dx, dy, dz);
 
         dx *= (camera.speed * speed_factor);
         dy *= (camera.speed * speed_factor);

@@ -1,18 +1,21 @@
 #pragma once
 
+#include <stdio.h>
 #include <string>
 
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
-#define die(...) (fprintf(stderr, __VA_ARGS__), _exit(1), 1)
+#define _pr_fmt(fmt) "%s:%d(%s) " fmt "\n", __FILE__, __LINE__, __func__
+#define DEBUG(fmt, ...) printf(_pr_fmt(fmt), ##__VA_ARGS__)
+#define DIE(fmt, ...) (fprintf(stderr, _pr_fmt(fmt), ##__VA_ARGS__), exit(1), 1)
 
 #define CHECK_STATUS(f, v)                                                     \
   {                                                                            \
     GLenum __s;                                                                \
     if ((__s = (f)) != (v)) {                                                  \
-      printf("%s[%d] : %s() : %04x\n", __func__, __LINE__, #f, __s);           \
+      DEBUG("%s() : %04x\n", #f, __s);                                         \
     }                                                                          \
   }
 

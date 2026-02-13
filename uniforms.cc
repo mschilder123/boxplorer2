@@ -8,6 +8,7 @@
 
 #include "camera.h"
 #include "shader_procs.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -341,11 +342,11 @@ void Uniforms::bindToUI(void *bar) {
 }
 
 void Uniforms::send(int program) {
-  // printf("^%s:%d\n", __func__, __LINE__);
+  // DEBUG("^");
   for (unordered_map<string, iUniformPtr>::iterator it = uniforms.begin();
        it != uniforms.end(); ++it) {
     if (it->second->ok())
       it->second->send(program);
   }
-  // printf("~%s:%d\n", __func__, __LINE__);
+  // DEBUG("~");
 }

@@ -21,7 +21,7 @@ sdl2-test: sdl2-test.cc
 	g++ $(CPPFLAGS) sdl2-test.cc -o sdl2-test $(LDFLAGS)
 
 boxplorer2.o: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
-	camera.h interpolate.h uniforms.h params.h \
+	camera.h interpolate.h uniforms.h params.h utils.h \
 	cfgs/menger.cfg.data/fragment.glsl \
 	Makefile.osx
 	g++ -c $(CPPFLAGS) boxplorer2.cc
@@ -39,13 +39,13 @@ glsl-test: glsl-test.cc glsl.o TGA.o TGA.h glsl.h \
 	Makefile.osx
 	g++ $(CPPFLAGS) glsl-test.cc TGA.o glsl.o -o glsl-test $(LDFLAGS)
 
-interpolate.o: interpolate.cc interpolate.h
-shader.o: shader.cc shader.h shader_procs.h
-shader_procs.o: shader_procs.cc shader_procs.h
-camera.o: camera.cc camera.h params.h
-uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h
-glsl.o: glsl.cc glsl.h
-TGA.o: TGA.cc TGA.h glsl.h
+interpolate.o: interpolate.cc interpolate.h utils.h
+shader.o: shader.cc shader.h shader_procs.h utils.h
+shader_procs.o: shader_procs.cc shader_procs.h utils.h
+camera.o: camera.cc camera.h params.h utils.h
+uniforms.o: uniforms.cc uniforms.h shader_procs.h camera.h utils.h
+glsl.o: glsl.cc glsl.h utils.h
+TGA.o: TGA.cc TGA.h glsl.h utils.h
 
 TwBar.o: AntTweakBar/src/TwBar.cpp
 	g++ -c $(CPPFLAGS) $<

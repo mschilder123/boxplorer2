@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "shader_procs.h"
+#include "utils.h"
 
 #define DECLARE_GL_PROC(type, name) type name = 0
 #define DECLARE_GL_PROC_X(type, name) type x_##name = 0
@@ -70,13 +71,13 @@ bool enableShaderProcs(void) {
 #define IMPORT_GL_PROC(type, name)                                             \
   do {                                                                         \
     if (!(name = (type)SDL_GL_GetProcAddress(#name))) {                        \
-      fprintf(stderr, "failed to import function " #name "\n");                \
+      DIE("failed to import function " #name);                                 \
     }                                                                          \
   } while (0)
 #define IMPORT_GL_PROC_X(type, name)                                           \
   do {                                                                         \
     if (!(x_##name = (type)SDL_GL_GetProcAddress(#name))) {                    \
-      fprintf(stderr, "failed to import function " #name "\n");                \
+      DIE("failed to import function " #name);                                 \
     }                                                                          \
   } while (0)
 
@@ -141,7 +142,7 @@ void glActiveTexture(GLenum texture) { x_glActiveTexture(texture); }
 // Interposer for optional logging
 GLint glGetUniformLocation(GLuint program, const GLchar *name) {
   GLint r = x_glGetUniformLocation(program, name);
-  //  printf("%s:%d(%d, %s) = %d\n", __func__, __LINE__, program, name, r);
+  //  DEBUG("f(%d, %s) = %d", program, name, r);
   return r;
 }
 

@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "glsl.h"
+#include "utils.h"
 
 #if defined(_WIN32)
 #pragma warning(disable : 4244)
@@ -34,19 +35,18 @@ bool TGA::readFile(const char *filename) {
     expected[14] = header[14];
     expected[15] = header[15];
     if (memcmp(header, expected, sizeof header) != 0) {
-      fprintf(stderr, "%s : unsupported TGA format, only 24bpp supported\n",
-              __func__);
+      DEBUG("unsupported TGA format, only 24bpp supported");
       break;
     }
     int width = header[13] * 256 + header[12];
     int height = header[15] * 256 + header[14];
     if (width > 32768 || height > 32768) {
-      fprintf(stderr, "%s : oversized TGA image not supported\n", __func__);
+      DEBUG("oversized TGA image not supported");
       break;
     }
     unsigned char *data = new unsigned char[width * height * 3];
     if (fread(data, width * height * 3, 1, f) != 1) {
-      fprintf(stderr, "%s : failed to load TGA pixel data\n", __func__);
+      DEBUG("failed to load TGA pixel data");
       delete[] data;
       break;
     }

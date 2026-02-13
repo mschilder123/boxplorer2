@@ -226,11 +226,11 @@ public:
             v = fscanf(f, " %s", s);
             if (v == 1) {
               std::string define = "#define " + a + " " + s + "\n";
-              printf("%s : %s", __func__, define.c_str());
+              DEBUG("%s", define.c_str());
               defines->append(define);
               if (!a.compare("d")) {
                 de_func_name.assign(s);
-                printf("%s : de_func %s\n", __func__, de_func_name.c_str());
+                DEBUG("de_func %s", de_func_name.c_str());
               }
             }
           }
@@ -271,10 +271,10 @@ public:
         }
       }
       fclose(f);
-      printf("%s : read '%s'\n", __func__, configFile.c_str());
+      DEBUG("read '%s'", configFile.c_str());
       result = true;
     } else {
-      printf("%s : failed to open '%s'\n", __func__, configFile.c_str());
+      DEBUG("failed to open '%s'", configFile.c_str());
     }
     if (result)
       sanitizeParameters();
@@ -373,7 +373,7 @@ public:
                 par[i][2]);
       }
       fclose(f);
-      printf("%s : wrote '%s'\n", __func__, filename.c_str());
+      DEBUG("wrote '%s'", filename.c_str());
     }
   }
 
