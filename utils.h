@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string>
 
@@ -8,14 +10,30 @@
 #endif
 
 #define _pr_fmt(fmt) "%s:%d(%s) " fmt "\n", __FILE__, __LINE__, __func__
-#define DEBUG(fmt, ...) printf(_pr_fmt(fmt), ##__VA_ARGS__)
 #define DIE(fmt, ...) (fprintf(stderr, _pr_fmt(fmt), ##__VA_ARGS__), exit(1), 1)
+
+struct _LOG {
+  _LOG(const char *file, int line, const char *func, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    printf("%s:%d(%s) ", file, line, func); // preample
+    vprintf(fmt, args);
+    va_end(args);
+  }
+  ~_LOG() { std::cout << std::endl; }
+
+  template <typename T> friend _LOG &operator<<(_LOG &&ll, const T &t) {
+    std::cout << t;
+    return ll;
+  }
+};
+#define DEBUG(fmt, ...) _LOG(__FILE__, __LINE__, __func__, fmt, __VA_ARGS__)
 
 #define CHECK_STATUS(f, v)                                                     \
   {                                                                            \
     GLenum __s;                                                                \
     if ((__s = (f)) != (v)) {                                                  \
-      DEBUG("%s() : %04x\n", #f, __s);                                         \
+      DEBUG("%s() : %04x", #f, __s);                                           \
     }                                                                          \
   }
 

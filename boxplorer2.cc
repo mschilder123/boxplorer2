@@ -2725,7 +2725,7 @@ int main(int argc, char **argv) {
           // Automata border toggle.
           case SDLK_b: {
             border_lifeform = !border_lifeform;
-            DEBUG("border_lifeform = %s", border_lifeform ? "true" : "false");
+            DEBUG("border_lifeform = ") << border_lifeform;
           } break;
 
           // Switch fullscreen mode (drops the whole OpenGL context in Windows).
