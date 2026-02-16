@@ -3,6 +3,9 @@
 //mandelbulb mod.by visual/bermarte>thanx 2 Xyrus and 2 subblue
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
 
+#include "setup.inc"
+#line 7
+
 #define DE de_bulb
 #define COLOR color_bulb
 
@@ -18,8 +21,8 @@
 #define JuliaVector par[1]
 
 // Camera position and direction.
-varying vec3 eye, dir;
-varying float zoom;
+//varying vec3 eye, dir;
+//varying float zoom;
 
 // Interactive parameters.
 uniform vec3 par[20];
@@ -31,7 +34,7 @@ uniform float ao_strength;  // Strength of ambient occlusion. {min=0 max=.01 ste
 uniform float glow_strength;  // How much glow is applied after max_steps. {min=0 max=10 step=.05}
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.05}
 
-uniform float xres, yres, time, speed;
+//uniform float xres, yres, time, speed;
 
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
@@ -45,8 +48,6 @@ uniform int max_steps;  // Maximum raymarching steps. {min=1 max=200}
 #define specularColor par[7]
 #define glowColor par[3]
 #define lightVector par[9]
-
-#include "setup.inc"
 
 vec3  aoColor = vec3(.1, .1, .1);
 
