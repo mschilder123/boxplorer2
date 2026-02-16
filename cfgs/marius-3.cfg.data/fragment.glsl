@@ -2,6 +2,9 @@
 // Original formula by Tglad
 // - http://www.fractalforums.com/3d-fractal-generation/amazing-fractal
 
+#include "setup.inc"
+#line 5
+
 #define P0 p0                    // standard Mandelbox
 //#define P0 vec4(par[1].x,par[1].y,par[2].y,1)  // Mandelbox Julia
 
@@ -26,7 +29,7 @@
 #define MAX_DIST 4.0
 
 // Camera position and direction.
-varying vec3 eye, dir;
+//varying vec3 eye, dir;
 
 // Interactive parameters.
 uniform vec3 par[10];
@@ -37,7 +40,7 @@ uniform float ao_strength;  // Strength of ambient occlusion. {min=0 max=.01 ste
 uniform float glow_strength;  // How much glow is applied after max_steps. {min=0 max=10 step=.05}
 uniform float dist_to_color;  // How is background mixed with the surface color after max_steps. {min=0 max=10 step=.01}
 
-uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
+//uniform float speed;  // {min=1e-06 max=.1 step=1e-06}
 
 uniform int iters;  // Number of fractal iterations. {min=1 max=100}
 uniform int color_iters;  // Number of fractal iterations for coloring. {min=1 max=100}
@@ -185,11 +188,11 @@ float ambient_occlusion(vec3 p, vec3 n, int niters) {
 }
 
 void main() {
-  vec3 eye_in = eye;
-  eye_in += 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed *
-      vec3(gl_ModelViewMatrix[0]);
+  vec3 eye_in, dp;
 
-  vec3 p = eye_in, dp = normalize(dir);
+  if (!setup_ray(eye, dir, eye_in, dp)) return;
+
+  vec3 p = eye_in;
 
   float totalD = 0.0, D = 0.0;
 
@@ -236,11 +239,5 @@ void main() {
   // Glow is based on the number of steps.
   col = mix(col, glowColor, float(steps)/float(max_steps) * glow_strength);
 
-  float zNear = speed;
-  float zFar = 65535.0*zNear;
-  float a = zFar / (zFar - zNear);
-  float b = zFar * zNear / (zNear - zFar);
-  float depth = (a + b / clamp(totalD/length(dir), zNear, zFar));
-  gl_FragDepth = depth;
-  gl_FragColor = vec4(col, depth);
+  write_pixel(dir, totalD, col);
 }
