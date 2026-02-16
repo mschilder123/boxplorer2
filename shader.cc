@@ -90,7 +90,12 @@ bool Shader::compile(const string &defines, const string &vertex_shader,
     for (int i = 0; i < nUniforms; ++i) {
       glGetActiveUniform(p, i, maxLen, &written, &size, &type, name);
       location = glGetUniformLocation(p, name);
+
       printf(" %-8d | %-5x| %s\n", location, type, name);
+
+      if (location >= 0) {
+        uniform_locations_[name] = location;
+      }
 
       string sname(name);
       string stype;

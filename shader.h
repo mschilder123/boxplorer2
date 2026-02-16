@@ -2,6 +2,7 @@
 #define _F_SHADER_H_
 
 #include <string>
+#include <unordered_map>
 
 class Shader {
 public:
@@ -22,11 +23,19 @@ public:
   const std::string &log() const { return log_; }
   const std::string &uniforms() const { return uniforms_; }
 
+  int uniform_location(const std::string &name) const {
+    auto it = uniform_locations_.find(name);
+    if (it == uniform_locations_.end())
+      return -1;
+    return it->second;
+  }
+
 private:
   std::string source_;
   unsigned int program_;
   std::string log_;
   std::string uniforms_;
+  std::unordered_map<std::string, int> uniform_locations_;
   bool ok_;
 };
 

@@ -1543,24 +1543,29 @@ void initTwBar(enum StereoMode stereoMode) {
   if (::render.shaderManager.fxaa.ok()) {
     TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "group=post");
   }
+
   if (::render.shaderManager.dof.ok()) {
     TwAddVarRW(bar, "dof", TW_TYPE_BOOL32, &camera.enable_dof, "group=post");
     TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.aperture,
                "min=0.0 max=10.0 step=0.01 group=post");
   }
-  if (::render.shaderManager.effects.ok() || ::render.shaderManager.fxaa.ok() ||
-      ::render.shaderManager.dof.ok()) {
-    // Global, thus on config, not camera.
+  if (::render.shaderManager.effects.uniform_location("exposure") != -1) {
     TwAddVarRW(bar, "exposure", TW_TYPE_FLOAT, &config.exposure,
                "min=0.0 max=5.0 step=0.01 group=post");
+  }
+  if (::render.shaderManager.effects.uniform_location("maxBright") != -1) {
     TwAddVarRW(bar, "maxBright", TW_TYPE_FLOAT, &config.maxBright,
                "min=0.0 max=5.0 step=0.01 group=post");
+  }
+  if (::render.shaderManager.effects.uniform_location("gamma") != -1) {
     TwAddVarRW(bar, "gamma", TW_TYPE_FLOAT, &config.gamma,
                "min=0.0 max=5.0 step=0.01 group=post");
   }
 
-  TwAddVarRW(bar, "focus", TW_TYPE_FLOAT, &camera.focus,
-             "min=-20.0 max=30.0 step=0.1 group=3d");
+  if (stereoMode != ST_NONE) {
+    TwAddVarRW(bar, "focus", TW_TYPE_FLOAT, &camera.focus,
+               "min=-20.0 max=30.0 step=0.1 group=3d");
+  }
 
   if (stereoMode == ST_OCULUS) {
     TwAddVarRW(bar, "ipd", TW_TYPE_FLOAT, &config.ipd,
