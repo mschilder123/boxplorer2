@@ -1,9 +1,7 @@
 // http://dmishin.blogspot.com/2013/11/the-single-rotation-rule-remarkably.html
 
-varying vec3 dir;
-
 uniform sampler2D iBackbuffer;
-uniform float xres, yres, time;
+uniform float xres, yres;
 uniform vec3 par[2];
 uniform int frameno;
 
@@ -16,8 +14,8 @@ uniform int frameno;
 vec2 position;
 vec2 pixelSize = vec2(1.0/xres, 1.0/yres);
 
-void Count(float dx, float dy, inout int count, int factor) {
-  vec4 cur = texture2D(iBackbuffer, position + pixelSize*vec2( dx, dy ));
+void Count(vec2 offset, inout int count, int factor) {
+  vec4 cur = texture2D(iBackbuffer, position + offset);
   count += int(cur.a) * factor;
 }
 
@@ -33,13 +31,17 @@ vec4 color() {
   // Direction toggle.
   phase *= direction;
 
-  float alive = cur.a;
-  int count = int(alive);
+  vec2 offsets = phase * pixelSize;
 
   // Count neighbours in relative 2x2.
-  Count(phase.x, 0.0, count, 2);
-  Count(0.0, phase.y, count, 4);
-  Count(phase.x, phase.y, count, 8);
+  float alive = cur.a;
+  int count = int(alive);                 // bit 0
+
+  Count(vec2(offsets.x, 0.0), count, 2);  // bit 1
+  Count(vec2(0.0, offsets.y), count, 4);  // bit 2
+  Count(offsets, count, 8);               // bit 3
+
+  // count now 0..15, 1 bit per pixel in the 2x2
  
   // Bounce gas
   //                  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
@@ -96,9 +98,10 @@ int rotb = 0x0010;
   rule += rotb * int(clamp(-direction * phase.x * phase.y, 0.0, 1.0));
 
   if (fract(float(rule) / pow(2.0, float(count + 1))) < 0.5) {
-    // dead: decay to black
+    // die or already dead: decay to black
     return cur * vec4(par[0], 0.5);
-  } else if (fract(float(count) / 2.0) < 0.5) {
+  } else if (alive < 1.0) {
+    // get born
     const float t = 0.5 * 0.5;
     if (alive >= t) {
       // period 2: green
@@ -111,7 +114,7 @@ int rotb = 0x0010;
       return vec4(cur.r * .0, cur.g * 0.0, 1.0, 1.0);
     }
   } else {
-    // stable: climb to full red
+    // already alive: climb to full red
     return vec4(clamp(cur.r + 0.0001, 0.0, 1.0),
                 cur.g * par[0].g, cur.b * par[0].b, 1.0);
   }
