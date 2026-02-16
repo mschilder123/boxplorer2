@@ -198,8 +198,8 @@ void main() {
     D = de_box(p + totalD * dp);
     if (D < m_dist) break;
     totalD += D;
-    if (D > MAX_DIST) break;
-    m_dist = min_dist * pow(totalD * par[8].x + 1.0, 100.*par[8].y);  // Vary LoD
+  if (D > MAX_DIST) break;
+  m_dist = min_dist * pow(totalD * par[8].x + 1.0, 100.*par[8].y);  // Vary LoD
   }
 
   p += totalD * dp;
@@ -226,8 +226,7 @@ void main() {
     col = mix(aoColor, col, clamp(ambient_occlusion(p, n, niters), 0., 1.));
 
   // fog
-  col = mix(col, backgroundColor, clamp(pow(1.+totalD*par[9].y, 2.)-1.,
-  0., 1.));
+  col = mix(col, backgroundColor, clamp(pow(1.+totalD*par[9].y, 2.)-1., 0., 1.));
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.
