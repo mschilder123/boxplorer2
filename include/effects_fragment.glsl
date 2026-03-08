@@ -19,7 +19,7 @@ uniform float ipd;
 void main() {
   vec4 color;
 
-#if defined ST_OCULUS
+#if defined ST_OCULUS_OLD
   // Attempt chromatic aberration compensation.
   vec2 uv = gl_FragCoord.xy / vec2(xres, yres);
   float halfIpd = (ipd * 10. - 20.) / xres;
