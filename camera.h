@@ -45,7 +45,7 @@ typedef int ViewQuadrant;
 #define VQ_DONE 6
 #define VQ_LETTER "fbudrl"
 
-class KeyFrame {
+class Camera {
 public:
   double v[16]; // view matrix
   double q[4];  // quaterion orientation
@@ -67,9 +67,9 @@ public:
   int n_funis;
   bool isKey_; // Whether this frame is actually a defined KeyFrame.
 
-  KeyFrame();
+  Camera();
 
-  double distanceTo(const KeyFrame &other) const;
+  double distanceTo(const Camera &other) const;
 
   double *right() { return &v[0]; }
   double *up() { return &v[4]; }
@@ -112,15 +112,6 @@ public:
   // Map a uniform name to a address within this.
   // Returns NULL on fail.
   void *map_address(const std::string &type, const std::string &name, int n);
-};
-
-class Camera : public KeyFrame {
-public:
-  Camera &operator=(const KeyFrame &other) {
-    *((KeyFrame *)this) = other;
-    iBackbufferCount = 0; // reset progressive rendering count.
-    return *this;
-  }
 
   // Set the OpenGL modelview matrix to the camera matrix, for shader.
   void activate(ViewQuadrant vq) {
@@ -498,20 +489,10 @@ public:
     }
   }
 
-  void mixHydraOrientation(float *quat) {
-    double q[4];
-    q[0] = quat[0];
-    q[1] = quat[1];
-    q[2] = quat[2];
-    q[3] = quat[3];
-    qnormalize(q);
-    qmul(q, this->q);
-    quat2mat(q, this->v);
-  }
-
   // take this->q and q and produce this->v,q := this->q + q
-  void mixSensorOrientation(float q[4]) {
+  void mixHmdPose(float q[4], float p[3]) {
     double q1[4];
+
     q1[0] = q[0];
     q1[1] = q[1];
     q1[2] = q[2];
@@ -530,11 +511,18 @@ public:
     this->q[1] = q1[1];
     this->q[2] = q1[2];
     this->q[3] = q1[3];
+
+    const float f = abs(this->speed) * 80.0;
+    this->move(f * +p[0], f * +p[1], f * -p[2]);
   }
 
   // take this->v and q and produce this->v,q := this->v - q
-  void unmixSensorOrientation(float q[4]) {
+  void unmixHmdPose(float q[4], float p[3]) {
     double q1[4];
+
+    const float f = abs(this->speed) * 80.0;
+    this->move(f * -p[0], f * -p[1], f * +p[2]);
+
     q1[0] = q[0];
     q1[1] = q[1];
     q1[2] = q[2];

@@ -11,7 +11,7 @@
 
 using namespace std;
 
-KeyFrame::KeyFrame() {
+Camera::Camera() {
   memset(v, 0, sizeof(v));
   memset(q, 0, sizeof(q));
   memset(x, 0, sizeof(x));
@@ -30,13 +30,13 @@ KeyFrame::KeyFrame() {
   enable_fxaa = 1;
 }
 
-double KeyFrame::distanceTo(const KeyFrame &other) const {
+double Camera::distanceTo(const Camera &other) const {
   double delta[3] = {v[12] - other.v[12], v[13] - other.v[13],
                      v[14] - other.v[14]};
   return sqrt(dot(delta, delta));
 }
 
-void KeyFrame::orthogonalize() {
+void Camera::orthogonalize() {
   if (!normalize(ahead())) {
     ahead()[0] = ahead()[1] = 0;
     ahead()[2] = 1;
@@ -68,7 +68,7 @@ void KeyFrame::orthogonalize() {
 
 // Rotate the camera by `deg` degrees around a normalized axis.
 // Behaves like `glRotate` without normalizing the axis.
-void KeyFrame::rotate(double deg, double x, double y, double z) {
+void Camera::rotate(double deg, double x, double y, double z) {
   double s = sin(deg * PI / 180), c = cos(deg * PI / 180), t = 1 - c;
   double r[3][3] = {{x * x * t + c, x * y * t + z * s, x * z * t - y * s},
                     {y * x * t - z * s, y * y * t + c, y * z * t + x * s},
@@ -84,7 +84,7 @@ void KeyFrame::rotate(double deg, double x, double y, double z) {
   iBackbufferCount = 0;
 }
 
-void *KeyFrame::map_address(const string &type, const string &name, int n) {
+void *Camera::map_address(const string &type, const string &name, int n) {
   // DEBUG("looking for %s %s", type.c_str(), name.c_str());
 
   // TODO: handle arrays

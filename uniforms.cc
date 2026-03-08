@@ -62,7 +62,7 @@ public:
   void send(int program) {
     glUniform1i(glGetUniformLocation(program, name_.c_str()), *adr_);
   }
-  bool link(KeyFrame *kf) {
+  bool link(Camera *kf) {
     adr_ = (int *)kf->map_address(type_, name_, 1);
     return adr_ != NULL;
   }
@@ -106,7 +106,7 @@ public:
   void send(int program) {
     glUniform1i(glGetUniformLocation(program, name_.c_str()), *adr_);
   }
-  bool link(KeyFrame *kf) {
+  bool link(Camera *kf) {
     adr_ = (int *)kf->map_address("int", name_, 1);
     return adr_ != NULL;
   }
@@ -149,7 +149,7 @@ public:
   void send(int program) {
     glUniform1f(glGetUniformLocation(program, name_.c_str()), *adr_);
   }
-  bool link(KeyFrame *kf) {
+  bool link(Camera *kf) {
     adr_ = (float *)kf->map_address(type_, name_, 1);
     return adr_ != NULL;
   }
@@ -194,7 +194,7 @@ public:
   void send(int program) {
     glUniform1d(glGetUniformLocation(program, name_.c_str()), *adr_);
   }
-  bool link(KeyFrame *kf) {
+  bool link(Camera *kf) {
     adr_ = (double *)kf->map_address(type_, name_, 1);
     return adr_ != NULL;
   }
@@ -244,7 +244,7 @@ public:
   void send(int program) {
     glUniform3fv(glGetUniformLocation(program, name_.c_str()), 1, adr_);
   }
-  bool link(KeyFrame *kf) {
+  bool link(Camera *kf) {
     adr_ = (float *)kf->map_address(type_, name_, 1);
     return adr_ != NULL;
   }
@@ -324,7 +324,7 @@ bool Uniforms::parseFromGlsl(const string &glsl) {
   return true;
 }
 
-void Uniforms::link(KeyFrame *kf) {
+void Uniforms::link(Camera *kf) {
   for (unordered_map<string, iUniformPtr>::iterator it = uniforms.begin();
        it != uniforms.end(); ++it) {
     if (it->second->link(kf)) {

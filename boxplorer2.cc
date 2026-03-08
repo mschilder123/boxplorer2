@@ -46,14 +46,6 @@
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comdlg32.lib")
 
-#include "oculus_sdk4.h"
-
-#if defined(HYDRA)
-#include <sixense.h>
-#pragma comment(lib, "sixense.lib")
-#pragma comment(lib, "sixense_utils.lib")
-#endif // HYDRA
-
 #endif // _WIN32
 
 using namespace std;
@@ -72,6 +64,7 @@ using namespace std;
 #include "camera.h"
 #include "default_shaders.h"
 #include "glsl.h"
+#include "hmd.h"
 #include "interpolate.h"
 #include "params.h"
 #include "shader.h"
@@ -330,6 +323,8 @@ struct RenderContext {
 
   GLuint background_texture;
 
+  HMD *hmd = nullptr;
+
   // DLP-Link or interlaced L/R eye polarity
   int polarity = 1;
 } render;
@@ -362,6 +357,9 @@ void clearGlContext() {
 
   glDeleteFramebuffers(1, &render.fxaaFbo);
   glDeleteTextures(1, &render.fxaaTex);
+
+  if (render.hmd)
+    render.hmd->FreeTextures();
 }
 
 struct InputContext {
@@ -416,9 +414,6 @@ struct FPSCounter {
     static Uint32 lastfps = 0;
     if (lastFrameTime - lastfps > 5000) {
       // Once per 5 seconds.
-#if defined(_WIN32)
-      // SetOculusPrediction(0.9 / fps); // A bit lower than latency.
-#endif
       DEBUG("fps %f", fps);
       lastfps = lastFrameTime;
     }
@@ -433,9 +428,9 @@ struct FPSCounter {
 Camera camera, // Active camera view.
     config;    // Global configuration set.
 
-vector<KeyFrame> keyframes; // Keyframes
+vector<Camera> keyframes; // Keyframes
 
-void suggestDeltaTime(KeyFrame &camera, const vector<KeyFrame> &keyframes) {
+void suggestDeltaTime(Camera &camera, const vector<Camera> &keyframes) {
   if (keyframes.empty()) {
     camera.delta_time = 0;
   } else {
@@ -448,13 +443,13 @@ void suggestDeltaTime(KeyFrame &camera, const vector<KeyFrame> &keyframes) {
 #define NSUBFRAMES 100 // # splined subframes between keyframes.
 // TODO: make relative to delta_time, thus more like max fps.
 
-void CatmullRom(const vector<KeyFrame> &keyframes, vector<KeyFrame> *output,
+void CatmullRom(const vector<Camera> &keyframes, vector<Camera> *output,
                 bool loop = false, int nsubframes = NSUBFRAMES) {
   output->clear();
   if (keyframes.size() < 2)
     return; // Need at least two points.
 
-  vector<KeyFrame> controlpoints(keyframes);
+  vector<Camera> controlpoints(keyframes);
 
   size_t n = controlpoints.size();
 
@@ -514,12 +509,12 @@ void CatmullRom(const vector<KeyFrame> &keyframes, vector<KeyFrame> *output,
 
   // Now spline all into intermediate frames.
   for (size_t i = 0; i < n - 3; ++i) {
-    const KeyFrame *p0 = &controlpoints[i > 0 ? i - 1 : n - 1];
-    const KeyFrame *p1 = &controlpoints[i];
-    const KeyFrame *p2 = &controlpoints[i + 1];
-    const KeyFrame *p3 = &controlpoints[i + 2];
+    const Camera *p0 = &controlpoints[i > 0 ? i - 1 : n - 1];
+    const Camera *p1 = &controlpoints[i];
+    const Camera *p2 = &controlpoints[i + 1];
+    const Camera *p3 = &controlpoints[i + 2];
     for (int f = 0; f < nsubframes; ++f) {
-      KeyFrame tmp = config; // Start with default values.
+      Camera tmp = config; // Start with default values.
       tmp.setKey(f == 0);
       const double t = ((double)f) / nsubframes;
 
@@ -1278,6 +1273,11 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     } // ::render.shaderManager.fxaa.ok()
   }
 
+  if (stereoMode == ST_OCULUS) {
+    if (render.hmd)
+      render.hmd->AllocateTextures();
+  }
+
   drawLifeform();
 
   return true;
@@ -1535,7 +1535,7 @@ void initTwBar(enum StereoMode stereoMode) {
     char pos[100];
     int x = window.width();
     int y = window.height();
-    sprintf(pos, "boxplorer position='%d %d'", x / 6, y / 4);
+    sprintf(pos, "boxplorer position='%d %d'", (int)(x / 3.5), (int)(y / 2.5));
     TwDefine(pos);
     TwDefine("GLOBAL fontsize=3");
   }
@@ -1776,56 +1776,15 @@ int main(int argc, char **argv) {
   if (fullscreen)
     config.fullscreen = fullscreen;
 
-#if defined(_WIN32)
   if (stereoMode == ST_OCULUS) {
-    if (!InitOculusSDK()) {
-      DIE("InitOculusSDK() fail!");
+    render.hmd = CreateHMD();
+    if (!render.hmd) {
+      DEBUG("CreateHMD() fail!");
     }
 
-    hmd_settings_t hmd;
-    if (!GetOculusDeviceInfo(&hmd)) {
-      DIE("GetOculusDeviceInfo() fail!");
-    }
-    DEBUG("Oculus %dx%d", hmd.h_resolution, hmd.v_resolution);
-    DEBUG("Oculus ipd %f", hmd.interpupillary_distance);
-    DEBUG("Oculus distortion (%f,%f,%f,%f)", hmd.distortion_k[0],
-          hmd.distortion_k[1], hmd.distortion_k[2], hmd.distortion_k[3]);
-    // TODO: actually do something w/ these values.
-
-    SetOculusPrediction(.025); // Also gets adjusted later based on fps.
-    ResetOculusOrientation();
+    if (render.hmd)
+      render.hmd->ResetPose();
   }
-#endif
-
-#if defined(HYDRA)
-  if (sixenseInit() != SIXENSE_SUCCESS) {
-    DIE("sixenseInit() fail!");
-  }
-
-  sixenseSetFilterEnabled(1);
-  if (sixenseSetFilterParams(0.0, 0.0, 2000.0, 1.0) != SIXENSE_SUCCESS) {
-    DIE("SetFilterParams() fail!");
-  }
-
-  if (sixenseSetActiveBase(0) != SIXENSE_SUCCESS) {
-    DIE("sixenseSetActiveBase() fail!");
-  }
-
-  sixenseAllControllerData ssdata;
-
-  if (sixenseIsControllerEnabled(0) != SIXENSE_SUCCESS) {
-    DIE("controller(0) not enabled!");
-  }
-
-  double speed_base = 200.0;
-  int lbuttons = SIXENSE_BUTTON_START; // so we calibrate on first loop.
-  int rbuttons = 0;
-  float neutral_x = 0;
-  float neutral_y = 0;
-  float neutral_z = 0;
-#endif
-
-  double speed_factor = 1.0;
 
   // Sanitize / override config parameters.
   if (loop)
@@ -1845,16 +1804,16 @@ int main(int argc, char **argv) {
     // Fix resolution for optimal performance.
     // config.width = 1280; config.height = 800;  // DK1
     // config.fov_x = 110; config.fov_y = 94.0;  // DK1
-    config.width = 1920;
-    config.height = 1080;
-    config.fov_x = 100;
-    config.fov_y = 100.0;
+    config.width = 2 * 1824; // 5408;  // quest3
+    config.height = 1968;    // 2736;
+    config.fov_x = 110.0;
+    config.fov_y = 96.0;
     fixedFov = true;
     // Enable multipass but not ::render.shaderManager.dof and
-    // ::render.shaderManager.fxaa.
+    // ::render.shaderManager.fxaa?
     config.backbuffer = 1;
-    config.enable_fxaa = 0;
-    config.enable_dof = 0;
+    config.enable_fxaa = 1;
+    config.enable_dof = 1;
   }
   if (stereoMode == ST_SPHERICAL) {
     config.width = 2048;
@@ -1972,7 +1931,7 @@ int main(int argc, char **argv) {
   int done = 0;
   int frameno = 0;
 
-  vector<KeyFrame> splines;
+  vector<Camera> splines;
   size_t splines_index = 0;
 
   double frame_time = 1 / config.fps;
@@ -2001,7 +1960,7 @@ int main(int argc, char **argv) {
   bool pausing = false;
   bool stepping = false;
 
-  bool mixedInOculus = false;
+  bool mixedInHmd = false;
   bool multiPass = false;
 
   GLSL::vec3 effects_zoom(.5, .5, 1.); // centered and no zoom
@@ -2014,7 +1973,7 @@ int main(int argc, char **argv) {
   }
 
   double last_de = 10.0;
-  KeyFrame *next_camera = &camera;
+  Camera *next_camera = &camera;
 
   // Check availability of DE; setup func ptr.
   if (!de_func_name.empty()) {
@@ -2030,7 +1989,8 @@ int main(int argc, char **argv) {
     }
   }
 
-  float view_q[4] = {0, 0, 0, 1};
+  float hmd_view_q[4] = {0, 0, 0, 1};
+  float hmd_pos[3] = {0, 0, 0};
 
   uint32_t poll_ticks = SDL_GetTicks();
 
@@ -2115,18 +2075,19 @@ int main(int argc, char **argv) {
       }
 
       if (!rendering) {
-#if defined(_WIN32)
         // When not rendering a sequence,
-        // now mix in orientation (and translation.. where's my DK2 Oculus?)
+        // now mix in orientation (and translation..)
         if (stereoMode == ST_OCULUS) {
-          if (GetOculusQuat(view_q)) {
-            if (input.grabbed == true) {
-              camera.mixSensorOrientation(view_q);
-              mixedInOculus = true;
-            }
+          if (mixedInHmd) {
+            camera.unmixHmdPose(hmd_view_q, hmd_pos);
+            mixedInHmd = false; // TODO: Camera field vs. local flag?
+          }
+
+          if (render.hmd && render.hmd->GetHeadPose(hmd_view_q, hmd_pos)) {
+            camera.mixHmdPose(hmd_view_q, hmd_pos);
+            mixedInHmd = true;
           }
         }
-#endif
 
         // DEBUG("-- begin frame --");
 
@@ -2215,8 +2176,6 @@ int main(int argc, char **argv) {
         glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[frameno & 1]);
       }
 
-      camera.speed *= speed_factor;
-
       if (rendercubes) {
         glViewport(0, 0, config.width, config.height);
 
@@ -2241,14 +2200,13 @@ int main(int argc, char **argv) {
         }
       }
 
-      camera.speed /= speed_factor;
-
       glUseProgram(0);
-
       glBindTexture(GL_TEXTURE_2D, 0);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     } // !pausing || stepping
+
+    CHECK_ERROR;
 
     if (multiPass) {
       // We are post-processing of sorts.
@@ -2290,6 +2248,8 @@ int main(int argc, char **argv) {
 
         currentFrame = render.fxaaTex; // Our output is input for next stage.
       }                                // ::render.shaderManager.fxaa
+
+      CHECK_ERROR;
 
       if (::render.shaderManager.dof.ok() && config.enable_dof &&
           camera.enable_dof && camera.aperture != 0) {
@@ -2354,6 +2314,8 @@ int main(int argc, char **argv) {
         }
       } // dof
 
+      CHECK_ERROR;
+
       // Combine input(s) into final frame.
       GLuint final_program = ::render.shaderManager.effects.program();
       glUseProgram(final_program);
@@ -2408,9 +2370,22 @@ int main(int argc, char **argv) {
 
       drawScreen();
 
+      CHECK_ERROR;
+
       glUseProgram(0);
       // glDisable(GL_TEXTURE_2D);
+
+      if (stereoMode == ST_OCULUS) {
+        if (render.hmd) {
+          render.hmd->BlitFrom(/*default fb*/ 0, config.width, config.height);
+        }
+        glViewport(0, 0, window.width(), window.height());
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      }
+
     } // multiPass
+
+    CHECK_ERROR;
 
     // Draw keyframe splined path, if we have 2+ keyframes and not rendering.
     if (!config.no_spline && stereoMode == ST_NONE && // TODO: show path in 3d
@@ -2433,7 +2408,7 @@ int main(int argc, char **argv) {
 
       camera.activateGl();
 
-      vector<KeyFrame> splines;
+      vector<Camera> splines;
       CatmullRom(keyframes, &splines, config.loop);
 
       glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
@@ -2478,7 +2453,7 @@ int main(int argc, char **argv) {
         // Encode keyframe # in blue channel.
         glColor4f(0.0f, 0.0f, 1.0f - (i / 256.0), 1.0f);
         glBegin(GL_LINES);
-        KeyFrame tmp = keyframes[i];
+        Camera tmp = keyframes[i];
         tmp.move(tmp.speed, 0, 0);
         // Translate points, eye is at origin.
         glVertex3d(tmp.pos()[0] - camera.pos()[0],
@@ -3049,9 +3024,6 @@ int main(int argc, char **argv) {
       // Continue after calling SDL_GetRelativeMouseState() so view direction
       // does not jump after closing AntTweakBar.
       if (input.grabbed == false) {
-        if (mixedInOculus) {
-          camera.unmixSensorOrientation(view_q);
-        }
         continue;
       }
 
@@ -3079,6 +3051,47 @@ int main(int argc, char **argv) {
       (void)mouse_button_right;
       (void)joystick_lt;
       (void)joystick_rt;
+
+      if (render.hmd) {
+        // Hmd touch controllers handling.
+        render.hmd->RefreshInputState();
+
+        camera.move(0, 0,
+                    camera.speed * 3.0 *
+                        render.hmd->RightIndexTrigger()); // forward
+        camera.move(0, 0,
+                    -camera.speed * 3.0 *
+                        render.hmd->RightHandTrigger()); // back
+
+        camera.rotate(render.hmd->RightThumbstickY() * .1 *
+                          camera.keyb_rot_speed,
+                      1, 0, 0);
+        camera.rotate(render.hmd->RightThumbstickX() * .1 *
+                          camera.keyb_rot_speed,
+                      0, 1, 0);
+
+        if (render.hmd->ButtonB()) {
+          // SDLK_TAB
+          if (++keyframe >= keyframes.size())
+            keyframe = 0;
+          if (keyframe < keyframes.size())
+            next_camera = &keyframes[keyframe];
+          if (keyframes.empty())
+            next_camera = &config; // reset view
+        }
+        if (render.hmd->ButtonA()) {
+          // SDLK_BACKSPACE
+          if (--keyframe >= keyframes.size())
+            keyframe = keyframes.size() - 1;
+          if (keyframe < keyframes.size())
+            next_camera = &keyframes[keyframe];
+          if (keyframes.empty())
+            next_camera = &config; // reset view
+        }
+        if (render.hmd->RightThumbButton()) {
+          render.hmd->ResetPose();
+        }
+      }
 
       if (keystate[SDL_SCANCODE_W])
         camera.move(0, 0, camera.speed); // forward
@@ -3156,109 +3169,8 @@ int main(int argc, char **argv) {
         }
       }
 
-#if defined(HYDRA)
-      // Sixense Hydra
-      if (sixenseGetAllNewestData(&ssdata) == SIXENSE_SUCCESS) {
-        //  DEBUG("%f %f %f %f",
-        //  ssdata.controllers[0].rot_quat[0],ssdata.controllers[0].rot_quat[1],ssdata.controllers[0].rot_quat[2],ssdata.controllers[0].rot_quat[3]);
-
-        int clbuttons = ssdata.controllers[1].buttons;
-        int crbuttons = ssdata.controllers[0].buttons;
-
-#if 0
-  camera.move(0, 0, camera.speed *   ssdata.controllers[0].joystick_y);
-  m_rotateX2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_x);
-  m_rotateY2(camera.keyb_rot_speed *.1 * ssdata.controllers[1].joystick_y);
-  m_rotateZ2(camera.keyb_rot_speed *.1 * -ssdata.controllers[0].joystick_x);
-#endif
-
-        //  DEBUG("%08x, %f", ssdata.controllers[0].buttons,
-        //  ssdata.controllers[0].trigger); DEBUG("%+7.7f %+7.7f %+7.7f, ",
-        //  ssdata.controllers[0].pos[0],ssdata.controllers[0].pos[1],ssdata.controllers[0].pos[2]);
-        //  DEBUG("%+7.7f %+7.7f %+7.7f",
-        //  ssdata.controllers[1].pos[0],ssdata.controllers[1].pos[1],ssdata.controllers[1].pos[2]);
-
-        float dx = ssdata.controllers[0].pos[0] - ssdata.controllers[1].pos[0];
-        float dy = ssdata.controllers[0].pos[1] - ssdata.controllers[1].pos[1];
-        float dz = ssdata.controllers[0].pos[2] - ssdata.controllers[1].pos[2];
-        float d = sqrt(dx * dx + dy * dy + dz * dz);
-
-        // DEBUG("%+7.7f", d);
-
-        // spot in between two hands.
-        dx =
-            (ssdata.controllers[0].pos[0] + ssdata.controllers[1].pos[0]) / 2.0;
-        dy =
-            (ssdata.controllers[0].pos[1] + ssdata.controllers[1].pos[1]) / 2.0;
-        dz =
-            (ssdata.controllers[0].pos[2] + ssdata.controllers[1].pos[2]) / 2.0;
-
-        // set neutral when any start button is pressed.
-        bool calibrate = (lbuttons | rbuttons | clbuttons | crbuttons) &
-                         SIXENSE_BUTTON_START;
-
-        if (calibrate) {
-          speed_base = d;
-          neutral_x = dx;
-          neutral_y = dy;
-          neutral_z = dz;
-        }
-
-        // distance between controllers is eye separation / speed multiplier.
-        speed_factor = d / speed_base;
-
-        //  DEBUG("triggers %+7.7f, %+7.7f", ssdata.controllers[0].trigger,
-        //  ssdata.controllers[1].trigger); DEBUG("buttons  %+7.7x, %+7.7x",
-        //  clbuttons, crbuttons);
-
-        // flip back&forth through keyframes w/ edge trigger of bumper button
-        // presses.
-        if ((clbuttons & SIXENSE_BUTTON_BUMPER) &&
-            ((clbuttons ^ lbuttons) & SIXENSE_BUTTON_BUMPER)) {
-          --keyframe;
-          if (keyframe >= keyframes.size())
-            keyframe = keyframes.size() - 1;
-          if (keyframe < keyframes.size()) {
-            next_camera = &keyframes[keyframe];
-          } else {
-            next_camera = &config;
-          }
-        }
-        lbuttons = clbuttons;
-
-        if ((crbuttons & SIXENSE_BUTTON_BUMPER) &&
-            ((crbuttons ^ rbuttons) & SIXENSE_BUTTON_BUMPER)) {
-          ++keyframe;
-          if (keyframe >= keyframes.size())
-            keyframe = 0;
-          if (keyframe < keyframes.size()) {
-            next_camera = &keyframes[keyframe];
-          } else {
-            next_camera = &config;
-          }
-        }
-        rbuttons = crbuttons;
-
-        dx = (neutral_x - dx) / 100.0;
-        dy = (neutral_y - dy) / 100.0;
-        dz = (neutral_z - dz) / 100.0;
-
-        // DEBUG("%+8.8lf %+8.8lf %+8.8lf", dx, dy, dz);
-
-        dx *= (camera.speed * speed_factor);
-        dy *= (camera.speed * speed_factor);
-        dz *= (camera.speed * speed_factor);
-        camera.move(-dx, -dy, dz);
-      }
-#endif // HYDRA
-
       if (!(ctlXChanged || ctlYChanged))
         consecutiveChanges = 0;
-
-      // We might have changed view. Preserve changes, minus HMD orientation.
-      if (mixedInOculus) {
-        camera.unmixSensorOrientation(view_q);
-      }
     }
 
     if (outputFilename != NULL) {
@@ -3278,15 +3190,12 @@ int main(int argc, char **argv) {
   camera.saveConfig("last.cfg",
                     &defines); // Save a config file on exit, just in case.
 
-#if defined(_WIN32)
   if (stereoMode == ST_OCULUS) {
-    ReleaseOculusSDK();
+    if (render.hmd) {
+      delete render.hmd;
+      render.hmd = nullptr;
+    }
   }
-#endif
-
-#if defined(HYDRA)
-  sixenseExit();
-#endif
 
   window.reset();
 

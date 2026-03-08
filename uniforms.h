@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-class KeyFrame;
+class Camera;
 
 // Generic uniform interface.
 class iUniform {
@@ -14,7 +14,7 @@ public:
   virtual bool parse(const std::string &line) = 0;
   virtual void send(int prog) = 0;      // send to shader
   virtual void bindToUI(void *bar) = 0; // register as tw var
-  virtual bool link(KeyFrame *kf) = 0;  // link to storage within keyframe.
+  virtual bool link(Camera *kf) = 0;    // link to storage within keyframe.
   virtual iUniform *Clone() = 0;
   virtual bool ok() = 0;
 };
@@ -58,7 +58,7 @@ public:
   bool parseFromGlsl(const std::string &glsl);
 
   // Map a uniform var to local storage backed by kf.
-  void link(KeyFrame *kf);
+  void link(Camera *kf);
 
   // Register linked vars with UI.
   void bindToUI(void *bar);

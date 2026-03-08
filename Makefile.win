@@ -10,23 +10,26 @@ clean:
 	del boxplorer2.exe shadershrink.exe edit-cfg.exe glsl-test.exe sdl2-test.exe
 	del boxplorer2.exp boxplorer2.lib
 
-CFLAGS=/nologo /ISDL2/include /I. /Iinclude /IAntTweakBar/include /IAntTweakBar/src /MD /D_CONSOLE /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DANT_DEBUG /DNO_HYDRA /DNO_HAVE_SDK4 /std:c++17
+CFLAGS=/nologo /ISDL2/include /I. /Iinclude /IAntTweakBar/include /IAntTweakBar/src /ILibOVR/Include /MD /D_CONSOLE /Gm- /EHsc /GS /W3 /WX- /Ox /DTW_NO_LIB_PRAGMA /DTW_STATIC /DANT_DEBUG /std:c++17
 
-LDFLAGS=/link /LIBPATH:SDL2/VisualC/x64/Release /SUBSYSTEM:console /nologo
+LDFLAGS=/link /LIBPATH:SDL2/VisualC/x64/Release /LIBPATH:LibOVR/Lib/Windows/x64/Release /SUBSYSTEM:console /nologo
 
 TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         TwPrecomp.obj LoadOGL.obj \
         TwEventSDL.obj TwEventSDL12.obj TwEventSDL13.obj TwEventSDL20.obj \
         LoadOGLCore.obj TwOpenGLCore.obj
 
-BX_OBJECTS = boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj glsl.obj TGA.obj utils.obj shader_manager.obj \
-        oculus_sdk4.obj
+BX_OBJECTS = boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj \
+						 glsl.obj TGA.obj utils.obj shader_manager.obj hmd.obj
 
 boxplorer2.exe: $(BX_OBJECTS) $(TW_OBJS) Makefile.win
 	link $(LDFLAGS) $(BX_OBJECTS) $(TW_OBJS)
 
 sdl2-test.exe: sdl2-test.cc Makefile.win
 	cl $(CFLAGS) sdl2-test.cc $(LDFLAGS)
+
+sdl2-haptic.exe: sdl2-haptic.cc Makefile.win
+	cl $(CFLAGS) sdl2-haptic.cc $(LDFLAGS)
 
 shadershrink.exe: shadershrink.cc Makefile.win
 	cl $(CFLAGS) shadershrink.cc $(LDFLAGS)
@@ -38,9 +41,10 @@ edit-cfg.exe: edit-cfg.cc Makefile.win
 	cl $(CFLAGS) edit-cfg.cc $(LDFLAGS)
 
 boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
-                glsl.h interpolate.h uniforms.h camera.h shader.h params.h \
+                glsl.h interpolate.h uniforms.h camera.h shader.h params.h hmd.h \
                 cfgs\menger.cfg.data\fragment.glsl include\setup.inc \
 								utils.h Makefile.win
+hmd.obj: hmd.cc hmd.h
 glsl.obj: glsl.cc glsl.h utils.h
 interpolate.obj: interpolate.cc interpolate.h utils.h
 shader.obj: shader.cc shader.h utils.h
