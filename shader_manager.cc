@@ -1,6 +1,5 @@
 
 #include "shader_manager.h"
-#include "oculus_sdk4.h" // For ST_OCULUS definition if needed? or just pass integer/bool
 #include "utils.h"
 
 using namespace std;
@@ -85,14 +84,6 @@ bool ShaderManager::loadHelpers(const string &defines, int stereoMode) {
   // glsl_source.append(fragment);
 
   bool ok = (effects.compile(defines, vertex, fragment) != 0);
-
-#if 0
-  // ST_OCULUS is an enum in boxplorer2.cc, hard to use here without full loop dependency or moving enum.
-  // Assuming 6 is ST_OCULUS for now, or we should move StereoMode to a header.
-  if (stereoMode == 6) { 
-    return ok;
-  }
-#endif
 
   string fxaa_vertex;
   string fxaa_fragment;
