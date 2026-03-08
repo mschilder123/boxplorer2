@@ -115,20 +115,16 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
 
   vec2 q;
   if (sign(speed) < 0.0) {
-    // left. 45 pixel shift towards center. Eyeballed.
-    q = (gl_FragCoord.xy - vec2(-ipd * 10.0 + 20.0, 0.0)) / vec2(halfx, yres);
+    // left. 220 pixel shift towards center. Eyeballed.
+    q = (gl_FragCoord.xy - vec2(-ipd * 10.0 + 220.0, 0.0)) / vec2(halfx, yres);
   } else {
-    // right. 45 pixel shift towards center.
-    q = (gl_FragCoord.xy - vec2(halfx + ipd * 10.0 - 20.0, 0.0)) / vec2(halfx, yres);
+    // right. 220 pixel shift towards center.
+    q = (gl_FragCoord.xy - vec2(halfx + ipd * 10.0 - 220.0, 0.0)) / vec2(halfx, yres);
   }
   vec2 p = -1.0 + 2.0 * q;
 
-  // Oculus barrel distort parameters.
-  vec3 oculus_warp = vec3(1.0, 0.22, 0.24);  // k0, k1, k2
-  vec2 oculus_scale = vec2(0.3, 0.35);  // x/y ratio eyeballed
-  float r2 = dot(p, p);  // Radius squared, from center.
-  float l1 = sqrt(r2);
-  p *= oculus_scale * dot(oculus_warp, vec3(1.0, r2, r2*r2));
+  vec2 oculus_scale = vec2(0.50, 0.55);  // x/y ratio eyeballed
+  p *= oculus_scale;
   float l2 = length(p);
   if (l2 > .5) { 
     // Don't waste time on pixels we can't see.
@@ -146,8 +142,8 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   eye_out = eye + eye_d;
 
   // Note: no asymmetric frustum for Rift.
-  // z value (0.35) determines fov. Eyeballed.
-  ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.35, 0.0)));
+  // z value (0.40) determines fov. Eyeballed.
+  ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.50, 0.0)));
 #else  // ST_OCULUS
 #if defined(ST_INTERLACED)
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
