@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
   bool done = false;
 
   SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-  SDL_Joystick *joystick = SDL_JoystickOpen(2);
+  SDL_Joystick *joystick = SDL_JoystickOpen(0);
 
   printf(__FUNCTION__ " : JoystickName '%s'\n", SDL_JoystickName(joystick));
   printf(__FUNCTION__ " : JoystickNumAxes   : %i\n",
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
          SDL_JoystickNumHats(joystick));
   SDL_JoystickEventState(SDL_ENABLE);
 
-  Sint16 axes[6] = {0};
+  Sint16 axes[8] = {0};
 
   while (!done) {
     ++frame;
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
         Sint16 v = event.jaxis.value;
         if (v < -5000 || v > 5000) {
           axes[event.jaxis.axis] = v;
-          for (int i = 0; i < 6; ++i) {
+          for (int i = 0; i < 8; ++i) {
             printf("%d:%8d ", i, axes[i]);
           }
           printf("\n");
