@@ -29,6 +29,12 @@ public:
     std::cout << t;
     return ll;
   }
+
+  template <typename T>
+  friend cout_logger &operator<<(cout_logger &ll, const T &t) {
+    std::cout << t;
+    return ll;
+  }
 };
 #define DEBUG(fmt, ...)                                                        \
   cout_logger(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
