@@ -180,7 +180,7 @@ public:
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     double z_near = fabs(speed);
-    double z_far = speed * 65535.0;
+    double z_far = z_near * 65535.0;
     double fH = tan(fov_y * PI / 360.0f) * z_near;
     double fW = tan(fov_x * PI / 360.0f) * z_near;
     glFrustum(-fW, fW, -fH, fH, z_near, z_far);
