@@ -1,10 +1,8 @@
 // syntopia's Fragmentarium Life.
 // coloring and tweaks by marius.
 
-varying vec3 dir;
-
 uniform sampler2D iBackbuffer;
-uniform float xres, yres, time;
+uniform float xres, yres;
 uniform vec3 par[2];
 
 #define decayR par[0].x  // {min=0 max=1 step=.0001}
