@@ -1991,6 +1991,7 @@ int main(int argc, char **argv) {
 
   float hmd_view_q[4] = {0, 0, 0, 1};
   float hmd_pos[3] = {0, 0, 0};
+  float hmd_ipd = 0.067;
 
   uint32_t poll_ticks = SDL_GetTicks();
 
@@ -2079,12 +2080,13 @@ int main(int argc, char **argv) {
         // now mix in orientation (and translation..)
         if (stereoMode == ST_OCULUS) {
           if (mixedInHmd) {
-            camera.unmixHmdPose(hmd_view_q, hmd_pos);
+            camera.unmixHmdPose(hmd_view_q, hmd_pos, hmd_ipd);
             mixedInHmd = false; // TODO: Camera field vs. local flag?
           }
 
-          if (render.hmd && render.hmd->GetHeadPose(hmd_view_q, hmd_pos)) {
-            camera.mixHmdPose(hmd_view_q, hmd_pos);
+          if (render.hmd &&
+              render.hmd->GetHeadPose(hmd_view_q, hmd_pos, &hmd_ipd)) {
+            camera.mixHmdPose(hmd_view_q, hmd_pos, hmd_ipd);
             mixedInHmd = true;
           }
         }

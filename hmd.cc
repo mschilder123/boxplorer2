@@ -320,7 +320,7 @@ public:
     return true;
   }
 
-  bool GetHeadPose(float hmd_quat[4], float hmd_pos[3]) {
+  bool GetHeadPose(float hmd_quat[4], float hmd_pos[3], float *ipd) {
     bool result = false;
 
 #if 1
@@ -334,6 +334,10 @@ public:
 
     ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyePose, EyeRenderPose,
                     &sensorSampleTime);
+
+    *ipd = (Vector3f(EyeRenderPose[0].Position) -
+            Vector3f(EyeRenderPose[1].Position))
+               .Length();
 
     ovrQuatf lq = EyeRenderPose[0].Orientation;
 

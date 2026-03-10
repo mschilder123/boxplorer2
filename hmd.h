@@ -9,7 +9,7 @@ public:
 
   virtual bool BlitFrom(unsigned int srcFbo, int width, int height) = 0;
 
-  virtual bool GetHeadPose(float hmd_quat[4], float hmd_pos[3]) = 0;
+  virtual bool GetHeadPose(float hmd_quat[4], float hmd_pos[3], float *ipd) = 0;
   virtual bool GetLeftHandPose(float hmd_quat[4], float hmd_pos[3]) = 0;
   virtual bool GetRightHandPose(float hmd_quat[4], float hmd_pos[3]) = 0;
 

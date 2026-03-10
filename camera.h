@@ -489,8 +489,14 @@ public:
     }
   }
 
+  double hmdScaleFactor(float ipd) {
+    const double virtual_ipd = fabs(speed) * 2.0;
+    const double real_ipd = ipd;
+    return virtual_ipd / real_ipd;
+  }
+
   // take this->q and q and produce this->v,q := this->q + q
-  void mixHmdPose(float q[4], float p[3]) {
+  void mixHmdPose(float q[4], float p[3], float ipd) {
     double q1[4];
 
     q1[0] = q[0];
@@ -512,15 +518,15 @@ public:
     this->q[2] = q1[2];
     this->q[3] = q1[3];
 
-    const float f = abs(this->speed) * 80.0;
+    const double f = this->hmdScaleFactor(ipd);
     this->move(f * +p[0], f * +p[1], f * -p[2]);
   }
 
   // take this->v and q and produce this->v,q := this->v - q
-  void unmixHmdPose(float q[4], float p[3]) {
+  void unmixHmdPose(float q[4], float p[3], float ipd) {
     double q1[4];
 
-    const float f = abs(this->speed) * 80.0;
+    const double f = this->hmdScaleFactor(ipd);
     this->move(f * -p[0], f * -p[1], f * +p[2]);
 
     q1[0] = q[0];
