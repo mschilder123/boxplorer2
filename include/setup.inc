@@ -176,7 +176,7 @@ void write_pixel(vec3 ray, float z, vec3 finalCol) {
 
   // compute CoC, thin lens model
   float P = abs(focus + 30.0) * zNear;
-  float D = max(zNear, z);;
+  float D = max(zNear, z);
   float A = aperture;
   float F = 8.*abs(speed); //~focalLength;
   float CoC = abs(A*(F*(P-D))/(D*(P-F)));
