@@ -2084,10 +2084,11 @@ int main(int argc, char **argv) {
             mixedInHmd = false; // TODO: Camera field vs. local flag?
           }
 
-          if (render.hmd &&
-              render.hmd->GetHeadPose(hmd_view_q, hmd_pos, &hmd_ipd)) {
-            camera.mixHmdPose(hmd_view_q, hmd_pos, hmd_ipd);
-            mixedInHmd = true;
+          if (render.hmd != nullptr) {
+            if (render.hmd->GetHeadPose(hmd_view_q, hmd_pos, &hmd_ipd)) {
+              camera.mixHmdPose(hmd_view_q, hmd_pos, hmd_ipd);
+              mixedInHmd = true;
+            }
           }
         }
 

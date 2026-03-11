@@ -153,8 +153,8 @@ struct OculusTextureBuffer {
 
     // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboId);
 
-    CHECK_ERROR;
-    CHECK_FRAMEBUFFER;
+    // CHECK_ERROR;
+    // CHECK_FRAMEBUFFER;
   }
 
   void UnsetRenderSurface() {
@@ -238,7 +238,7 @@ public:
   bool BlitFrom(GLuint srcFbo, int width, int height) {
     ovrTimewarpProjectionDesc posTimewarpProjectionDesc = {};
 
-    // Render Scene to Eye Buffers
+    // Blit Scene to Eye Buffers
     for (int eye = 0; eye < 2; ++eye) {
       // Switch to eye render target
       eyeRenderTexture[eye]->SetAndClearRenderSurface();
@@ -249,7 +249,6 @@ public:
       posTimewarpProjectionDesc =
           ovrTimewarpProjectionDesc_FromProjection(proj, ovrProjection_None);
 
-#if 1
       // Blit eye halves
       glBindFramebuffer(GL_READ_FRAMEBUFFER, srcFbo);
       Sizei dstSize = eyeRenderTexture[eye]->GetSize();
@@ -269,10 +268,9 @@ public:
             GL_COLOR_BUFFER_BIT /*| GL_DEPTH_BUFFER_BIT, GL_NEAREST*/,
             GL_LINEAR);
       }
-#endif
 
-      CHECK_ERROR;
-      CHECK_FRAMEBUFFER;
+      // CHECK_ERROR;
+      // CHECK_FRAMEBUFFER;
 
       // Avoids an error when calling SetAndClearRenderSurface during next
       // iteration. Without this, during the next while loop iteration
@@ -305,7 +303,7 @@ public:
     ovrResult result =
         ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
 
-    CHECK_ERROR;
+    // CHECK_ERROR;
 
     // exit the rendering loop if submit returns an error, will retry on
     // ovrError_DisplayLost
@@ -321,9 +319,6 @@ public:
   }
 
   bool GetHeadPose(float hmd_quat[4], float hmd_pos[3], float *ipd) {
-    bool result = false;
-
-#if 1
     eyeRenderDesc[0] =
         ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
     eyeRenderDesc[1] =
@@ -353,49 +348,10 @@ public:
     hmd_pos[2] =
         (EyeRenderPose[0].Position.z + EyeRenderPose[1].Position.z) / 2;
 
-#if 0
-  DEBUG("lpos") << ":" << EyeRenderPose[0].Position.x
-                << "," << EyeRenderPose[0].Position.y
-                << "," << EyeRenderPose[0].Position.z;
-#endif
-
-    ovrQuatf rq = EyeRenderPose[1].Orientation;
-
-    // left and right eye direction should be equal
-    assert(lq.x == rq.x);
-    assert(lq.y == rq.y);
-    assert(lq.z == rq.z);
-    assert(lq.w == rq.w);
-
-#if 0
-  DEBUG("rpos") << ":" << EyeRenderPose[1].Position.x
-                << "," << EyeRenderPose[1].Position.y
-                << "," << EyeRenderPose[1].Position.z;
-#endif
-#endif
-
-#if 1
     double frameTime = ovr_GetPredictedDisplayTime(session, 0);
     trackingState = ovr_GetTrackingState(session, frameTime, ovrTrue);
 
-#if 0
-    ovrPoseStatef leftPose = trackingState.HandPoses[ovrHand_Left];
-#endif
-
-#if 0
-  DEBUG("lcdir") << ":" << leftPose.ThePose.Orientation.x
-                 << "," << leftPose.ThePose.Orientation.y
-                 << "," << leftPose.ThePose.Orientation.z;
-
-  DEBUG("lcpos") << ":" << leftPose.ThePose.Position.x
-                 << "," << leftPose.ThePose.Position.y
-                 << "," << leftPose.ThePose.Position.z;
-#endif
-#endif
-
-    result = true;
-
-    return result;
+    return true;
   }
 
   bool _getHandPose(ovrPoseStatef pose, float hmd_quat[4], float hmd_pos[3]) {
