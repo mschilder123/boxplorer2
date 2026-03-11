@@ -368,6 +368,19 @@ public:
     }
   }
 
+  // Only set the few uniforms that might differ between left and right halves.
+  void setUniforms2(float x_scale, float x_offset, float y_scale,
+                    float y_offset, double spd, GLuint program) {
+    glUniform1f(glGetUniformLocation(program, "x_scale"), x_scale);
+    glUniform1f(glGetUniformLocation(program, "x_offset"), x_offset);
+    glUniform1f(glGetUniformLocation(program, "y_scale"), y_scale);
+    glUniform1f(glGetUniformLocation(program, "y_offset"), y_offset);
+    glUniform1f(glGetUniformLocation(program, "speed"), spd);
+    if (glUniform1d) {
+      glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
+    }
+  }
+
   // Send parameters to gpu.
   void setUniforms(float x_scale, float x_offset, float y_scale, float y_offset,
                    double spd, GLuint program) {
@@ -396,21 +409,14 @@ public:
     glSetUniformf(fov_x);
     glSetUniformf(fov_y);
 
-    glSetUniformf(x_scale);
-    glSetUniformf(x_offset);
-    glSetUniformf(y_scale);
-    glSetUniformf(y_offset);
-
     glSetUniformf(time);
 
-    glUniform1f(glGetUniformLocation(program, "speed"), spd);
     glUniform1f(glGetUniformLocation(program, "ipd"), ipd);
     glUniform1f(glGetUniformLocation(program, "xres"), width);
     glUniform1f(glGetUniformLocation(program, "yres"), height);
 
     // Also pass in some double precision values, if supported.
     if (glUniform1d) {
-      glUniform1d(glGetUniformLocation(program, "dspeed"), spd);
       // For some reason 3dv below stopped working reliably..
       glUniform1d(glGetUniformLocation(program, "deyex"), pos()[0]);
       glUniform1d(glGetUniformLocation(program, "deyey"), pos()[1]);
@@ -429,6 +435,8 @@ public:
 
     // New-style discovered && active uniforms only.
     uniforms.send(program);
+
+    setUniforms2(x_scale, x_offset, y_scale, y_offset, spd, program);
   }
 
   void render(enum StereoMode stereo, ViewQuadrant vq, GLuint program,
@@ -438,7 +446,7 @@ public:
     case ST_OVERUNDER: { // left / right
       setUniforms(1.0, 0.0, 2.0, 1.0, +speed, program);
       glRects(-1, -1, 1, 0); // draw bottom half of screen
-      setUniforms(1.0, 0.0, 2.0, -1.0, -speed, program);
+      setUniforms2(1.0, 0.0, 2.0, -1.0, -speed, program);
       glRects(-1, 0, 1, 1); // draw top half of screen
     } break;
     case ST_QUADBUFFER: { // left - right
@@ -446,19 +454,19 @@ public:
       setUniforms(1.0, 0.0, 1.0, 0.0, -speed * polarity, program);
       glRects(-1, -1, 1, 1);
       glDrawBuffer(GL_BACK_RIGHT);
-      setUniforms(1.0, 0.0, 1.0, 0.0, +speed * polarity, program);
+      setUniforms2(1.0, 0.0, 1.0, 0.0, +speed * polarity, program);
       glRects(-1, -1, 1, 1);
     } break;
     case ST_XEYED: { // right | left
       setUniforms(2.0, +1.0, 1.0, 0.0, +speed, program);
       glRectf(-1, -1, 0, 1); // draw left half of screen
-      setUniforms(2.0, -1.0, 1.0, 0.0, -speed, program);
+      setUniforms2(2.0, -1.0, 1.0, 0.0, -speed, program);
       glRectf(0, -1, 1, 1); // draw right half of screen
     } break;
     case ST_SIDEBYSIDE: { // left | right
       setUniforms(2.0, +1.0, 1.0, 0.0, -speed, program);
       glRectf(-1, -1, 0, 1); // draw left half of screen
-      setUniforms(2.0, -1.0, 1.0, 0.0, +speed, program);
+      setUniforms2(2.0, -1.0, 1.0, 0.0, +speed, program);
       glRectf(0, -1, 1, 1); // draw right half of screen
     } break;
     case ST_NONE:
@@ -477,7 +485,7 @@ public:
     case ST_OCULUS:
       setUniforms(2.0, +1.0, 1.0, 0.0, -speed, program);
       glRectf(-1, -1, 0, 1); // draw left half of screen
-      setUniforms(2.0, -1.0, 1.0, 0.0, +speed, program);
+      setUniforms2(2.0, -1.0, 1.0, 0.0, +speed, program);
       glRectf(0, -1, 1, 1); // draw right half of screen
       break;
     case ST_COMPUTE_DE_ONLY:
