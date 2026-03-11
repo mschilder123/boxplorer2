@@ -333,11 +333,11 @@ struct RenderContext {
 // current glContext. Leaks detected with AMD CodeXL.
 void clearGlContext() {
   // release shaders.
-  ::render.shaderManager.fractal.clear();
-  ::render.shaderManager.effects.clear();
-  ::render.shaderManager.dof.clear();
-  ::render.shaderManager.de_shader.clear();
-  ::render.shaderManager.fxaa.clear();
+  render.shaderManager.fractal.clear();
+  render.shaderManager.effects.clear();
+  render.shaderManager.dof.clear();
+  render.shaderManager.de_shader.clear();
+  render.shaderManager.fxaa.clear();
 
   // delete fbos and textures.
   glDeleteTextures(1, &render.de_texture);
@@ -1004,28 +1004,27 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
   // Needs to be done after setting the video mode.
   enableShaderProcs() || DIE("This program needs support for GLSL shaders.");
 
-  ::render.shaderManager.loadFractal(defines) ||
-      DIE("Error in GLSL ::render.shaderManager.fractal shader "
+  render.shaderManager.loadFractal(defines) ||
+      DIE("Error in GLSL render.shaderManager.fractal shader "
           "compilation:\n%s",
-          ::render.shaderManager.fractal.log().c_str());
+          render.shaderManager.fractal.log().c_str());
 
-  ::render.shaderManager.loadHelpers(defines, stereoMode) ||
-      DIE("Error in GLSL ::render.shaderManager.effects shader "
+  render.shaderManager.loadHelpers(defines, stereoMode) ||
+      DIE("Error in GLSL render.shaderManager.effects shader "
           "compilation:\n%s",
-          ::render.shaderManager.effects.log().c_str());
+          render.shaderManager.effects.log().c_str());
 
   glEnable(GL_TEXTURE_2D);
 
   if (!config.disable_de) {
 #if defined(GL_RGBA32F) // We need this to be actually capable of GL_FLOAT
     // Try compile same shader to get a minimal DE computation version.
-    ::render.shaderManager.loadDEShader(defines,
-                                        "#define ST_COMPUTE_DE_ONLY\n");
+    render.shaderManager.loadDEShader(defines, "#define ST_COMPUTE_DE_ONLY\n");
 
-    if (!::render.shaderManager.de_shader.ok()) {
-      DEBUG("::render.shaderManager.de_shader failed to "
+    if (!render.shaderManager.de_shader.ok()) {
+      DEBUG("render.shaderManager.de_shader failed to "
             "compile: no GPU de.");
-      DEBUG(":\n%s", ::render.shaderManager.de_shader.log().c_str());
+      DEBUG(":\n%s", render.shaderManager.de_shader.log().c_str());
       while (glGetError() != GL_NO_ERROR)
         ;
     } else {
@@ -1170,7 +1169,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    if (::render.shaderManager.dof.ok()) {
+    if (render.shaderManager.dof.ok()) {
       // Create and initialize blur fbos.
 
       glGenTextures(ARRAYSIZE(render.blurTex), render.blurTex);
@@ -1210,7 +1209,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
       }
     }
 
-    if (::render.shaderManager.dof.ok() || ::render.shaderManager.fxaa.ok()) {
+    if (render.shaderManager.dof.ok() || render.shaderManager.fxaa.ok()) {
 
       // Create and initialize scratch fbo.
 
@@ -1239,11 +1238,11 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glBindTexture(GL_TEXTURE_2D, 0);
-    } // ::render.shaderManager.dof.ok() || ::render.shaderManager.fxaa.ok()
+    } // render.shaderManager.dof.ok() || render.shaderManager.fxaa.ok()
 
-    if (::render.shaderManager.fxaa.ok()) {
+    if (render.shaderManager.fxaa.ok()) {
 
-      // Create and initialize ::render.shaderManager.fxaa fbo
+      // Create and initialize render.shaderManager.fxaa fbo
 
       glGenTextures(1, &render.fxaaTex);
       glGenFramebuffers(1, &render.fxaaFbo);
@@ -1270,7 +1269,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
 
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glBindTexture(GL_TEXTURE_2D, 0);
-    } // ::render.shaderManager.fxaa.ok()
+    } // render.shaderManager.fxaa.ok()
   }
 
   if (stereoMode == ST_OCULUS) {
@@ -1444,16 +1443,15 @@ void borderLifeform(int frameno) {
 TwBar *bar = NULL;
 
 // Find '\n#define foo par[x].z  // {twbar params}' in
-// ::render.shaderManager.glsl_source.
+// render.shaderManager.glsl_source.
 void initTwParDefines() {
   size_t start = 0;
-  while ((start = ::render.shaderManager.glsl_source.find(
+  while ((start = render.shaderManager.glsl_source.find(
               "\n#define ", start + 1)) != string::npos) {
-    size_t eol = ::render.shaderManager.glsl_source.find("\n", start + 1);
+    size_t eol = render.shaderManager.glsl_source.find("\n", start + 1);
     if (eol == string::npos)
       continue;
-    string line(::render.shaderManager.glsl_source, start + 1,
-                eol - (start + 1));
+    string line(render.shaderManager.glsl_source, start + 1, eol - (start + 1));
 
     size_t parStart = line.find(" par[");
     if (parStart == string::npos || parStart < 8)
@@ -1493,15 +1491,14 @@ void initTwParDefines() {
   }
 }
 
-// Find '\nuniform <type> name;' in ::render.shaderManager.glsl_source.
+// Find '\nuniform <type> name;' in render.shaderManager.glsl_source.
 // Pick up type and twbar params, if found.
 void initTwUniform(const string &name, void *addr) {
   size_t start = 0;
-  while ((start = ::render.shaderManager.glsl_source.find(
+  while ((start = render.shaderManager.glsl_source.find(
               "\nuniform ", start + 1)) != string::npos) {
-    size_t eol = ::render.shaderManager.glsl_source.find("\n", start + 1);
-    string line(::render.shaderManager.glsl_source, start + 1,
-                eol - (start + 1));
+    size_t eol = render.shaderManager.glsl_source.find("\n", start + 1);
+    string line(render.shaderManager.glsl_source, start + 1, eol - (start + 1));
 
     size_t attr_start = line.find("{");
     size_t attr_end = line.find("}");
@@ -1540,24 +1537,24 @@ void initTwBar(enum StereoMode stereoMode) {
     TwDefine("GLOBAL fontsize=3");
   }
 
-  if (::render.shaderManager.fxaa.ok()) {
+  if (render.shaderManager.fxaa.ok()) {
     TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "group=post");
   }
 
-  if (::render.shaderManager.dof.ok()) {
+  if (render.shaderManager.dof.ok()) {
     TwAddVarRW(bar, "dof", TW_TYPE_BOOL32, &camera.enable_dof, "group=post");
     TwAddVarRW(bar, "aperture", TW_TYPE_FLOAT, &camera.aperture,
                "min=0.0 max=10.0 step=0.01 group=post");
   }
-  if (::render.shaderManager.effects.uniform_location("exposure") != -1) {
+  if (render.shaderManager.effects.uniform_location("exposure") != -1) {
     TwAddVarRW(bar, "exposure", TW_TYPE_FLOAT, &config.exposure,
                "min=0.0 max=5.0 step=0.01 group=post");
   }
-  if (::render.shaderManager.effects.uniform_location("maxBright") != -1) {
+  if (render.shaderManager.effects.uniform_location("maxBright") != -1) {
     TwAddVarRW(bar, "maxBright", TW_TYPE_FLOAT, &config.maxBright,
                "min=0.0 max=5.0 step=0.01 group=post");
   }
-  if (::render.shaderManager.effects.uniform_location("gamma") != -1) {
+  if (render.shaderManager.effects.uniform_location("gamma") != -1) {
     TwAddVarRW(bar, "gamma", TW_TYPE_FLOAT, &config.gamma,
                "min=0.0 max=5.0 step=0.01 group=post");
   }
@@ -1692,10 +1689,9 @@ int main(int argc, char **argv) {
       fullscreen = true;
     } else if (!strcmp(argv[argc - 1], "--speed")) {
       configSpeed = true;
-    } else if (!strcmp(argv[argc - 1],
-                       "--disable-::render.shaderManager.dof")) {
+    } else if (!strcmp(argv[argc - 1], "--disable-render.shaderManager.dof")) {
       enableDoF = -1;
-    } else if (!strcmp(argv[argc - 1], "--enable-::render.shaderManager.dof")) {
+    } else if (!strcmp(argv[argc - 1], "--enable-render.shaderManager.dof")) {
       enableDoF = 1;
     } else if (!strcmp(argv[argc - 1], "--disable-de")) {
       disableDE = -1;
@@ -1794,7 +1790,7 @@ int main(int argc, char **argv) {
   if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER ||
       stereoMode == ST_ANAGLYPH) {
     config.enable_dof =
-        0; // ::render.shaderManager.fxaa post does not work for these.
+        0; // render.shaderManager.fxaa post does not work for these.
   }
   if (disableDE)
     config.disable_de = (disableDE == -1); // override
@@ -1804,13 +1800,13 @@ int main(int argc, char **argv) {
     // Fix resolution for optimal performance.
     // config.width = 1280; config.height = 800;  // DK1
     // config.fov_x = 110; config.fov_y = 94.0;  // DK1
-    config.width = 2 * 1824; // 5408;  // quest3
+    config.width = 2 * 1824; // 5408;  // quest3 // TODO get from render.hmd
     config.height = 1968;    // 2736;
     config.fov_x = 110.0;
     config.fov_y = 96.0;
     fixedFov = true;
-    // Enable multipass but not ::render.shaderManager.dof and
-    // ::render.shaderManager.fxaa?
+    // Enable multipass but not render.shaderManager.dof and
+    // render.shaderManager.fxaa?
     config.backbuffer = 1;
     config.enable_fxaa = 1;
     config.enable_dof = 1;
@@ -1899,10 +1895,10 @@ int main(int argc, char **argv) {
   }
 
   // Parse as many uniforms from glsl source as we can find.
-  uniforms.parseFromGlsl(::render.shaderManager.glsl_source);
+  uniforms.parseFromGlsl(render.shaderManager.glsl_source);
 
   // TODO: prune uniforms to just those reported active by shader compiler.
-  cout << ::render.shaderManager.fractal.uniforms();
+  cout << render.shaderManager.fractal.uniforms();
 
   // Bind as many uniforms as we can find a match for to camera.
   uniforms.link(&camera);
@@ -2084,7 +2080,7 @@ int main(int argc, char **argv) {
             mixedInHmd = false; // TODO: Camera field vs. local flag?
           }
 
-          if (render.hmd != nullptr) {
+          if (render.hmd) {
             if (render.hmd->GetHeadPose(hmd_view_q, hmd_pos, &hmd_ipd)) {
               camera.mixHmdPose(hmd_view_q, hmd_pos, hmd_ipd);
               mixedInHmd = true;
@@ -2112,7 +2108,7 @@ int main(int argc, char **argv) {
             de = de_func_64 ? GLSL::abs(de_func_64(pos))
                             : GLSL::abs(de_func(pos));
 
-          } else if (::render.shaderManager.de_shader.ok()) {
+          } else if (render.shaderManager.de_shader.ok()) {
             // We did not find a CPU based DE; try the GPU based one.
             glDisable(GL_DEPTH_TEST);
             glBindFramebuffer(GL_FRAMEBUFFER, render.de_fbo);
@@ -2124,10 +2120,10 @@ int main(int argc, char **argv) {
             // Compute DE using shader.
             // We'll read the result next round so no costly glFinish needed.
             // TODO: use for auto-focus using center-weighted samples?
-            GLuint program = ::render.shaderManager.de_shader.program();
+            GLuint program = render.shaderManager.de_shader.program();
             glUseProgram(program);
             camera.render(ST_COMPUTE_DE_ONLY, VQ_FRONT, program,
-                          ::render.polarity);
+                          render.polarity);
 
             glUseProgram(0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2145,19 +2141,19 @@ int main(int argc, char **argv) {
       glDepthFunc(GL_ALWAYS); // we're writing Z every pixel
       // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      GLuint program = ::render.shaderManager.fractal.program();
-      glUseProgram(program); // the ::render.shaderManager.fractal shader
+      GLuint program = render.shaderManager.fractal.program();
+      glUseProgram(program); // the render.shaderManager.fractal shader
 
       // Figure out whether to render direct or via fbo.
-      // A backbuffer (e.g. previous frame), or ::render.shaderManager.dof or
-      // ::render.shaderManager.fxaa requires rendering to fbo.
+      // A backbuffer (e.g. previous frame), or render.shaderManager.dof or
+      // render.shaderManager.fxaa requires rendering to fbo.
       multiPass = (config.enable_dof &&
-                   ((::render.shaderManager.dof.ok() && camera.enable_dof &&
+                   ((render.shaderManager.dof.ok() && camera.enable_dof &&
                      camera.aperture != 0) ||
-                    (::render.shaderManager.fxaa.ok() && camera.fxaa))) ||
+                    (render.shaderManager.fxaa.ok() && camera.fxaa))) ||
                   config.backbuffer;
 
-      // Set up input texture to ::render.shaderManager.fractal shader.
+      // Set up input texture to render.shaderManager.fractal shader.
       if (render.background_texture) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, render.background_texture);
@@ -2186,7 +2182,7 @@ int main(int argc, char **argv) {
           // Hack: render to render.fxaaFbo
           glBindFramebuffer(GL_FRAMEBUFFER, render.mainFbo[frameno & 1]);
 
-          camera.render(stereoMode, vq, program, ::render.polarity);
+          camera.render(stereoMode, vq, program, render.polarity);
 
           char filename[256];
           sprintf(filename, "cube-%05d%c.tga", frameno, VQ_LETTER[vq]);
@@ -2196,10 +2192,10 @@ int main(int argc, char **argv) {
         glViewport(0, 0, window.width(), window.height());
       } else {
         if (stereoMode == ST_DOME) {
-          camera.render(stereoMode, VQ_UP, program, ::render.polarity);
+          camera.render(stereoMode, VQ_UP, program, render.polarity);
         } else {
           // This is where the tflops go..
-          camera.render(stereoMode, VQ_FRONT, program, ::render.polarity);
+          camera.render(stereoMode, VQ_FRONT, program, render.polarity);
         }
       }
 
@@ -2231,15 +2227,14 @@ int main(int argc, char **argv) {
         // glGenerateMipmap(GL_TEXTURE_2D);
       }
 
-      if (::render.shaderManager.fxaa.ok() && config.enable_fxaa &&
-          camera.fxaa) {
-        // We have a ::render.shaderManager.fxaa shader.
+      if (render.shaderManager.fxaa.ok() && config.enable_fxaa && camera.fxaa) {
+        // We have a render.shaderManager.fxaa shader.
         // Compute and point currentFrame(s) at output.
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, currentFrame);
 
         glBindFramebuffer(GL_FRAMEBUFFER, render.fxaaFbo);
-        GLuint program = ::render.shaderManager.fxaa.program();
+        GLuint program = render.shaderManager.fxaa.program();
         glUseProgram(program);
         glUniform1i(glGetUniformLocation(program, "iTexture"), 0);
         glUniform1f(glGetUniformLocation(program, "xres"), config.width);
@@ -2250,13 +2245,13 @@ int main(int argc, char **argv) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         currentFrame = render.fxaaTex; // Our output is input for next stage.
-      }                                // ::render.shaderManager.fxaa
+      }                                // render.shaderManager.fxaa
 
       CHECK_ERROR;
 
-      if (::render.shaderManager.dof.ok() && config.enable_dof &&
+      if (render.shaderManager.dof.ok() && config.enable_dof &&
           camera.enable_dof && camera.aperture != 0) {
-        // We have a ::render.shaderManager.dof shader.
+        // We have a render.shaderManager.dof shader.
         // Compute iBlur0 and iBlur1
         for (int i = 0; i < NBLUR * 2; ++i) {
 
@@ -2295,7 +2290,7 @@ int main(int argc, char **argv) {
           glBindTexture(GL_TEXTURE_2D,
                         render.mainDepth[frameno & 1]); // current depth
 
-          GLuint dof_program = ::render.shaderManager.dof.program();
+          GLuint dof_program = render.shaderManager.dof.program();
           glUseProgram(dof_program);
 
           glUniform1i(glGetUniformLocation(dof_program, "iTexture"), 0);
@@ -2320,7 +2315,7 @@ int main(int argc, char **argv) {
       CHECK_ERROR;
 
       // Combine input(s) into final frame.
-      GLuint final_program = ::render.shaderManager.effects.program();
+      GLuint final_program = render.shaderManager.effects.program();
       glUseProgram(final_program);
 
       glEnable(GL_TEXTURE_2D);
@@ -2341,7 +2336,7 @@ int main(int argc, char **argv) {
       glBindTexture(GL_TEXTURE_2D, render.mainDepth[frameno & 1]);
       glUniform1i(glGetUniformLocation(final_program, "iDepth"), 1);
 
-      if (::render.shaderManager.dof.ok() && camera.enable_dof &&
+      if (render.shaderManager.dof.ok() && camera.enable_dof &&
           camera.aperture != 0) {
         // Pass blur textures as 2 and 3, if we computed them.
         glActiveTexture(GL_TEXTURE2);
@@ -2724,7 +2719,7 @@ int main(int argc, char **argv) {
           // or print screenshot (w/ ctrl).
           case SDLK_p: {
             if (!hasCtrl) {
-              ::render.polarity *= -1;
+              render.polarity *= -1;
             } else {
               // Save config and screenshot (filename = current time).
               time_t t = time(0);
