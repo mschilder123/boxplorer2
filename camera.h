@@ -499,6 +499,11 @@ public:
   void mixHmdPose(float q[4], float p[3], float ipd) {
     double q1[4];
 
+    // first translate
+    const double f = this->hmdScaleFactor(ipd);
+    this->move(f * +p[0], f * +p[1], f * -p[2]);
+
+    // then add orientation
     q1[0] = q[0];
     q1[1] = q[1];
     q1[2] = q[2];
@@ -517,18 +522,13 @@ public:
     this->q[1] = q1[1];
     this->q[2] = q1[2];
     this->q[3] = q1[3];
-
-    const double f = this->hmdScaleFactor(ipd);
-    this->move(f * +p[0], f * +p[1], f * -p[2]);
   }
 
   // take this->v and q and produce this->v,q := this->v - q
   void unmixHmdPose(float q[4], float p[3], float ipd) {
     double q1[4];
 
-    const double f = this->hmdScaleFactor(ipd);
-    this->move(f * -p[0], f * -p[1], f * +p[2]);
-
+    // undo orientation
     q1[0] = q[0];
     q1[1] = q[1];
     q1[2] = q[2];
@@ -550,5 +550,9 @@ public:
     this->q[1] = q1[1];
     this->q[2] = q1[2];
     this->q[3] = q1[3];
+
+    // undo translation
+    const double f = this->hmdScaleFactor(ipd);
+    this->move(f * -p[0], f * -p[1], f * +p[2]);
   }
 };
