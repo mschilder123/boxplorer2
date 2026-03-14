@@ -56,6 +56,9 @@ public:
   PROCESS_COMMON_PARAMS
 #undef PROCESS
 
+  float iLightPos[3];  // hmd left hand torch
+  float iLightDir[3];
+
   // Par[] parameter array.
   float par[NUMPARS][3]; // min(|this|, |glsl|) gets sent to shader.
 
@@ -503,6 +506,40 @@ public:
     return virtual_ipd / real_ipd;
   }
 
+  // Call before mixHmdPose()
+  void setLeftHandPose(float q[4], float p[3], float ipd) {
+    // set position
+    const double f = this->hmdScaleFactor(ipd);
+    this->move(f * +p[0], f * +p[1], f * -p[2]);
+
+    this->iLightPos[0] = pos()[0];
+    this->iLightPos[1] = pos()[1];
+    this->iLightPos[2] = pos()[2];
+
+    // undo move
+    this->move(f * -p[0], f * -p[1], f * +p[2]);
+
+    // set direction
+    double q1[4];
+    q1[0] = q[0];
+    q1[1] = q[1];
+    q1[2] = q[2];
+    q1[3] = q[3];
+
+    q1[2] = -q1[2]; // We roll other way
+    qnormalize(q1);
+
+    // combine current view quat with sensor quat.
+    qmul(q1, this->q);
+
+    double v[16];
+    quat2mat(q1, v);
+
+    this->iLightDir[0] = v[8];  // ahead()
+    this->iLightDir[1] = v[9];
+    this->iLightDir[2] = v[10];
+  }
+
   // take this->q and q and produce this->v,q := this->q + q
   void mixHmdPose(float q[4], float p[3], float ipd) {
     double q1[4];
@@ -518,7 +555,7 @@ public:
     q1[3] = q[3];
 
     q1[2] = -q1[2]; // We roll other way
-    qnormalize(q1);
+    // qnormalize(q1); // should have been normalized, still would be normalized
 
     // combine current view quat with sensor quat.
     qmul(q1, this->q);

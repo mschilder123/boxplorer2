@@ -33,7 +33,7 @@ void mslerp(const double *m1, const double *m2, double *mr, double t) {
   quat2mat(qr, mr);
 }
 
-// Leaves m[12..14] untouched.
+// Leaves m[12..14] aka posistion untouched.
 void quat2mat(const double *q, double *m) {
   double x2, y2, z2, xy, xz, xw, yz, yw, zw;
   x2 = 2 * q[0] * q[0];

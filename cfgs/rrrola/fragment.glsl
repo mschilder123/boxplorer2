@@ -8,6 +8,11 @@
 #define DECLARE_COLORING(x)
 #define INOUT(a,b) inout a b
 
+#ifdef d
+#undef d
+#define d de_combo
+#endif
+
 // distance estimator func
 #ifndef d
 #define d de_mandelbox // PKlein,combi,menger,mandelbox,ssponge
@@ -19,7 +24,7 @@
 #endif
 
 #include "setup.inc"
-#line 24
+#line 22
 
 // Colors. Can be negative or >1 for interestiong effects.
 #endif  // _FAKE_GLSL_
@@ -30,6 +35,9 @@ uniform bool julia;
 #define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
 
+uniform vec3 iLightPos;
+uniform vec3 iLightDir;
+
 #define DIST_MULTIPLIER par[8].z  // {min=.01 max=2.0 step=.01}
 #define MAX_DIST 10.0
 
@@ -38,8 +46,8 @@ uniform vec3 par[10];
 
 uniform float min_dist;           // Distance at which raymarching stops.
 uniform float ao_eps;             // Base distance at which ambient occlusion is estimated.
-uniform float ao_strength;        // Strength of ambient occlusion.
-uniform float glow_strength;      // How much glow is applied after max_steps.
+uniform float ao_strength;   // {min=0 max=1 step=.01}     // Strength of ambient occlusion.
+uniform float glow_strength; // {min=0 max=1 step=.01}     // How much glow is applied after max_steps.
 uniform float dist_to_color;      // How is background mixed with the surface color after max_steps.
 
 uniform int iters;  // Number of fractal iterations. {min=0 max=500 step=1}
@@ -47,16 +55,23 @@ uniform int color_iters;  // Number of fractal iterations for coloring. {min=0 m
 uniform int max_steps;  // Maximum raymarching steps. {min=0 max=1000 step=1}
 
 vec3 backgroundColor = vec3(0.07, 0.06, 0.16),
+#if 1
   surfaceColor1 = vec3(0.95, 0.64, 0.1),
   surfaceColor2 = vec3(0.89, 0.95, 0.75),
   surfaceColor3 = vec3(0.55, 0.06, 0.03),
+#else
+  surfaceColor1 = vec3(0.95, 0.04, 0.1),
+  surfaceColor2 = vec3(0.09, 0.95, 0.75),
+  surfaceColor3 = vec3(0.05, 0.06, 0.93),
+#endif
   specularColor = vec3(1.0, 0.8, 0.4) * 4.0,
   glowColor = vec3(0.03, 0.4, 0.4),
   aoColor = vec3(0, 0, 0);
 
 float minRad2;
 vec4 scale;
-float absScalePowIters;
+float absScalem1;
+float absScalePow1mIters;
 mat3 rotationMatrix;
 
 void init() {
@@ -65,12 +80,9 @@ void init() {
 
   // compute couple of constants.
   minRad2 = clamp(MB_MINRAD2, 1.0e-9, 1.0);
-  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(-MB_SCALE)) / minRad2;
-  
-  float s = abs(MB_SCALE), ds = 1.0 / abs(MB_SCALE);
-  //for (int i=0; i<int(float(iters) * detail); i++) s*= ds;
-  for (int i=0; i<iters; i++) s*= ds;
-  absScalePowIters = s;
+  scale = vec4(MB_SCALE, MB_SCALE, MB_SCALE, abs(MB_SCALE)) / minRad2;
+  absScalem1 = abs(MB_SCALE - 1.0);
+  absScalePow1mIters = pow(abs(MB_SCALE), float(1 - iters)); 
   
   float csat = cos(rotationAngle);
   float ssat = sin(rotationAngle);
@@ -88,9 +100,8 @@ float de_mandelbox(vec3 pos) {
   vec4 p = vec4(pos,1.0);  // p.w is the distance estimate
   vec4 P0;
   if (julia) P0 = vec4(JuliaVector, JL); else P0 = p;
-  int it = iters; //int(float(iters)*detail);
 if (rotationAngle == 0.)
-  for (int i=0; i<it; i++) {
+  for (int i=0; i<iters; i++) {
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
     p *= clamp(max(minRad2/r2, minRad2), 0.0, 1.0);
@@ -98,7 +109,7 @@ if (rotationAngle == 0.)
     //if (r2 > 1000.0) break;
   }
 else
-  for (int i=0; i<it; i++) {
+  for (int i=0; i<iters; i++) {
     p = vec4(rotationMatrix * p.xyz, p.w);
     p = vec4(clamp(p.xyz, -1.0, 1.0) * 2.0 - p.xyz, p.w);
     float r2 = dot(p.xyz, p.xyz);
@@ -107,13 +118,52 @@ else
     //if (r2 > 1000.0) break;
   }
 #if 1
-  return ((length(p.xyz) - abs(MB_SCALE - 1.0)) / p.w
-            - absScalePowIters) * DIST_MULTIPLIER;
+  return ((length(p.xyz) - absScalem1) / p.w - absScalePow1mIters) * DIST_MULTIPLIER;
 #else
-  return length(p.xyz) / abs(p.w);
+  return length(p.xyz) / p.w;
 #endif
 }
 DECLARE_DE(de_mandelbox)
+
+// arbitrary orientation cylinder
+// p evaluation pos
+// a center of one end
+// b center of other end
+// r radius
+float sdCylinder(vec3 p, vec3 a, vec3 b, float r)
+{
+  vec3 pa = p - a;
+  vec3 ba = b - a;
+  float baba = dot(ba,ba);
+  float paba = dot(pa,ba);
+
+  float x = length(pa*baba-ba*paba) - r*baba;
+  float y = abs(paba-baba*0.5)-baba*0.5;
+  float x2 = x*x;
+  float y2 = y*y*baba;
+  float d = (max(x,y)<0.0)?-min(x2,y2):(((x>0.0)?x2:0.0)+((y>0.0)?y2:0.0));
+  return sign(d)*sqrt(abs(d))/baba;
+}
+
+float sdSphere( vec3 p, float r )
+{
+  return length(p) - r;
+}
+
+float de_combo(vec3 pos) {
+  float d_mbox = de_mandelbox(pos);
+  float d_light = sdCylinder(
+         pos,
+         iLightPos - 2. * abs(speed)*iLightDir,
+         iLightPos - .1 * abs(speed)*iLightDir,
+         1.5 * abs(speed));
+#if 0 // void sphere around center eye, clips nearby stuff.
+  float d_near = sdSphere(pos - eye, 20.0 * abs(speed));
+  return max(min(d_mbox, d_light), -d_near);
+#else
+  return min(d_mbox, d_light);
+#endif
+}
 
 // Compute the color at `pos`.
 vec3 c_mandelbox(vec3 pos) {
@@ -229,26 +279,20 @@ void main() {
   vec3 eye_in, dp; 
 
   if (!setup_ray(eye, dir, eye_in, dp)) return;
-#if 0
-{
-  vec2 p = -1. + 2.*gl_FragCoord.xy / vec2(xres, yres);
-  float lp = length(p);
-  detail = 1.0 - .5 * smoothstep(.1, .8, lp);
-}
-#endif
 
   init();
 
-  float m_zoom = zoom * 0.5 / (xres * pow(detail, 3.0));
+  float m_zoom = zoom * 0.5 / (xres * detail * detail);
   float noise = noise(gl_FragCoord.xy * time);
 
   vec3 p = eye_in;
   float D = d(p);
   float side = sign(D);
-  float totalD = side * noise * D;   // Randomize first step.
+  //float totalD = side * noise * D;   // Randomize first step.
+  float totalD = 0.0;
 
   // Intersect the view ray with the Mandelbox using raymarching.
-  float m_dist = m_zoom * totalD;
+  float m_dist = m_zoom * totalD * 4.0;
 
 //#define OVERSTEP
 #ifdef OVERSTEP
@@ -274,16 +318,19 @@ void main() {
 #endif  // OVERSTEP
 
     if (totalD > MAX_DIST) break;
-    m_dist =  m_zoom * totalD;
+    m_dist =  m_zoom * totalD * 4.0;
+    //m_dist = m_zoom * pow(1.0 + totalD, 2);
   }
 
 #if 1
   // If we got a hit, find desired distance to surface.
   // Likely our hit was lot closer than m_dist; make it approx. m_dist.
+  // (reduces banding on smooth surfaces)
   if (D < m_dist) {
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 3; ++i) {
       totalD += D - m_dist;
-      m_dist =  m_zoom * totalD;
+      m_dist =  m_zoom * totalD * 4.0;
+      //m_dist = m_zoom * pow(1.0 + totalD, 2);
       D = d(p + totalD * dp);
     }
   }
@@ -298,54 +345,75 @@ void main() {
   if (totalD < MAX_DIST) {
     vec3 n = normal(p, D);
     col = c(p);
-#if 1
+
+#if 0 // non-flash light 
     col = blinn_phong(n, -dp,
                       normalize(eye_in+vec3(0,1,0)+dp),
                       col);
 
     col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
 
-    //vec3 hsv = rgb2hsv(col);
-    //hsv.z /= clamp(.005 * (m_dist / (m_zoom * abs(speed))), 1.0, 10.0);
-    //col = hsv2rgb(hsv);
+    vec3 hsv = rgb2hsv(col);
+    hsv.z /= clamp(.005 * (m_dist / (m_zoom * abs(speed))), 1.0, 10.0);
+    col = hsv2rgb(hsv);
 #else
-    // light things up a bit
-    // carry a light to the right and up a bit from eye, propotional
-    // to speed (i.e. size of head / ipd).
-    vec3 light_d = vec3(gl_ModelViewMatrix * vec4(abs(speed) * 14.0, abs(speed) * 5.0, 0, 0));
-    vec3 light = eye + light_d;
+    // light things up
+    // carry a headlamp, up a bit from eyes, proportional to speed (i.e. ipd).
+#if 0
+    vec4 light_offset = gl_ModelViewMatrix * vec4(0, abs(speed) * 4.0, 0, 0);
+    vec3 light_pos = eye + light_offset;
+#else
+    vec3 light_pos = iLightPos;
+#endif
     // trace back from p to light to determine shadow.
-    vec3 tolight = normalize(light - p);
-    float lightDist = length(light - p);
-    float shadow = 1.0f;  // fully lit
-    float lightRayLength = abs(speed);
-    for (int i = 0; i < steps; ++i) {
-      float d = d(p + lightRayLength * tolight);
-      lightRayLength += d;
-      if (lightRayLength > lightDist - 2*m_dist) {
-        // reached light
-        break;
-      }
+    vec3 tolight = normalize(light_pos - p);
+    // angle of light cone
+    float angle = acos(clamp(dot(iLightDir, -tolight), 0., 1.));
+    float lightDist = length(light_pos - p);
+    float shadow = 1.0;
+#if 0
+    // drop off light
+    float ld = lightDist / abs(speed);  // scaled distance to light
+    shadow *= clamp(10.0 / ld, 0.2, 1.0);
+#endif
 
-      shadow = min(shadow, 1.0 * d / lightRayLength);
+    if (angle < .5) {  // about 60 degree light cone from flashlight
+      float t = m_dist;
+      float ph = 1e20;
+      for (int i = 0; i < max_steps; ++i) {
+        float h = max(d(p + t * tolight), 0.0);
+        if (h < .5 * m_dist) { // hit something
+          shadow = .1;
+          break;
+        }
 
-      if (d < m_dist) {
-        // hit obstacle; fully shaded
-        shadow = 0.0;
-        break;
+#if 0
+        // soft shadow (lots of banding with our fractal sdf..)
+        const float w = .01;
+        float y = h*h/(2.0*ph);
+        float d = sqrt(h*h-y*y);
+        shadow = min(shadow, d/(w*max(0.0,t-y)));
+
+        if (shadow < .1) {
+          // dark enough
+          break;
+        }
+
+        ph = h;
+#endif
+
+        t += h;
+        if (t > lightDist - 2.0 * m_dist) {
+          // reached light
+          break;
+        }
       }
+    } else {
+      shadow = .1;
     }
 
-    col = blinn_phong(n, -dp,
-                      tolight,
-                      //normalize(eye_in+vec3(0,1,0)+dp),
-                      col);
-
-    //col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
-
-    vec3 hsv = rgb2hsv(col);
-    hsv.z *= shadow;
-    col = hsv2rgb(hsv);
+    col = shadow * blinn_phong(n, -dp, tolight, col);
+    col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
 #endif
 
     // We've gone through all steps, but we haven't hit anything.
@@ -364,6 +432,11 @@ void main() {
   col = mix(col,
             glowColor,
             (float(steps)+noise)/float(max_steps) * glow_strength);
+
+  // gamma
+  col = pow(col, vec3(.95));
+  // contrast
+  //col = 1.3*col-0.1;
 
   write_pixel(dir, totalD, sqrt(detail) * col);
 }

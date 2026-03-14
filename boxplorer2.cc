@@ -2082,6 +2082,9 @@ int main(int argc, char **argv) {
 
           if (render.hmd) {
             if (render.hmd->GetHeadPose(hmd_view_q, hmd_pos, &hmd_ipd)) {
+              float q[4], p[3];
+              render.hmd->GetLeftHandPose(q, p);
+              camera.setLeftHandPose(q, p, hmd_ipd);
               camera.mixHmdPose(hmd_view_q, hmd_pos, hmd_ipd);
               mixedInHmd = true;
             }
@@ -2130,6 +2133,8 @@ int main(int argc, char **argv) {
           }
 
           if (de != 0.0 && de != last_de) {
+            if (de < config.min_dist) de = config.min_dist;
+
             DEBUG("de=%12.12e", de);
             camera.speed = de / 10.0;
             last_de = de;
@@ -3060,6 +3065,9 @@ int main(int argc, char **argv) {
         camera.move(0, 0,
                     -camera.speed * 3.0 *
                         render.hmd->RightHandTrigger()); // back
+        camera.move(0, 0,
+                    -camera.speed * 3.0 *
+                        render.hmd->LeftIndexTrigger()); // alternate back
 
         camera.rotate(render.hmd->RightThumbstickY() * .1 *
                           camera.keyb_rot_speed,

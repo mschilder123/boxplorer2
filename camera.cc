@@ -102,6 +102,13 @@ void *Camera::map_address(const string &type, const string &name, int n) {
   PROCESS_COMMON_PARAMS
 #undef PROCESS
 
+    if (name.compare("iLightPos") == 0) {
+      return &this->iLightPos;
+    }
+    if (name.compare("iLightDir") == 0) {
+      return &this->iLightDir;
+    }
+
   // for non-predefined uniforms, map them into couple of arrays,
   // so we'd get automagic uniform discovery and linkage.
   if (type.compare("float") == 0) {
