@@ -35,6 +35,7 @@ uniform bool julia;
 #define MB_SCALE par[0].y  // {min=-3 max=3 step=.001}
 #define MB_MINRAD2 par[0].x  // {min=0 max=5 step=.001}
 
+uniform float iLightPower;
 uniform vec3 iLightPos;
 uniform vec3 iLightDir;
 
@@ -166,7 +167,7 @@ float de_combo(vec3 pos) {
 }
 
 // Compute the color at `pos`.
-vec3 c_mandelbox(vec3 pos) {
+vec3 c_mandelbox(vec3 pos, float D) {
   vec3 p = pos;
   vec3 P0;
   if (julia) P0 = JuliaVector; else P0 = p;
@@ -190,7 +191,7 @@ else
   }
   // c.x: log final distance (fractional iteration count)
   // c.y: spherical orbit trap at (0,0,0)
-  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap) ), 0.0, 2.0);
+  vec2 c = clamp(vec2( 0.33*log(dot(p,p))-1.0, sqrt(trap)), 0.0, 1.0);
   return mix(mix(surfaceColor1, surfaceColor2, c.y), surfaceColor3, c.x);
 }
 DECLARE_COLORING(c_mandelbox)
@@ -199,18 +200,18 @@ float normal_eps = 0.000001;
 
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
-vec3 normal(vec3 pos, float d_pos) {
+vec3 normal(vec3 pos, float d_pos, float side) {
   vec2 Eps = vec2(0, max(normal_eps, d_pos));
 #if 0
   return normalize(vec3(
-    -d(pos-Eps.yxx)+d(pos+Eps.yxx),
-    -d(pos-Eps.xyx)+d(pos+Eps.xyx),
-    -d(pos-Eps.xxy)+d(pos+Eps.xxy)
+    -side*d(pos-Eps.yxx)+side*d(pos+Eps.yxx),
+    -side*d(pos-Eps.xyx)+side*d(pos+Eps.xyx),
+    -side*d(pos-Eps.xxy)+side*d(pos+Eps.xxy)
   ));
 #else
   // Eiffie's denormal
-  vec3 dn = vec3(d(pos-Eps.yxx),d(pos-Eps.xyx),d(pos-Eps.xxy));
-  vec3 dp = vec3(d(pos+Eps.yxx),d(pos+Eps.xyx),d(pos+Eps.xxy));
+  vec3 dn = vec3(side*d(pos-Eps.yxx),side*d(pos-Eps.xyx),side*d(pos-Eps.xxy));
+  vec3 dp = vec3(side*d(pos+Eps.yxx),side*d(pos+Eps.xyx),side*d(pos+Eps.xxy));
   return (dp-dn)/(length(dp-vec3(d_pos))+length(vec3(d_pos)-dn));
 #endif
 }
@@ -301,7 +302,7 @@ void main() {
 #endif  // oVERSTEP
   int steps;
   for (steps=0; steps<max_steps; steps++) {
-    D = (side * d(p + totalD * dp));
+    D = side * d(p + totalD * dp);
     if (D < m_dist) break;
 #ifdef OVERSTEP
     if (D < os) {
@@ -331,7 +332,7 @@ void main() {
       totalD += D - m_dist;
       m_dist =  m_zoom * totalD * 4.0;
       //m_dist = m_zoom * pow(1.0 + totalD, 2);
-      D = d(p + totalD * dp);
+      D = side * d(p + totalD * dp);
     }
   }
 #endif
@@ -343,20 +344,22 @@ void main() {
 
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
-    vec3 n = normal(p, D);
-    col = c(p);
+    vec3 n = normal(p, D, side);
+    col = c(p, totalD);
 
-#if 0 // non-flash light 
+    if (iLightPower < 0.1) {
     col = blinn_phong(n, -dp,
-                      normalize(eye_in+vec3(0,1,0)+dp),
+                      //normalize(eye_in+vec3(0,1,0)+dp),
+                      normalize(iLightPos - p),
                       col);
 
     col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
 
     vec3 hsv = rgb2hsv(col);
-    hsv.z /= clamp(.005 * (m_dist / (m_zoom * abs(speed))), 1.0, 10.0);
+    hsv.z /= clamp(pow(1.0 + totalD, 5.0), 1.0, 10.0);
     col = hsv2rgb(hsv);
-#else
+
+    } else {
     // light things up
     // carry a headlamp, up a bit from eyes, proportional to speed (i.e. ipd).
 #if 0
@@ -370,7 +373,7 @@ void main() {
     // angle of light cone
     float angle = acos(clamp(dot(iLightDir, -tolight), 0., 1.));
     float lightDist = length(light_pos - p);
-    float shadow = 1.0;
+    float shadow = iLightPower;
 #if 0
     // drop off light
     float ld = lightDist / abs(speed);  // scaled distance to light
@@ -381,7 +384,7 @@ void main() {
       float t = m_dist;
       float ph = 1e20;
       for (int i = 0; i < max_steps; ++i) {
-        float h = max(d(p + t * tolight), 0.0);
+        float h = max(side*d(p + t * tolight), 0.0);
         if (h < .5 * m_dist) { // hit something
           shadow = .1;
           break;
@@ -414,7 +417,7 @@ void main() {
 
     col = shadow * blinn_phong(n, -dp, tolight, col);
     col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
-#endif
+    }
 
     // We've gone through all steps, but we haven't hit anything.
     // Mix in the background color.

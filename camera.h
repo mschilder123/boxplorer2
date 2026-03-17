@@ -56,7 +56,8 @@ public:
   PROCESS_COMMON_PARAMS
 #undef PROCESS
 
-  float iLightPos[3];  // hmd left hand torch
+  float iLightPower;
+  float iLightPos[3]; // hmd left hand torch
   float iLightDir[3];
 
   // Par[] parameter array.
@@ -535,7 +536,7 @@ public:
     double v[16];
     quat2mat(q1, v);
 
-    this->iLightDir[0] = v[8];  // ahead()
+    this->iLightDir[0] = v[8]; // ahead()
     this->iLightDir[1] = v[9];
     this->iLightDir[2] = v[10];
   }
@@ -567,6 +568,22 @@ public:
     this->q[1] = q1[1];
     this->q[2] = q1[2];
     this->q[3] = q1[3];
+  }
+
+  void mixRightHandPose(float q[4], float factor) {
+    double q1[4];
+
+    q1[0] = q[0];
+    q1[1] = q[1];
+    q1[2] = q[2];
+    q1[3] = q[3];
+
+    q1[2] = -q1[2]; // We roll other way
+
+    qmul(q1, this->q);
+
+    qslerp(this->q, q1, this->q, factor);
+    quat2mat(this->q, this->v);
   }
 
   // take this->v and q and produce this->v,q := this->v - q

@@ -2133,7 +2133,8 @@ int main(int argc, char **argv) {
           }
 
           if (de != 0.0 && de != last_de) {
-            if (de < config.min_dist) de = config.min_dist;
+            if (de < config.min_dist)
+              de = config.min_dist;
 
             DEBUG("de=%12.12e", de);
             camera.speed = de / 10.0;
@@ -3065,9 +3066,15 @@ int main(int argc, char **argv) {
         camera.move(0, 0,
                     -camera.speed * 3.0 *
                         render.hmd->RightHandTrigger()); // back
-        camera.move(0, 0,
-                    -camera.speed * 3.0 *
-                        render.hmd->LeftIndexTrigger()); // alternate back
+
+        if (render.hmd->RightIndexTrigger()) {
+          float q[4];
+
+          render.hmd->GetRightHandPose(q);
+          camera.mixRightHandPose(q, .01);
+        }
+
+        camera.iLightPower = render.hmd->LeftIndexTrigger();
 
         camera.rotate(render.hmd->RightThumbstickY() * .1 *
                           camera.keyb_rot_speed,

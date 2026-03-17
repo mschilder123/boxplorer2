@@ -360,9 +360,11 @@ public:
     hmd_quat[2] = pose.ThePose.Orientation.z;
     hmd_quat[3] = pose.ThePose.Orientation.w;
 
-    hmd_pos[0] = pose.ThePose.Position.x;
-    hmd_pos[1] = pose.ThePose.Position.y;
-    hmd_pos[2] = pose.ThePose.Position.z;
+    if (hmd_pos != nullptr) {
+      hmd_pos[0] = pose.ThePose.Position.x;
+      hmd_pos[1] = pose.ThePose.Position.y;
+      hmd_pos[2] = pose.ThePose.Position.z;
+    }
 
     return true;
   }
