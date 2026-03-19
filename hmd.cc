@@ -201,6 +201,9 @@ public:
       result = ovr_Create(&session, &luid);
       if (OVR_SUCCESS(result)) {
         hmdDesc = ovr_GetHmdDesc(session);
+        DEBUG("Hmd type: ") << hmdDesc.Type;
+        DEBUG("Hmd rez : %dx%d", hmdDesc.Resolution.w, hmdDesc.Resolution.h);
+        DEBUG("Hmd rate: %f", hmdDesc.DisplayRefreshRate);
         ovr_SetTrackingOriginType(session, ovrTrackingOrigin_EyeLevel);
         ok = true;
       } else {
@@ -215,6 +218,7 @@ public:
     for (int eye = 0; eye < 2; ++eye) {
       ovrSizei idealTextureSize = ovr_GetFovTextureSize(
           session, ovrEyeType(eye), hmdDesc.DefaultEyeFov[eye], 1);
+      DEBUG("Hmd eye texture %dx%d", idealTextureSize.w, idealTextureSize.h);
       eyeRenderTexture[eye] =
           new OculusTextureBuffer(session, idealTextureSize, 1);
 

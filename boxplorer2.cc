@@ -1801,8 +1801,8 @@ int main(int argc, char **argv) {
     // Fix resolution for optimal performance.
     // config.width = 1280; config.height = 800;  // DK1
     // config.fov_x = 110; config.fov_y = 94.0;  // DK1
-    config.width = 2 * 1824; // 5408;  // quest3 // TODO get from render.hmd
-    config.height = 1968;    // 2736;
+    config.width = 2 * 1824; // quest3 // TODO get from render.hmd
+    config.height = 1968;
     config.fov_x = 110.0;
     config.fov_y = 96.0;
     fixedFov = true;
@@ -2346,7 +2346,6 @@ int main(int argc, char **argv) {
       CHECK_ERROR;
 
       glUseProgram(0);
-      // glDisable(GL_TEXTURE_2D);
 
       if (doingFxaa) {
         // We have a fxaa shader.
@@ -2375,15 +2374,15 @@ int main(int argc, char **argv) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // default framebuffer
       }
 
-      if (stereoMode == ST_OCULUS) {
-        if (render.hmd) {
-          render.hmd->BlitFrom(/*default fb*/ 0, config.width, config.height);
-        }
-        glViewport(0, 0, window.width(), window.height());
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      }
-
     } // multiPass
+
+    if (stereoMode == ST_OCULUS) {
+      if (render.hmd) {
+        render.hmd->BlitFrom(/*default fb*/ 0, config.width, config.height);
+      }
+      glViewport(0, 0, window.width(), window.height());
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
     CHECK_ERROR;
 
