@@ -436,10 +436,5 @@ void main() {
             glowColor,
             (float(steps)+noise)/float(max_steps) * glow_strength);
 
-  // gamma
-  col = pow(col, vec3(.95));
-  // contrast
-  //col = 1.3*col-0.1;
-
   write_pixel(dir, totalD, sqrt(detail) * col);
 }

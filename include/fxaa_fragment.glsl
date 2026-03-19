@@ -4,6 +4,7 @@
 // http://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
 
 uniform sampler2D iTexture;
+uniform sampler2D iDepth;
 varying vec2 iTexCoord;
 uniform float xres, yres;
 
@@ -58,4 +59,6 @@ void main() {
   } else {
     gl_FragColor = vec4(rgbB, alpha);
   }
+
+  gl_FragDepth = texture2D(iDepth, iTexCoord).x;
 }

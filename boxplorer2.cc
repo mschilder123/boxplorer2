@@ -192,6 +192,7 @@ public:
     reset();
 
     DEBUG("%dx%d display %d", w, h, d);
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1);
     window_ = SDL_CreateWindow("test", last_x_, last_y_, w, h,
                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     glcontext_ = SDL_GL_CreateContext(window_);
@@ -1015,6 +1016,7 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
           render.shaderManager.effects.log().c_str());
 
   glEnable(GL_TEXTURE_2D);
+  // glEnable(GL_FRAMEBUFFER_SRGB); // TODO color management
 
   if (!config.disable_de) {
 #if defined(GL_RGBA32F) // We need this to be actually capable of GL_FLOAT
@@ -1789,8 +1791,7 @@ int main(int argc, char **argv) {
     config.enable_dof = (enableDoF == 1); // override
   if (stereoMode == ST_INTERLACED || stereoMode == ST_QUADBUFFER ||
       stereoMode == ST_ANAGLYPH) {
-    config.enable_dof =
-        0; // render.shaderManager.fxaa post does not work for these.
+    config.enable_fxaa = config.enable_dof = 0;
   }
   if (disableDE)
     config.disable_de = (disableDE == -1); // override
@@ -1805,9 +1806,7 @@ int main(int argc, char **argv) {
     config.fov_x = 110.0;
     config.fov_y = 96.0;
     fixedFov = true;
-    // Enable multipass but not render.shaderManager.dof and
-    // render.shaderManager.fxaa?
-    config.backbuffer = 1;
+    config.backbuffer = 0;
     config.enable_fxaa = 1;
     config.enable_dof = 1;
   }
@@ -1958,6 +1957,8 @@ int main(int argc, char **argv) {
 
   bool mixedInHmd = false;
   bool multiPass = false;
+  bool doingDoF = false;
+  bool doingFxaa = false;
 
   GLSL::vec3 effects_zoom(.5, .5, 1.); // centered and no zoom
   int zoomMouseX = 0;
@@ -2150,14 +2151,15 @@ int main(int argc, char **argv) {
       GLuint program = render.shaderManager.fractal.program();
       glUseProgram(program); // the render.shaderManager.fractal shader
 
+      doingDoF = (config.enable_dof && render.shaderManager.dof.ok() &&
+                  camera.enable_dof && camera.aperture != 0);
+      doingFxaa =
+          (config.enable_fxaa && render.shaderManager.fxaa.ok() && camera.fxaa);
+
       // Figure out whether to render direct or via fbo.
       // A backbuffer (e.g. previous frame), or render.shaderManager.dof or
       // render.shaderManager.fxaa requires rendering to fbo.
-      multiPass = (config.enable_dof &&
-                   ((render.shaderManager.dof.ok() && camera.enable_dof &&
-                     camera.aperture != 0) ||
-                    (render.shaderManager.fxaa.ok() && camera.fxaa))) ||
-                  config.backbuffer;
+      multiPass = doingDoF || doingFxaa || config.backbuffer;
 
       // Set up input texture to render.shaderManager.fractal shader.
       if (render.background_texture) {
@@ -2224,39 +2226,7 @@ int main(int argc, char **argv) {
 
       GLuint currentFrame = render.mainTex[frameno & 1];
 
-      if (!config.backbuffer) {
-        glEnable(GL_TEXTURE_2D);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, currentFrame);
-        // Mipmap the frame.
-        // TODO: not needed by default. Costly?
-        // glGenerateMipmap(GL_TEXTURE_2D);
-      }
-
-      if (render.shaderManager.fxaa.ok() && config.enable_fxaa && camera.fxaa) {
-        // We have a render.shaderManager.fxaa shader.
-        // Compute and point currentFrame(s) at output.
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, currentFrame);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, render.fxaaFbo);
-        GLuint program = render.shaderManager.fxaa.program();
-        glUseProgram(program);
-        glUniform1i(glGetUniformLocation(program, "iTexture"), 0);
-        glUniform1f(glGetUniformLocation(program, "xres"), config.width);
-        glUniform1f(glGetUniformLocation(program, "yres"), config.height);
-        drawScreen();
-
-        glUseProgram(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        currentFrame = render.fxaaTex; // Our output is input for next stage.
-      }                                // render.shaderManager.fxaa
-
-      CHECK_ERROR;
-
-      if (render.shaderManager.dof.ok() && config.enable_dof &&
-          camera.enable_dof && camera.aperture != 0) {
+      if (doingDoF) {
         // We have a render.shaderManager.dof shader.
         // Compute iBlur0 and iBlur1
         for (int i = 0; i < NBLUR * 2; ++i) {
@@ -2335,15 +2305,20 @@ int main(int argc, char **argv) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       }
 
+      if (doingFxaa) {
+        // Fxaa is next, render to its input.
+        glBindFramebuffer(GL_FRAMEBUFFER, render.fxaaFbo);
+        currentFrame = render.fxaaTex;
+      }
+
       glUniform1i(glGetUniformLocation(final_program, "iTexture"), 0);
 
-      // Pass main depth as texture 1
+      // Pass current depth as texture 1
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, render.mainDepth[frameno & 1]);
       glUniform1i(glGetUniformLocation(final_program, "iDepth"), 1);
 
-      if (render.shaderManager.dof.ok() && camera.enable_dof &&
-          camera.aperture != 0) {
+      if (doingDoF) {
         // Pass blur textures as 2 and 3, if we computed them.
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, render.blurTex[0]);
@@ -2359,18 +2334,12 @@ int main(int argc, char **argv) {
         glUniform1i(glGetUniformLocation(final_program, "enable_dof"), 0);
       }
 
-      // send tonemap params etc.
+      // send tonemap params.
       glUniform1f(glGetUniformLocation(final_program, "exposure"),
                   config.exposure);
       glUniform1f(glGetUniformLocation(final_program, "maxBright"),
                   config.maxBright);
       glUniform1f(glGetUniformLocation(final_program, "gamma"), config.gamma);
-
-      if (stereoMode == ST_OCULUS) {
-        glUniform1f(glGetUniformLocation(final_program, "xres"), config.width);
-        glUniform1f(glGetUniformLocation(final_program, "yres"), config.height);
-        glUniform1f(glGetUniformLocation(final_program, "ipd"), config.ipd);
-      }
 
       drawScreen();
 
@@ -2378,6 +2347,33 @@ int main(int argc, char **argv) {
 
       glUseProgram(0);
       // glDisable(GL_TEXTURE_2D);
+
+      if (doingFxaa) {
+        // We have a fxaa shader.
+        // Compute over current frame and write to default framebuffer.
+
+        // Current frame as color input in texture 0
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, currentFrame);
+
+        // Pass current depth as texture 1
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, render.mainDepth[frameno & 1]);
+
+        currentFrame = 0;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // default framebuffer as output
+
+        GLuint program = render.shaderManager.fxaa.program();
+        glUseProgram(program);
+        glUniform1i(glGetUniformLocation(program, "iTexture"), 0);
+        glUniform1i(glGetUniformLocation(program, "iDepth"), 1);
+        glUniform1f(glGetUniformLocation(program, "xres"), config.width);
+        glUniform1f(glGetUniformLocation(program, "yres"), config.height);
+        drawScreen();
+
+        glUseProgram(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // default framebuffer
+      }
 
       if (stereoMode == ST_OCULUS) {
         if (render.hmd) {

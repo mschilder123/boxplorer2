@@ -116,14 +116,18 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   vec2 q;
   if (sign(speed) < 0.0) {
     // left. 220 pixel shift towards center. Eyeballed.
+    // TODO make relatiave to -1..1, not xres
+    //      make close to hmd frustum
     q = (gl_FragCoord.xy - vec2(-ipd * 10.0 + 220.0, 0.0)) / vec2(halfx, yres);
   } else {
     // right. 220 pixel shift towards center.
+    // TODO make relatiave to -1..1, not xres
+    //      make close to hmd frustum
     q = (gl_FragCoord.xy - vec2(halfx + ipd * 10.0 - 220.0, 0.0)) / vec2(halfx, yres);
   }
   vec2 p = -1.0 + 2.0 * q;
 
-  vec2 oculus_scale = vec2(0.50, 0.55);  // x/y ratio eyeballed
+  vec2 oculus_scale = vec2(0.50, 0.55);  // x/y ratio eyeballed. TODO make close to hmd frustum
   p *= oculus_scale;
   float l2 = length(p);
   if (l2 > .5) { 
@@ -138,11 +142,12 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   }
 
   // Shift eye position, abs(speed) is half inter-occular distance.
+  // TODO also move forward a bit? Figure ratio compared to ipd from hmd data..
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0.0, 0.0, 0.0));
   eye_out = eye + eye_d;
 
   // Note: no asymmetric frustum for Rift.
-  // z value (0.40) determines fov. Eyeballed.
+  // z value (0.50) determines fov. Eyeballed. TODO: hmd frustum
   ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.50, 0.0)));
 #else  // ST_OCULUS
 #if defined(ST_INTERLACED)
