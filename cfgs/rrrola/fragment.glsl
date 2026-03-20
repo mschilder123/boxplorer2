@@ -345,78 +345,82 @@ void main() {
   // We've got a hit or we're not sure.
   if (totalD < MAX_DIST) {
     vec3 n = normal(p, D, side);
-    col = c(p, totalD);
+    // get material color at estimated surface location, thus add m_dist * dp
+    col = c(p + m_dist * dp, totalD);
 
     if (iLightPower < 0.1) {
-    col = blinn_phong(n, -dp,
-                      //normalize(eye_in+vec3(0,1,0)+dp),
-                      normalize(iLightPos - p),
-                      col);
+      col = blinn_phong(n, -dp,
+                        //normalize(eye_in+vec3(0,1,0)+dp),
+                        normalize(iLightPos - p),
+                        col);
 
-    col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
+      col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
 
-    vec3 hsv = rgb2hsv(col);
-    hsv.z /= clamp(pow(1.0 + totalD, 5.0), 1.0, 10.0);
-    col = hsv2rgb(hsv);
+#if 1
+      // drop off intesity per distance
+      vec3 hsv = rgb2hsv(col);
+      hsv.z /= clamp(pow(1.0 + totalD, 3.0), 1.0, 8.0);
+      col = hsv2rgb(hsv);
+#endif
 
     } else {
-    // light things up
-    // carry a headlamp, up a bit from eyes, proportional to speed (i.e. ipd).
+      // light things up
+      // carry a headlamp, up a bit from eyes, proportional to speed (i.e. ipd).
 #if 0
-    vec4 light_offset = gl_ModelViewMatrix * vec4(0, abs(speed) * 4.0, 0, 0);
-    vec3 light_pos = eye + light_offset;
+      vec4 light_offset = gl_ModelViewMatrix * vec4(0, abs(speed) * 4.0, 0, 0);
+      vec3 light_pos = eye + light_offset;
 #else
-    vec3 light_pos = iLightPos;
+      vec3 light_pos = iLightPos;
 #endif
-    // trace back from p to light to determine shadow.
-    vec3 tolight = normalize(light_pos - p);
-    // angle of light cone
-    float angle = acos(clamp(dot(iLightDir, -tolight), 0., 1.));
-    float lightDist = length(light_pos - p);
-    float shadow = iLightPower;
+      // trace back from p to light to determine shadow.
+      vec3 tolight = normalize(light_pos - p);
+      // angle of light cone
+      float angle = acos(clamp(dot(iLightDir, -tolight), 0., 1.));
+      float lightDist = length(light_pos - p);
+      float shadow = iLightPower;
 #if 0
-    // drop off light
-    float ld = lightDist / abs(speed);  // scaled distance to light
-    shadow *= clamp(10.0 / ld, 0.2, 1.0);
+      // drop off light
+      float ld = lightDist / abs(speed);  // scaled distance to light
+      shadow *= clamp(10.0 / ld, 0.2, 1.0);
 #endif
 
-    if (angle < .5) {  // about 60 degree light cone from flashlight
-      float t = m_dist;
-      float ph = 1e20;
-      for (int i = 0; i < max_steps; ++i) {
-        float h = max(side*d(p + t * tolight), 0.0);
-        if (h < .5 * m_dist) { // hit something
-          shadow = .1;
-          break;
-        }
+      if (angle < .5) {  // about 60 degree light cone from flashlight
+        float t = m_dist;
+        float ph = 1e20;
+        for (int i = 0; i < max_steps; ++i) {
+          float h = max(side*d(p + t * tolight), 0.0);
+          if (h < .5 * m_dist) { // hit something
+            shadow = .1;
+            break;
+          }
 
 #if 0
-        // soft shadow (lots of banding with our fractal sdf..)
-        const float w = .01;
-        float y = h*h/(2.0*ph);
-        float d = sqrt(h*h-y*y);
-        shadow = min(shadow, d/(w*max(0.0,t-y)));
+          // soft shadow (lots of banding with our fractal sdf..)
+          const float w = .01;
+          float y = h*h/(2.0*ph);
+          float d = sqrt(h*h-y*y);
+          shadow = min(shadow, d/(w*max(0.0,t-y)));
 
-        if (shadow < .1) {
-          // dark enough
-          break;
-        }
+          if (shadow < .1) {
+            // dark enough
+            break;
+          }
 
-        ph = h;
+          ph = h;
 #endif
 
-        t += h;
-        if (t > lightDist - 2.0 * m_dist) {
-          // reached light
-          break;
+          t += h;
+          if (t > lightDist - 2.0 * m_dist) {
+            // reached light
+            break;
+          }
         }
+      } else {
+        shadow = .1;
       }
-    } else {
-      shadow = .1;
-    }
 
-    col = shadow * blinn_phong(n, -dp, tolight, col);
-    col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
+      col = shadow * blinn_phong(n, -dp, tolight, col);
+      col = mix(aoColor, col, ambient_occlusion(p, n, abs(D), side, m_dist));
     }
 
     // We've gone through all steps, but we haven't hit anything.
