@@ -877,7 +877,8 @@ bool setupDirectories(const char *configFile) {
     BaseDir.erase(slash + 1);
 
   char *fileName = NULL;
-  DWORD result = GetFullPathName(configFile, MAX_PATH, dirName, &fileName);
+  std::string tmp = BaseDir + "\\" + std::string(configFile);
+  DWORD result = GetFullPathName(tmp.c_str(), MAX_PATH, dirName, &fileName);
   if (result) {
     if (fileName) {
       BaseFile.assign(fileName);
