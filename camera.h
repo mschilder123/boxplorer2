@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <math.h>
 #include <string>
 
@@ -287,6 +288,12 @@ public:
     }
     if (height < 1)
       height = width * 3 / 4;
+
+    // make sure both width is multiple of 16 and heigth multiple of 8
+    width += (width & 15) ? 16 - (width & 15) : 0;
+    height += (height & 7) ? 8 - (height & 7) : 0;
+    assert(width % 16 == 0);
+    assert(height % 8 == 0);
 
     // FOV: keep pixels square unless stated otherwise.
     // Default FOV_y is 42 degrees.
