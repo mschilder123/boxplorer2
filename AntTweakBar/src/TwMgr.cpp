@@ -6222,6 +6222,9 @@ void CTwMgr::UpdateHelpBar()
 
 #include "res/TwXCursors.h"
 
+#pragma warning(push)
+#pragma warning(disable : 4302) // type truncation
+
 void CTwMgr::CreateCursors()
 {
     if( m_CursorsCreated )
@@ -6273,6 +6276,8 @@ void CTwMgr::CreateCursors()
     
     m_CursorsCreated = true;
 }
+
+#pragma warning(pop)
 
 
 CTwMgr::CCursor CTwMgr::PixmapCursor(int _CurIdx)
