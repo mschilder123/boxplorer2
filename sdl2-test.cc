@@ -16,6 +16,16 @@
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
 #pragma comment(lib, "Shell32.lib")
+// SDL2 statics
+#pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "version.lib")
+#pragma comment(lib, "imm32.lib")
+#pragma comment(lib, "setupapi.lib")
+#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "winmm.lib")
 #endif
 
 #if !defined(__FUNCTION__)
