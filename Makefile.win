@@ -23,7 +23,7 @@ TW_OBJS=TwBar.obj TwFonts.obj TwMgr.obj TwColors.obj TwOpenGL.obj \
         LoadOGLCore.obj TwOpenGLCore.obj
 
 BX_OBJECTS = boxplorer2.obj interpolate.obj uniforms.obj camera.obj shader.obj shader_procs.obj \
-						 glsl.obj TGA.obj utils.obj shader_manager.obj hmd.obj
+						 glsl.obj TGA.obj utils.obj shader_manager.obj hmd.obj gfx.obj
 
 boxplorer2.exe: $(BX_OBJECTS) $(TW_OBJS) Makefile.win
 	link $(LDFLAGS) $(BX_OBJECTS) $(TW_OBJS)
@@ -46,7 +46,7 @@ edit-cfg.exe: edit-cfg.cc Makefile.win
 boxplorer2.obj: boxplorer2.cc default_shaders.h shader_procs.h TGA.h \
                 glsl.h interpolate.h uniforms.h camera.h shader.h params.h hmd.h \
                 cfgs\menger.cfg.data\fragment.glsl include\setup.inc \
-								utils.h Makefile.win
+								utils.h gfx.h Makefile.win
 hmd.obj: hmd.cc hmd.h
 glsl.obj: glsl.cc glsl.h utils.h
 interpolate.obj: interpolate.cc interpolate.h utils.h
@@ -55,6 +55,7 @@ shader_procs.obj: shader_procs.cc shader_procs.h utils.h
 uniforms.obj: uniforms.cc uniforms.h shader_procs.h camera.h utils.h
 camera.obj: camera.cc camera.h params.h utils.h
 TGA.obj: TGA.cc TGA.h utils.h
+gfx.obj: gfx.cc gfx.h shader_procs.h utils.h
 
 TwBar.obj: AntTweakBar\src\TwBar.cpp
 	cl $(CFLAGS) -c $**
