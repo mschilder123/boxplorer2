@@ -5,14 +5,30 @@
 *.dll
 *.exp
 *.lib
+
+# Visual C++
 .vscode/
+.vs/
+VisualC/.vs/
+x64/
+*.user
+
+# Subprojects/symlinks
 SDL2/
+LibOVR
+LibOVRKernel
+
+# Linux build artifacts
 boxplorer2
 sdl2-test
 shadershrink
 edit-cfg
 glsl-test
 TGA2rle
+
+# most recent view
 last.cfg
+
+# Makefile symlinks
 makefile
 GNUmakefile

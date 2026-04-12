@@ -1,5 +1,8 @@
-# Needs a SDL2 tree in ./SDL2:
+# Expects a SDL2 tree in ./SDL2/:
 # git clone -b release-2.32.x https://github.com/mschilder123/SDL2.git
+#
+# Also expects LibOVR in ./LibOVR/:
+# https://developers.meta.com/horizon/downloads/package/oculus-sdk-for-windows/
 #
 # TODO: submodule?
 
