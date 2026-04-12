@@ -133,6 +133,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\boxplorer2.cc" />
     <ClCompile Include="..\..\camera.cc" />
+    <ClCompile Include="..\..\gfx.cc" />
     <ClCompile Include="..\..\glsl.cc" />
     <ClCompile Include="..\..\hmd.cc" />
     <ClCompile Include="..\..\interpolate.cc" />
@@ -145,6 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\camera.h" />
+    <ClInclude Include="..\..\gfx.h" />
     <ClInclude Include="..\..\glsl.h" />
     <ClInclude Include="..\..\hmd.h" />
     <ClInclude Include="..\..\interpolate.h" />
