@@ -24,7 +24,7 @@
 #endif
 
 #include "setup.inc"
-#line 22
+#line 27
 
 // Colors. Can be negative or >1 for interestiong effects.
 #endif  // _FAKE_GLSL_
@@ -201,7 +201,7 @@ float normal_eps = 0.000001;
 // Compute the normal at `pos`.
 // `d_pos` is the previously computed distance at `pos` (for forward differences).
 vec3 normal(vec3 pos, float d_pos, float side) {
-  vec2 Eps = vec2(0, max(normal_eps, d_pos));
+  vec2 Eps = vec2(0, max(normal_eps, abs(d_pos)));
 #if 0
   return normalize(vec3(
     -side*d(pos-Eps.yxx)+side*d(pos+Eps.yxx),
@@ -290,36 +290,27 @@ void main() {
   float D = d(p);
   float side = sign(D);
   //float totalD = side * noise * D;   // Randomize first step.
-  float totalD = 0.0;
+  float totalD = side * noise * D;
 
   // Intersect the view ray with the Mandelbox using raymarching.
   float m_dist = m_zoom * totalD * 4.0;
-
-//#define OVERSTEP
-#ifdef OVERSTEP
-  float os = 0.;
-#define sf par[0].z  // {min=0 max=2 step=.01}
-#endif  // oVERSTEP
-  int steps;
-  for (steps=0; steps<max_steps; steps++) {
+  int steps = 0;
+  for (; steps < max_steps; steps++) {
     D = side * d(p + totalD * dp);
-    if (D < m_dist) break;
-#ifdef OVERSTEP
-    if (D < os) {
-      // might have overstepped
-      totalD -= os;
-      steps--;
-      continue;
-    } else {
-      os = sf * D;
-      totalD += D + os;
+#if 0
+    if (D < 0) {
+#if 1
+      write_pixel(dir, 10.0, vec3(1.0));
+      return;
+#endif
     }
-#else  // OVERSTEP
+#endif
     totalD += D;
-#endif  // OVERSTEP
+    m_dist = m_zoom * totalD * 4.0;
+
+    if (D < m_dist) break;
 
     if (totalD > MAX_DIST) break;
-    m_dist =  m_zoom * totalD * 4.0;
     //m_dist = m_zoom * pow(1.0 + totalD, 2);
   }
 

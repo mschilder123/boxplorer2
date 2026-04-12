@@ -32,6 +32,8 @@
   PROCESS(float, dof_offset, "dof_offset", true)                               \
   PROCESS(int, enable_dof, "enable_dof", false)                                \
   PROCESS(int, enable_fxaa, "enable_fxaa", false)                              \
+  PROCESS(int, enable_cone, "enable_cone", false)                              \
+  PROCESS(int, cone, "cone", false)                                            \
   PROCESS(int, disable_de, "disable_de", false)                                \
   PROCESS(int, no_spline, "no_spline", false)                                  \
   PROCESS(float, focus, "focus", true)                                         \

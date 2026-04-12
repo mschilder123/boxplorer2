@@ -308,6 +308,11 @@ struct RenderContext {
   GLuint mainTex[NFBO];
   GLuint mainDepth[NFBO];
 
+  // 8x8 cone render stage
+  GLuint coneFbo = -1;
+  GLuint coneTex = -1;
+  GLuint coneDepth = -1;
+
   GLuint fxaaFbo = -1;
   GLuint fxaaTex = -1;
 
@@ -358,6 +363,10 @@ void clearGlContext() {
 
   glDeleteFramebuffers(1, &render.fxaaFbo);
   glDeleteTextures(1, &render.fxaaTex);
+
+  glDeleteFramebuffers(1, &render.coneFbo);
+  glDeleteTextures(1, &render.coneTex);
+  glDeleteTextures(1, &render.coneDepth);
 
   if (render.hmd)
     render.hmd->FreeTextures();
@@ -1275,6 +1284,47 @@ bool initGraphics(bool fullscreenToggle, int w, int h, bool hideMouse) {
     } // render.shaderManager.fxaa.ok()
   }
 
+  if (config.enable_cone) { // cone tracing cache
+    DEBUG("Allocating cone buffers.");
+    glGenFramebuffers(1, &render.coneFbo);
+    glGenTextures(1, &render.coneTex);
+    glGenTextures(1, &render.coneDepth);
+
+    glActiveTexture(GL_TEXTURE0);
+
+    glBindTexture(GL_TEXTURE_2D, render.coneTex);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, config.width / 8, config.height / 8,
+                 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+
+    glBindTexture(GL_TEXTURE_2D, render.coneDepth);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, config.width / 8,
+                 config.height / 8, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, render.coneFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           render.coneTex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+                           render.coneDepth, 0);
+
+    CHECK_FRAMEBUFFER;
+    CHECK_ERROR;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
+
   if (stereoMode == ST_OCULUS) {
     if (render.hmd)
       render.hmd->AllocateTextures();
@@ -1540,6 +1590,10 @@ void initTwBar(enum StereoMode stereoMode) {
     TwDefine("GLOBAL fontsize=3");
   }
 
+  if (config.enable_cone) {
+    TwAddVarRW(bar, "cone", TW_TYPE_BOOL32, &camera.cone, "group=opt");
+  }
+
   if (render.shaderManager.fxaa.ok()) {
     TwAddVarRW(bar, "fxaa", TW_TYPE_BOOL32, &camera.fxaa, "group=post");
   }
@@ -1577,6 +1631,7 @@ void initTwBar(enum StereoMode stereoMode) {
   initTwParDefines();
 
   // Tweak menus depending on state.
+  TwDefine("boxplorer/opt opened=false");
   TwDefine("boxplorer/post opened=false");
   TwDefine("boxplorer/3d opened=false");
   TwDefine("boxplorer/oculus opened=false");
@@ -1692,9 +1747,9 @@ int main(int argc, char **argv) {
       fullscreen = true;
     } else if (!strcmp(argv[argc - 1], "--speed")) {
       configSpeed = true;
-    } else if (!strcmp(argv[argc - 1], "--disable-render.shaderManager.dof")) {
+    } else if (!strcmp(argv[argc - 1], "--disable-dof")) {
       enableDoF = -1;
-    } else if (!strcmp(argv[argc - 1], "--enable-render.shaderManager.dof")) {
+    } else if (!strcmp(argv[argc - 1], "--enable-dof")) {
       enableDoF = 1;
     } else if (!strcmp(argv[argc - 1], "--disable-de")) {
       disableDE = -1;
@@ -1740,7 +1795,7 @@ int main(int argc, char **argv) {
 
   // Load configuration.
   if (setupDirectories(configFile) && config.loadConfig(BaseFile, &defines)) {
-    // succuss
+    // success
   } else {
     { DIE("Usage: boxplorer2 <configuration-file.cfg>"); }
   }
@@ -1848,7 +1903,6 @@ int main(int argc, char **argv) {
   int saveHeight = config.height;
 
   if (stereoMode == ST_XEYED) {
-    // config.width *= 2;
     config.width = 3840;
     config.height = 1080;
   }

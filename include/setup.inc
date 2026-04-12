@@ -108,7 +108,7 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   gl_FragColor = vec4(dist);
   gl_FragDepth = dist;
   return false;
-#else  // ST_COMPUTE_DE_ONLY
+#else  // !ST_COMPUTE_DE_ONLY
 #if !defined(ST_NONE)
 #if defined ST_OCULUS
   float halfx = xres / 2.0;
@@ -116,12 +116,12 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   vec2 q;
   if (sign(speed) < 0.0) {
     // left. 220 pixel shift towards center. Eyeballed.
-    // TODO make relatiave to -1..1, not xres
+    // TODO make relative to -1..1, not xres
     //      make close to hmd frustum
     q = (gl_FragCoord.xy - vec2(-ipd * 10.0 + 220.0, 0.0)) / vec2(halfx, yres);
   } else {
     // right. 220 pixel shift towards center.
-    // TODO make relatiave to -1..1, not xres
+    // TODO make relative to -1..1, not xres
     //      make close to hmd frustum
     q = (gl_FragCoord.xy - vec2(halfx + ipd * 10.0 - 220.0, 0.0)) / vec2(halfx, yres);
   }
@@ -149,7 +149,7 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   // Note: no asymmetric frustum for Rift.
   // z value (0.50) determines fov. Eyeballed. TODO: hmd frustum
   ray_out = normalize(vec3(gl_ModelViewMatrix * vec4(p, 0.50, 0.0)));
-#else  // ST_OCULUS
+#else  // !ST_OCULUS
 #if defined(ST_INTERLACED)
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4( 2.0 * (fract(gl_FragCoord.y * 0.5) - .5) * speed, 0, 0, 0));
 #elif defined(ST_ANAGLYPH)
@@ -157,18 +157,18 @@ bool setup_ray(vec3 eye, vec3 ray, OUT_(vec3,eye_out), OUT_(vec3,ray_out)) {
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(id * speed, 0, 0, 0));
 #else  // ST_INTERLACED
   vec3 eye_d = vec3(gl_ModelViewMatrix * vec4(speed, 0, 0, 0));
-#endif  // ST_INTERLACED
+#endif  // !ST_INTERLACED
   eye_out = eye + eye_d;
   // Construct asymmetric frustum.
   ray_out = normalize(ray * (focus + 30.0) * abs(speed) - eye_d);
-#endif // ST_OCULUS
+#endif // !ST_OCULUS
 #else  // ST_NONE
   eye_out = eye;
   ray_out = normalize(ray);
 #endif
 
   return true;
-#endif  // ST_COMPUTE_DE_ONLY
+#endif  // !ST_COMPUTE_DE_ONLY
 }
 
 void write_pixel(vec3 ray, float z, vec3 finalCol) {
